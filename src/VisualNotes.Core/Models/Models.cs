@@ -146,7 +146,18 @@ public sealed class CaptureAnalysis : Entity
     public string ExtractedText { get; set; } = string.Empty;
     public string? Summary { get; set; }
     public string? RawResultRelativePath { get; set; }
+    /// <summary>Exact provider response, when the active privacy policy permits retention.</summary>
+    public string? OriginalResponseJson { get; private set; }
+    /// <summary>Canonical JSON produced only after strict schema validation.</summary>
+    public string? NormalizedResponseJson { get; private set; }
     public ICollection<VisualRegion> Regions { get; set; } = [];
+
+    public void SetStructuredResponse(Services.ValidatedAnalysisResponse response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        OriginalResponseJson = response.OriginalJson;
+        NormalizedResponseJson = response.NormalizedJson;
+    }
 }
 
 public sealed class VisualRegion : Entity
