@@ -5,10 +5,12 @@ using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using VisualNotes.Infrastructure.Documents;
 
 BenchmarkRunner.Run<DocumentBenchmarks>();
 BenchmarkRunner.Run<ScreenshotStorageBenchmarks>();
 BenchmarkRunner.Run<CaptureListBenchmarks>();
+BenchmarkRunner.Run<OpenXmlExportBenchmarks>();
 
 [MemoryDiagnoser]
 public class DocumentBenchmarks
@@ -59,4 +61,30 @@ public class CaptureListBenchmarks
 
     [Benchmark(Description = "Scroll virtualizado (40 ventanas)")]
     public int ScrollWindows() => Enumerable.Range(0, 40).Sum(page => _library.Captures.Skip(page * 20).Take(30).Count());
+}
+
+[MemoryDiagnoser]
+public class OpenXmlExportBenchmarks
+{
+    private readonly string _path = Path.Combine(Path.GetTempPath(), "visual-notes-large.docx");
+    private SemanticDocument _document = null!;
+
+    [Params(100, 1_000)] public int Paragraphs { get; set; }
+
+    [GlobalSetup]
+    public void Setup() => _document = new SemanticDocument("Documento grande",
+    [new("large", SemanticNodeType.Section, SemanticContentOrigin.Observed, "Rendimiento", [],
+        Enumerable.Range(0, Paragraphs).Select(i => new SemanticNode($"p:{i}", SemanticNodeType.Paragraph,
+            SemanticContentOrigin.Observed, $"Párrafo {i}: {new string('x', 500)}")).ToArray())]);
+
+    [Benchmark(Description = "DOCX grande: tiempo, memoria y tamaño")]
+    public async Task<long> ExportLargeDocument()
+    {
+        var result = await new OpenXmlDocumentExporter().ExportAsync(new(_document, _path, new(Cover: false),
+            ConfirmOverwrite: (_, _) => ValueTask.FromResult(true)));
+        return result.Bytes;
+    }
+
+    [GlobalCleanup]
+    public void Cleanup() { if (File.Exists(_path)) File.Delete(_path); }
 }
