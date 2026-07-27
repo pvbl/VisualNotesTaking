@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "description": "Conjunto determinista y etiquetado para proteger contenido útil frente a falsos positivos.",
+  "cases": [
+    { "id": "same-bytes", "exactA": "abc", "exactB": "abc", "hashA": "0000000000000000", "hashB": "0000000000000000", "duplicate": true },
+    { "id": "minor-compression", "exactA": "abc", "exactB": "def", "hashA": "0000000000000000", "hashB": "0000000000000003", "duplicate": true },
+    { "id": "minor-cursor", "exactA": "abc", "exactB": "ghi", "hashA": "f0f0f0f0f0f0f0f0", "hashB": "f0f0f0f0f0f0f0f1", "duplicate": true },
+    { "id": "progressive-slide", "exactA": "abc", "exactB": "jkl", "hashA": "0000000000000000", "hashB": "000000000000003f", "duplicate": false },
+    { "id": "different-code", "exactA": "abc", "exactB": "mno", "hashA": "0000000000000000", "hashB": "000000000000ffff", "duplicate": false },
+    { "id": "visually-close-useful", "exactA": "abc", "exactB": "pqr", "hashA": "aaaaaaaaaaaaaaaa", "hashB": "aaaaaaaaaaaaaaa5", "duplicate": false },
+    { "id": "different-page", "exactA": "abc", "exactB": "stu", "hashA": "0123456789abcdef", "hashB": "fedcba9876543210", "duplicate": false }
+  ]
+}

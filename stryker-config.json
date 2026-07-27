@@ -4,7 +4,8 @@
     "test-projects": ["tests/VisualNotes.UnitTests/VisualNotes.UnitTests.csproj"],
     "mutate": [
       "**/BoundingBoxNormalizer.cs",
-      "**/SyntheticImageCropper.cs"
+      "**/SyntheticImageCropper.cs",
+      "**/CaptureDuplicateDetection.cs"
     ],
     "thresholds": { "high": 90, "low": 75, "break": 60 }
   }

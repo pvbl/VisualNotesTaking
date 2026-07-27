@@ -56,6 +56,26 @@ public sealed class CaptureLibrary
         capture.ProcessingStatus = ScreenshotStatus.Excluded;
     });
 
+    public void ResolveDuplicate(Guid retainedId, IReadOnlyCollection<Guid> duplicateIds, DuplicateResolution resolution)
+    {
+        if (_captures.All(capture => capture.Id != retainedId)) throw new ArgumentException("Retained capture was not found.", nameof(retainedId));
+        if (duplicateIds.Contains(retainedId)) throw new ArgumentException("The retained capture cannot also be a duplicate.", nameof(duplicateIds));
+        if (resolution == DuplicateResolution.Keep) return;
+
+        Save(duplicateIds.Append(retainedId).ToArray());
+        var retained = _captures.Single(capture => capture.Id == retainedId);
+        foreach (var duplicate in _captures.Where(capture => duplicateIds.Contains(capture.Id)))
+        {
+            duplicate.IncludeInDocument = false;
+            duplicate.ProcessingStatus = ScreenshotStatus.Excluded;
+            if (resolution == DuplicateResolution.Combine)
+            {
+                retained.Tags = MergeCommaSeparated(retained.Tags, duplicate.Tags);
+                retained.UserContext = string.Join(Environment.NewLine, new[] { retained.UserContext, duplicate.UserContext }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            }
+        }
+    }
+
     public void Delete(IReadOnlyCollection<Guid> ids) =>
         Mutate(ids, capture => capture.Status = EntityStatus.Deleted);
 
@@ -80,6 +100,8 @@ public sealed class CaptureLibrary
             capture.Status = state.Status;
             capture.ProcessingStatus = state.ProcessingStatus;
             capture.IncludeInDocument = state.IncludeInDocument;
+            capture.Tags = state.Tags;
+            capture.UserContext = state.UserContext;
         }
         _captures.Sort((left, right) => Index(states, left.Id).CompareTo(Index(states, right.Id)));
         return true;
@@ -95,10 +117,15 @@ public sealed class CaptureLibrary
     {
         if (ids.Count == 0) return;
         _undo.Push(_captures.Select((capture, index) => new CaptureState(capture.Id, index, capture.SectionId,
-            capture.Status, capture.ProcessingStatus, capture.IncludeInDocument)).ToArray());
+            capture.Status, capture.ProcessingStatus, capture.IncludeInDocument, capture.Tags, capture.UserContext)).ToArray());
     }
 
     private static int Index(IReadOnlyList<CaptureState> states, Guid id) => states.Single(state => state.Id == id).Index;
     private static IEnumerable<string> Tags(Screenshot capture) => capture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-    private sealed record CaptureState(Guid Id, int Index, Guid? SectionId, EntityStatus Status, ScreenshotStatus ProcessingStatus, bool IncludeInDocument);
+    private static string MergeCommaSeparated(string left, string right) => string.Join(", ",
+        left.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Concat(right.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Distinct(StringComparer.OrdinalIgnoreCase));
+    private sealed record CaptureState(Guid Id, int Index, Guid? SectionId, EntityStatus Status, ScreenshotStatus ProcessingStatus,
+        bool IncludeInDocument, string Tags, string UserContext);
 }
