@@ -1,21 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-  </PropertyGroup>
+  <PropertyGroup><IsPackable>false</IsPackable><IsTestProject>true</IsTestProject></PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Verify.Xunit" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
-    <ProjectReference Include="..\..\src\VisualNotes.App\VisualNotes.App.csproj" />
     <ProjectReference Include="..\..\src\VisualNotes.Core\VisualNotes.Core.csproj" />
     <ProjectReference Include="..\..\src\VisualNotes.Infrastructure\VisualNotes.Infrastructure.csproj" />
+    <Compile Include="..\Shared\Fixtures\*.cs" Link="Fixtures\%(Filename)%(Extension)" />
+    <Compile Include="..\Shared\Infrastructure\*.cs" Link="Infrastructure\%(Filename)%(Extension)" />
+    <Compile Include="..\Shared\Utilities\*.cs" Link="Utilities\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

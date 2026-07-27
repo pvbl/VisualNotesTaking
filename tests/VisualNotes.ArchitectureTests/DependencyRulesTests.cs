@@ -1,8 +1,10 @@
 using NetArchTest.Rules;
+using Shouldly;
 using Xunit;
 
 namespace VisualNotes.ArchitectureTests;
 
+[Trait("Category", "Architecture")]
 public sealed class DependencyRulesTests
 {
     private static readonly string[] InfrastructureOnlyNamespaces =
@@ -67,5 +69,5 @@ public sealed class DependencyRulesTests
     }
 
     private static void AssertSuccessful(TestResult result) =>
-        Assert.True(result.IsSuccessful, $"Forbidden dependencies: {string.Join(", ", result.FailingTypeNames ?? [])}");
+        result.IsSuccessful.ShouldBeTrue($"Forbidden dependencies: {string.Join(", ", result.FailingTypeNames ?? [])}");
 }

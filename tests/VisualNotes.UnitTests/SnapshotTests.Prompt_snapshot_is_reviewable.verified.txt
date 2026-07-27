@@ -1,0 +1,1 @@
+Analiza la captura y devuelve texto estructurado en español.
