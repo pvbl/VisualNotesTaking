@@ -11,7 +11,9 @@
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Verify.Xunit" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <PackageReference Include="FsCheck.Xunit" />
     <ProjectReference Include="..\..\src\VisualNotes.Core\VisualNotes.Core.csproj" />
+    <ProjectReference Include="..\..\src\VisualNotes.Infrastructure\VisualNotes.Infrastructure.csproj" />
     <Compile Include="..\Shared\Fixtures\*.cs" Link="Fixtures\%(Filename)%(Extension)" />
     <Compile Include="..\Shared\Utilities\*.cs" Link="Utilities\%(Filename)%(Extension)" />
   </ItemGroup>
