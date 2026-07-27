@@ -52,3 +52,15 @@ Se requiere Windows 10/11 o Windows Server con .NET 8 SDK y una sesión de escri
 ## Jobs independientes
 
 En pull requests, `core-tests` ejecuta unitarias, arquitectura e integración. `ui-tests`, `mutations` y `benchmarks` son jobs separados para aislar requisitos, duración y resultados. Para benchmarks locales: `dotnet run -c Release --project tests/VisualNotes.Benchmarks`.
+
+## Matriz manual de captura y DPI
+
+Antes de publicar cambios de captura, repita en una sesión interactiva de Windows con escalado de **100 %, 125 %, 150 % y 200 %**:
+
+1. Coloque un monitor a la izquierda y otro por encima del principal (orígenes negativos), y asigne escalados distintos.
+2. Compruebe `FullVirtualDesktop`, `CurrentMonitor` y `ActiveWindow` contra un patrón de color conocido.
+3. En `OneTimeRegion`, arrastre dentro de cada monitor y cruzando monitores; compruebe confirmar, `Enter`, cancelar, `Esc` y reiniciar (`R`).
+4. Verifique píxel a píxel las dimensiones y que overlay, borde y panel de VisualNotes no estén en el PNG.
+5. Compruebe que los metadatos conservan dispositivo, HWND/título, rectángulo físico, DPI, dimensiones, modo y fecha UTC.
+
+Registre el hardware, resolución, disposición, escalados y resultado en la incidencia de entrega. Estas comprobaciones necesitan una sesión de escritorio real y no se sustituyen por el job de CI sin escritorio.
