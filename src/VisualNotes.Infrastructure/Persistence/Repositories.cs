@@ -15,7 +15,7 @@ public sealed class SessionRepository(VisualNotesDbContext db) : ISessionReposit
 
 public sealed class ScreenshotRepository(VisualNotesDbContext db) : IScreenshotRepository
 {
-    public Task<Screenshot?> GetAsync(Guid id, CancellationToken ct = default) => db.Screenshots.Include(x => x.Image).Include(x => x.Context).SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<Screenshot?> GetAsync(Guid id, CancellationToken ct = default) => db.Screenshots.Include(x => x.Image).Include(x => x.Context).Include(x => x.Revisions).SingleOrDefaultAsync(x => x.Id == id, ct);
     public async Task<IReadOnlyList<Screenshot>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default) => await db.Screenshots.AsNoTracking().Include(x => x.Image).Where(x => x.SessionId == sessionId).OrderBy(x => x.CapturedAt).ToListAsync(ct);
     public Task AddAsync(Screenshot screenshot, CancellationToken ct = default) => db.Screenshots.AddAsync(screenshot, ct).AsTask();
 }

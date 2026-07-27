@@ -89,6 +89,29 @@ public sealed class SessionCoordinator(ISessionRepository sessions, IScreenshotR
         await SaveAndRememberAsync(session.Id, ct);
     }
 
+    public async Task SaveCaptureMetadataAsync(Screenshot capture, CancellationToken ct = default)
+    {
+        capture.Revisions.Add(new CaptureRevision
+        {
+            ScreenshotId = capture.Id, RevisionNumber = capture.Revisions.Count + 1,
+            UserContext = capture.UserContext, CaptureInstruction = capture.CaptureInstruction,
+            Tags = capture.Tags, Importance = capture.Importance, IncludeInDocument = capture.IncludeInDocument
+        });
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
+    public async Task ReanalyzeAsync(Screenshot capture, CancellationToken ct = default)
+    {
+        capture.ProcessingStatus = ScreenshotStatus.Queued;
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
+    public async Task RegenerateNoteAsync(Screenshot capture, CancellationToken ct = default)
+    {
+        capture.ProcessingStatus = ScreenshotStatus.NeedsReview;
+        await unitOfWork.SaveChangesAsync(ct);
+    }
+
     private async Task SaveAndRememberAsync(Guid sessionId, CancellationToken ct)
     {
         await settings.SetAsync(LastOpenSessionKey, sessionId, cancellationToken: ct);

@@ -5,6 +5,7 @@
              xmlns:views="clr-namespace:VisualNotes.App.Views"
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     <DataTemplate DataType="{x:Type vm:SessionViewModel}"><views:SessionView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:CapturesViewModel}"><views:CapturesView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:InstructionsViewModel}"><views:InstructionsView /></DataTemplate>

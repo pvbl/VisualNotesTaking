@@ -4,6 +4,7 @@ public enum EntityStatus { Active, Archived, Deleted }
 public enum ScreenshotStatus { Captured, Queued, Analyzing, NeedsReview, Ready, Excluded, Failed }
 public enum AnalysisJobStatus { Pending, Running, Completed, Failed, Cancelled }
 public enum SessionProcessingStatus { Pending, Processing, Ready, Failed }
+public enum CaptureImportance { Normal, Important, Critical }
 
 public abstract class Entity
 {
@@ -75,7 +76,26 @@ public sealed class Screenshot : Entity
     public string? PerceptualHash { get; set; }
     public ScreenshotImage? Image { get; set; }
     public ScreenshotContext? Context { get; set; }
+    public string UserContext { get; set; } = string.Empty;
+    public string CaptureInstruction { get; set; } = string.Empty;
+    public string Tags { get; set; } = string.Empty;
+    public CaptureImportance Importance { get; set; }
+    public bool IncludeInDocument { get; set; } = true;
+    public ICollection<CaptureRevision> Revisions { get; set; } = [];
     public ICollection<AnalysisJob> AnalysisJobs { get; set; } = [];
+}
+
+/// <summary>Immutable snapshot created whenever editable capture metadata is saved.</summary>
+public sealed class CaptureRevision : Entity
+{
+    public Guid ScreenshotId { get; set; }
+    public Screenshot? Screenshot { get; set; }
+    public int RevisionNumber { get; set; }
+    public string UserContext { get; set; } = string.Empty;
+    public string CaptureInstruction { get; set; } = string.Empty;
+    public string Tags { get; set; } = string.Empty;
+    public CaptureImportance Importance { get; set; }
+    public bool IncludeInDocument { get; set; } = true;
 }
 
 public sealed class ScreenshotImage : Entity
