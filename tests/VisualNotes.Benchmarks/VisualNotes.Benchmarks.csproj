@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><IsPackable>false</IsPackable></PropertyGroup>
-  <ItemGroup><PackageReference Include="BenchmarkDotNet" /><ProjectReference Include="..\..\src\VisualNotes.Core\VisualNotes.Core.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="BenchmarkDotNet" /><PackageReference Include="SixLabors.ImageSharp" /><ProjectReference Include="..\..\src\VisualNotes.Core\VisualNotes.Core.csproj" /><ProjectReference Include="..\..\src\VisualNotes.Infrastructure\VisualNotes.Infrastructure.csproj" /></ItemGroup>
 </Project>
