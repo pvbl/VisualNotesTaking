@@ -24,6 +24,8 @@ public sealed class SessionBackupService(VisualNotesDbContext db, string dataDir
                 await using var command = sanitized.CreateCommand();
                 command.CommandText = "DELETE FROM Settings WHERE IsSecret = 1; UPDATE ProviderProfiles SET ApiKeyReference = NULL;";
                 await command.ExecuteNonQueryAsync(ct);
+                command.CommandText = "VACUUM;";
+                await command.ExecuteNonQueryAsync(ct);
             }
 
             using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true);

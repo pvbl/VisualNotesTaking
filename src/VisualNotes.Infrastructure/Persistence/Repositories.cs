@@ -38,6 +38,6 @@ public sealed class ProviderProfileRepository(VisualNotesDbContext db) : IProvid
 public sealed class SettingsRepository(VisualNotesDbContext db) : ISettingsRepository
 {
     public async Task<T?> GetAsync<T>(string key, CancellationToken ct = default) { var item = await db.Settings.AsNoTracking().SingleOrDefaultAsync(x => x.Key == key, ct); return item is null ? default : JsonSerializer.Deserialize<T>(item.JsonValue); }
-    public async Task SetAsync<T>(string key, T value, bool isSecret = false, CancellationToken ct = default) { var item = await db.Settings.SingleOrDefaultAsync(x => x.Key == key, ct); if (item is null) { item = new AppSetting { Key = key }; await db.Settings.AddAsync(item, ct); } item.JsonValue = JsonSerializer.Serialize(value); item.IsSecret = isSecret; }
+    public async Task SetAsync<T>(string key, T value, bool isSecret = false, CancellationToken ct = default) { if (isSecret) throw new InvalidOperationException("Secrets must be stored through IApiCredentialStore."); var item = await db.Settings.SingleOrDefaultAsync(x => x.Key == key, ct); if (item is null) { item = new AppSetting { Key = key }; await db.Settings.AddAsync(item, ct); } item.JsonValue = JsonSerializer.Serialize(value); item.IsSecret = false; }
 }
 public sealed class UnitOfWork(VisualNotesDbContext db) : IUnitOfWork { public Task<int> SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct); }

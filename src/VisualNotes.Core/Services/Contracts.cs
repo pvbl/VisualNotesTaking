@@ -28,6 +28,19 @@ public interface ISettingsStore
     Task SetAsync<T>(string key, T value, CancellationToken cancellationToken = default);
 }
 
+/// <summary>Purpose-specific API credentials. Implementations must use an OS-protected store.</summary>
+public interface IApiCredentialStore
+{
+    Task SaveAsync(ApiCredentialProfile profile, string credential, CancellationToken cancellationToken = default);
+    Task<bool> ExistsAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default);
+    Task<string?> GetAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default);
+    Task<bool> VerifyAsync(ApiCredentialProfile profile, string candidate, CancellationToken cancellationToken = default);
+    Task DeleteAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default);
+    Task<string?> GetMaskedAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default);
+}
+
+public enum ApiCredentialProfile { Extraction, Composition }
+
 public interface IScreenshotStorageService
 {
     Task<StoredScreenshot> StoreAsync(ScreenshotStorageRequest request, CancellationToken cancellationToken = default);

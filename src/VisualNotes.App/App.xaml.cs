@@ -38,7 +38,7 @@ public partial class App : System.Windows.Application
             return;
         }
         _hotkeys = new GlobalHotkeyService(new WindowsGlobalHotkeyAdapter());
-        _viewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions, _hotkeys);
+        _viewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions, _hotkeys, _runtime.ApiCredentials);
         _hotkeys.HotkeyInvoked += OnHotkeyInvoked;
         var hotkeyResult = _hotkeys.Apply(SettingsViewModel.DefaultBindings());
         if (!hotkeyResult.Succeeded)

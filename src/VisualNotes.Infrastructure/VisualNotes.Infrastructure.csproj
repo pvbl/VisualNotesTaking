@@ -4,5 +4,6 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design"><PrivateAssets>all</PrivateAssets></PackageReference>
     <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
 </Project>
