@@ -1,0 +1,10 @@
+<UserControl x:Class="VisualNotes.App.Views.InstructionsView"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <StackPanel>
+  <TextBlock Text="Instrucciones" FontSize="32" FontWeight="SemiBold" Foreground="#172033"/>
+  <TextBlock Text="Define cómo se debe analizar y redactar el contenido." FontSize="16" Foreground="#64748B" Margin="0,8,0,30"/>
+  <Border Background="White" CornerRadius="10" Padding="28">
+   <TextBlock Text="Escribe aquí tus instrucciones para el análisis…" FontSize="17" Foreground="#334155" TextWrapping="Wrap"/>
+  </Border>
+ </StackPanel>
+</UserControl>
