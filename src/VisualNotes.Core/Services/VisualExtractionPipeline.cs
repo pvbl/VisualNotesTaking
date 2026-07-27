@@ -29,7 +29,8 @@ public interface IExtractionArtifactStore
 public sealed class VisualExtractionPipeline(
     IVisualSourceNormalizer normalizer,
     IVisionLanguageModelProvider visionModel,
-    IExtractionArtifactStore artifacts)
+    IExtractionArtifactStore artifacts,
+    BoundingBoxNormalizationOptions? boundingBoxOptions = null)
 {
     public async Task<ExtractionPipelineResult> ExtractAsync(
         VisualSource source, LanguageModelOptions options, CancellationToken cancellationToken = default)
@@ -47,16 +48,25 @@ public sealed class VisualExtractionPipeline(
         var validated = StructuredAnalysisResponseParser.Parse(modelResponse.Text, new(false));
         var extractionId = await artifacts.SaveExtractionAsync(validated.NormalizedJson, cancellationToken).ConfigureAwait(false);
         var crops = new List<PersistedCrop>();
-        foreach (var region in validated.Value.Regions)
+        var normalizedRegions = validated.Value.Regions.Select(region => (region.Label, Result:
+            BoundingBoxNormalizer.Normalize(region.Box, validated.Value.CoordinateSystem, normalized.Width, normalized.Height, boundingBoxOptions))).ToArray();
+        var consolidated = BoundingBoxNormalizer.Consolidate(normalizedRegions.Select(region => region.Result.Pixels));
+        foreach (var pixels in consolidated)
         {
-            var pixels = CoordinateConverter.ToPixels(region.Box, validated.Value.CoordinateSystem, normalized.Width, normalized.Height);
-            var crop = SyntheticImageCropper.Crop(normalized.RgbaPixels.Span, normalized.Width, normalized.Height, pixels);
-            var path = await artifacts.SaveCropAsync(extractionId, region.Label, pixels, crop, cancellationToken).ConfigureAwait(false);
-            crops.Add(new(region.Label, pixels, path));
+            var crop = VisualRegionCropper.Crop(normalized.RgbaPixels.Span, normalized.Width, normalized.Height, pixels);
+            var labels = normalizedRegions.Where(region => Overlaps(region.Result.Pixels, pixels)).Select(region => region.Label);
+            var label = string.Join(" + ", labels);
+            var path = await artifacts.SaveCropAsync(extractionId, label, pixels, crop, cancellationToken).ConfigureAwait(false);
+            crops.Add(new(label, pixels, path));
         }
 
         var persisted = new PersistedExtraction(extractionId, validated.NormalizedJson, crops);
-        return new(persisted, ComposeNote(validated.Value, crops), validated.Value);
+        var clippingWarnings = normalizedRegions.SelectMany(region => region.Result.Warnings).Distinct().ToArray();
+        var response = clippingWarnings.Length == 0 ? validated.Value : validated.Value with
+        {
+            Warnings = validated.Value.Warnings.Concat(clippingWarnings).ToArray()
+        };
+        return new(persisted, ComposeNote(response, crops), response);
     }
 
     public async Task<string> RegenerateNoteAsync(string extractionId, CancellationToken cancellationToken = default)
@@ -115,23 +125,15 @@ public sealed class VisualExtractionPipeline(
         if (source.Width <= 0 || source.Height <= 0 || source.RgbaPixels.Length != checked(source.Width * source.Height * 4))
             throw new ArgumentException("Normalizer must return tightly packed RGBA pixels with positive dimensions.", nameof(source));
     }
+
+    private static bool Overlaps(PhysicalRectangle first, PhysicalRectangle second) =>
+        first.X < second.Right && second.X < first.Right && first.Y < second.Bottom && second.Y < first.Bottom;
 }
 
 public static class CoordinateConverter
 {
     public static PhysicalRectangle ToPixels(BoundingBox box, CoordinateSystem system, int width, int height)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        var divisor = system switch { CoordinateSystem.Normalized01 => 1d, CoordinateSystem.Normalized1000 => 1000d, CoordinateSystem.Pixels => 0d, _ => throw new ArgumentOutOfRangeException(nameof(system)) };
-        var x1 = system == CoordinateSystem.Pixels ? box.XMin : box.XMin / divisor * width;
-        var y1 = system == CoordinateSystem.Pixels ? box.YMin : box.YMin / divisor * height;
-        var x2 = system == CoordinateSystem.Pixels ? box.XMax : box.XMax / divisor * width;
-        var y2 = system == CoordinateSystem.Pixels ? box.YMax : box.YMax / divisor * height;
-        var left = Math.Clamp((int)Math.Floor(x1), 0, width - 1);
-        var top = Math.Clamp((int)Math.Floor(y1), 0, height - 1);
-        var right = Math.Clamp((int)Math.Ceiling(x2), left + 1, width);
-        var bottom = Math.Clamp((int)Math.Ceiling(y2), top + 1, height);
-        return new(left, top, right - left, bottom - top);
+        return BoundingBoxNormalizer.Normalize(box, system, width, height, new(MinimumWidth: 1, MinimumHeight: 1)).Pixels;
     }
 }

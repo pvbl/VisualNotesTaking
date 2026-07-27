@@ -43,6 +43,11 @@ public sealed class RegionSelectionController
         if (!ScreenCaptureGeometry.IsValid(value)) throw new ArgumentOutOfRangeException(nameof(value));
         Selection = value; State = RegionSelectionState.Selected;
     }
+    public bool Delete()
+    {
+        if (IsLocked || Selection is null) return false;
+        _origin = null; Selection = null; State = RegionSelectionState.Selecting; return true;
+    }
     public void SetLocked(bool value) => IsLocked = value;
     public void SetHidden(bool value) => IsHidden = value;
     public void Reset() { _origin = null; Selection = null; IsLocked = false; IsHidden = false; State = RegionSelectionState.Selecting; }

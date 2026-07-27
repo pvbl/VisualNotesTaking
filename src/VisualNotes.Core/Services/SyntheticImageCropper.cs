@@ -19,3 +19,10 @@ public static class SyntheticImageCropper
         return result;
     }
 }
+
+/// <summary>Safe crop primitive for normalized visual regions.</summary>
+public static class VisualRegionCropper
+{
+    public static byte[] Crop(ReadOnlySpan<byte> source, int sourceWidth, int sourceHeight, PhysicalRectangle region) =>
+        SyntheticImageCropper.Crop(source, sourceWidth, sourceHeight, region);
+}

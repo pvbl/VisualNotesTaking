@@ -68,10 +68,10 @@ public static class StructuredAnalysisResponseParser
             var value = new StructuredAnalysisResponse(
                 RequiredString(root, "language"), RequiredString(root, "contentType"),
                 RequiredString(root, "title"), RequiredString(root, "summary"),
-                RequiredString(root, "transcription"), Blocks(root, "code", ContentBlockType.Code, coordinateSystem),
-                Blocks(root, "equations", ContentBlockType.Equation, coordinateSystem),
-                Blocks(root, "tables", ContentBlockType.Table, coordinateSystem), coordinateSystem,
-                Regions(root, coordinateSystem), Strings(root, "concepts"), Confidence(root, "confidence"),
+                RequiredString(root, "transcription"), Blocks(root, "code", ContentBlockType.Code),
+                Blocks(root, "equations", ContentBlockType.Equation),
+                Blocks(root, "tables", ContentBlockType.Table), coordinateSystem,
+                Regions(root), Strings(root, "concepts"), Confidence(root, "confidence"),
                 Strings(root, "warnings"));
 
             var normalized = JsonSerializer.Serialize(value, _jsonOptions);
@@ -95,7 +95,7 @@ public static class StructuredAnalysisResponseParser
         return options;
     }
 
-    private static IReadOnlyList<ContentBlock> Blocks(JsonElement root, string name, ContentBlockType expected, CoordinateSystem system)
+    private static IReadOnlyList<ContentBlock> Blocks(JsonElement root, string name, ContentBlockType expected)
     {
         var array = RequiredArray(root, name);
         var result = new List<ContentBlock>();
@@ -104,18 +104,18 @@ public static class StructuredAnalysisResponseParser
             RequireObject(item, name);
             var type = EnumValue<ContentBlockType>(RequiredString(item, "type"), $"{name}.type");
             if (type != expected) throw Invalid($"Items in '{name}' must have type '{expected}'.");
-            result.Add(new(type, RequiredString(item, "content"), OptionalBox(item, system)));
+            result.Add(new(type, RequiredString(item, "content"), OptionalBox(item)));
         }
         return result;
     }
 
-    private static IReadOnlyList<AnalysisRegion> Regions(JsonElement root, CoordinateSystem system)
+    private static IReadOnlyList<AnalysisRegion> Regions(JsonElement root)
     {
         var result = new List<AnalysisRegion>();
         foreach (var item in Bounded(RequiredArray(root, "regions"), "regions"))
         {
             RequireObject(item, "regions");
-            result.Add(new(RequiredString(item, "label"), RequiredBox(item, system), Confidence(item, "confidence")));
+            result.Add(new(RequiredString(item, "label"), RequiredBox(item), Confidence(item, "confidence")));
         }
         return result;
     }
@@ -124,18 +124,17 @@ public static class StructuredAnalysisResponseParser
         Bounded(RequiredArray(root, name), name).Select((item, index) => item.ValueKind == JsonValueKind.String
             ? item.GetString()! : throw Invalid($"'{name}[{index}]' must be a string.")).ToArray();
 
-    private static BoundingBox? OptionalBox(JsonElement item, CoordinateSystem system) =>
-        item.TryGetProperty("box", out var box) && box.ValueKind != JsonValueKind.Null ? Box(box, system) : null;
-    private static BoundingBox RequiredBox(JsonElement item, CoordinateSystem system) =>
-        item.TryGetProperty("box", out var box) ? Box(box, system) : throw Invalid("Required property 'box' is missing.");
+    private static BoundingBox? OptionalBox(JsonElement item) =>
+        item.TryGetProperty("box", out var box) && box.ValueKind != JsonValueKind.Null ? Box(box) : null;
+    private static BoundingBox RequiredBox(JsonElement item) =>
+        item.TryGetProperty("box", out var box) ? Box(box) : throw Invalid("Required property 'box' is missing.");
 
-    private static BoundingBox Box(JsonElement element, CoordinateSystem system)
+    private static BoundingBox Box(JsonElement element)
     {
         RequireObject(element, "box");
         var box = new BoundingBox(Number(element, "YMin"), Number(element, "XMin"), Number(element, "YMax"), Number(element, "XMax"));
-        var max = system switch { CoordinateSystem.Normalized01 => 1d, CoordinateSystem.Normalized1000 => 1000d, _ => double.MaxValue };
-        if (box.YMin < 0 || box.XMin < 0 || box.YMax > max || box.XMax > max || box.YMin >= box.YMax || box.XMin >= box.XMax)
-            throw Invalid("Box coordinates are outside their coordinate system or inverted.");
+        if (box.YMin >= box.YMax || box.XMin >= box.XMax)
+            throw Invalid("Box coordinates are empty or inverted.");
         return box;
     }
 

@@ -47,4 +47,15 @@ public sealed class RegionSelectionUiTests
         captureRequest.Region.ShouldBe(new PhysicalRectangle(50, 60, 800, 450));
         captureRequest.Region.Width.ShouldNotBe(800 + visualBorderThickness * 2);
     }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Selected_region_can_be_deleted_unless_locked()
+    {
+        var selection = new RegionSelectionController();
+        selection.SetSelection(new(10, 10, 20, 20));
+        selection.Delete().ShouldBeTrue();
+        selection.Selection.ShouldBeNull();
+        selection.SetSelection(new(10, 10, 20, 20)); selection.SetLocked(true);
+        selection.Delete().ShouldBeFalse();
+    }
 }
