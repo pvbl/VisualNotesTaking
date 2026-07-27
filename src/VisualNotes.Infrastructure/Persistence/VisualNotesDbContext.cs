@@ -13,6 +13,7 @@ public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> 
     public DbSet<ScreenshotContext> ScreenshotContexts => Set<ScreenshotContext>();
     public DbSet<CaptureRevision> CaptureRevisions => Set<CaptureRevision>();
     public DbSet<AnalysisJob> AnalysisJobs => Set<AnalysisJob>();
+    public DbSet<AnalysisJobAttempt> AnalysisJobAttempts => Set<AnalysisJobAttempt>();
     public DbSet<CaptureAnalysis> CaptureAnalyses => Set<CaptureAnalysis>();
     public DbSet<VisualRegion> VisualRegions => Set<VisualRegion>();
     public DbSet<GeneratedNote> GeneratedNotes => Set<GeneratedNote>();
@@ -41,6 +42,10 @@ public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> 
         modelBuilder.Entity<CaptureRevision>().HasIndex(x => new { x.ScreenshotId, x.RevisionNumber }).IsUnique();
         modelBuilder.Entity<Screenshot>().HasMany(x => x.Revisions).WithOne(x => x.Screenshot).HasForeignKey(x => x.ScreenshotId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<AnalysisJob>().HasOne(x => x.Result).WithOne(x => x.AnalysisJob).HasForeignKey<CaptureAnalysis>(x => x.AnalysisJobId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AnalysisJob>().HasIndex(x => x.IdempotencyKey).IsUnique();
+        modelBuilder.Entity<AnalysisJob>().HasIndex(x => new { x.JobStatus, x.NextAttemptAt });
+        modelBuilder.Entity<AnalysisJobAttempt>().HasIndex(x => new { x.AnalysisJobId, x.AttemptNumber }).IsUnique();
+        modelBuilder.Entity<AnalysisJob>().HasMany(x => x.AttemptHistory).WithOne(x => x.AnalysisJob).HasForeignKey(x => x.AnalysisJobId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<AppSetting>().HasIndex(x => x.Key).IsUnique();
         modelBuilder.Entity<ScreenshotImage>().Property(x => x.RelativePath).HasMaxLength(1024);
         modelBuilder.Entity<VisualRegion>().Property(x => x.CropRelativePath).HasMaxLength(1024);

@@ -3,6 +3,7 @@ namespace VisualNotes.Core.Models;
 public enum EntityStatus { Active, Archived, Deleted }
 public enum ScreenshotStatus { Captured, Queued, Analyzing, NeedsReview, Ready, Excluded, Failed }
 public enum AnalysisJobStatus { Pending, Running, Completed, Failed, Cancelled }
+public enum AnalysisJobTrigger { Automatic, Manual, Batch, SessionEnd }
 public enum SessionProcessingStatus { Pending, Processing, Ready, Failed }
 public enum CaptureImportance { Normal, Important, Critical }
 
@@ -132,11 +133,61 @@ public sealed class AnalysisJob : Entity
     public Guid? PromptProfileId { get; set; }
     public Guid? ProviderProfileId { get; set; }
     public AnalysisJobStatus JobStatus { get; set; } = AnalysisJobStatus.Pending;
+    public AnalysisJobTrigger Trigger { get; set; } = AnalysisJobTrigger.Automatic;
+    /// <summary>Stable caller supplied key. A unique database index prevents duplicate work.</summary>
+    public string IdempotencyKey { get; set; } = string.Empty;
     public int Attempts { get; set; }
+    public int MaximumAttempts { get; set; } = 3;
     public string? Error { get; set; }
+    public DateTimeOffset? NextAttemptAt { get; set; }
+    public DateTimeOffset? StartedAt { get; set; }
+    public DateTimeOffset? CompletedAt { get; set; }
+    public string? LeaseOwner { get; set; }
+    public DateTimeOffset? LeaseExpiresAt { get; set; }
     /// <summary>Template version and exact effective prompt used for this run; never contains provider secrets.</summary>
     public string? EffectivePromptSnapshotJson { get; set; }
     public CaptureAnalysis? Result { get; set; }
+    public ICollection<AnalysisJobAttempt> AttemptHistory { get; set; } = [];
+
+    public void Cancel(DateTimeOffset now)
+    {
+        if (JobStatus == AnalysisJobStatus.Completed) throw new InvalidOperationException("A completed job cannot be cancelled.");
+        JobStatus = AnalysisJobStatus.Cancelled;
+        CompletedAt = now;
+        ClearLease();
+    }
+
+    public void Retry(DateTimeOffset now)
+    {
+        if (JobStatus is not (AnalysisJobStatus.Failed or AnalysisJobStatus.Cancelled))
+            throw new InvalidOperationException("Only failed or cancelled jobs can be retried.");
+        JobStatus = AnalysisJobStatus.Pending;
+        Error = null;
+        NextAttemptAt = now;
+        CompletedAt = null;
+        ClearLease();
+    }
+
+    public void ChangeProvider(Guid providerProfileId)
+    {
+        if (JobStatus is AnalysisJobStatus.Running or AnalysisJobStatus.Completed)
+            throw new InvalidOperationException("The provider cannot be changed while running or after completion.");
+        ProviderProfileId = providerProfileId;
+    }
+
+    public void ClearLease() { LeaseOwner = null; LeaseExpiresAt = null; }
+}
+
+public sealed class AnalysisJobAttempt : Entity
+{
+    public Guid AnalysisJobId { get; set; }
+    public AnalysisJob? AnalysisJob { get; set; }
+    public int AttemptNumber { get; set; }
+    public Guid? ProviderProfileId { get; set; }
+    public DateTimeOffset StartedAt { get; set; }
+    public DateTimeOffset? FinishedAt { get; set; }
+    public string? Error { get; set; }
+    public DateTimeOffset? RetryAt { get; set; }
 }
 
 public sealed class CaptureAnalysis : Entity
