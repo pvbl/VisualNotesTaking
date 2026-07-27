@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
+using VisualNotes.Infrastructure.Security;
 
 namespace VisualNotes.Infrastructure;
 
@@ -17,11 +18,14 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         _database = database;
         Coordinator = coordinator;
         Sessions = sessions;
+        ApiCredentials = new WindowsDpapiCredentialStore();
     }
 
     public SessionCoordinator Coordinator { get; }
 
     public ISessionRepository Sessions { get; }
+
+    public IApiCredentialStore ApiCredentials { get; }
 
     public static async Task<VisualNotesRuntime> CreateAsync(
         string dataDirectory,

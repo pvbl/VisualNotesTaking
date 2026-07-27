@@ -30,10 +30,10 @@ public sealed class MainViewModel : ViewModelBase
 
     private readonly SettingsViewModel? _settings;
 
-    public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository, IGlobalHotkeyService? hotkeys = null)
+    public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository, IGlobalHotkeyService? hotkeys = null, IApiCredentialStore? credentials = null)
     {
         _coordinator = coordinator; _repository = repository;
-        _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys);
+        _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys, credentials);
         Sessions = new SessionViewModel(coordinator, repository, Activate);
         _currentViewModel = Sessions;
         NavigateCommand = new RelayCommand(page => CurrentViewModel = page switch
@@ -69,6 +69,7 @@ public sealed class MainViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
+        if (_settings is not null) await _settings.LoadCredentialsAsync();
         await Sessions.LoadAsync();
         var restored = await _coordinator.RestoreLastOpenAsync();
         if (restored is not null) Activate(restored);
@@ -200,6 +201,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private readonly Dictionary<SettingsLevel, SettingsValues> _layers = [];
     private string _conflictMessage = string.Empty;
     private SettingsLevel _selectedLevel = SettingsLevel.Global;
+    private readonly IApiCredentialStore? _credentials;
 
     public SettingsViewModel()
     {
@@ -207,11 +209,15 @@ public sealed class SettingsViewModel : ViewModelBase
         InitializeHierarchicalSettings();
     }
 
-    public SettingsViewModel(IGlobalHotkeyService hotkeys)
+    public SettingsViewModel(IGlobalHotkeyService hotkeys, IApiCredentialStore? credentials = null)
     {
         _hotkeys = hotkeys;
+        _credentials = credentials;
         Bindings = new(DefaultBindings().Select(binding => new HotkeyBindingEditor(binding)));
         SaveCommand = new RelayCommand(_ => Save());
+        SaveCredentialCommand = new RelayCommand(async value => await SaveCredentialAsync(value));
+        VerifyCredentialCommand = new RelayCommand(async value => await VerifyCredentialAsync(value));
+        DeleteCredentialCommand = new RelayCommand(async value => await DeleteCredentialAsync(value));
         InitializeHierarchicalSettings();
     }
 
@@ -219,6 +225,11 @@ public sealed class SettingsViewModel : ViewModelBase
     public string ConflictMessage { get => _conflictMessage; private set { _conflictMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasConflict)); } }
     public bool HasConflict => !string.IsNullOrEmpty(ConflictMessage);
     public ICommand SaveCommand { get; }
+    public ObservableCollection<ApiCredentialEditor> CredentialProfiles { get; } =
+        new(Enum.GetValues<ApiCredentialProfile>().Select(profile => new ApiCredentialEditor(profile)));
+    public ICommand SaveCredentialCommand { get; } = new RelayCommand(_ => { });
+    public ICommand VerifyCredentialCommand { get; } = new RelayCommand(_ => { });
+    public ICommand DeleteCredentialCommand { get; } = new RelayCommand(_ => { });
     public IReadOnlyList<SettingsLevel> Levels { get; } = Enum.GetValues<SettingsLevel>();
     public ObservableCollection<EffectiveSettingEditor> EffectiveValues { get; } = [];
     public SettingsLevel SelectedLevel
@@ -243,6 +254,37 @@ public sealed class SettingsViewModel : ViewModelBase
         ConflictMessage = result.Succeeded
             ? string.Empty
             : string.Join(Environment.NewLine, result.Conflicts.Select(conflict => conflict.Message).Distinct());
+    }
+
+    public async Task LoadCredentialsAsync()
+    {
+        if (_credentials is null) return;
+        foreach (var editor in CredentialProfiles) editor.MaskedValue = await _credentials.GetMaskedAsync(editor.Profile);
+    }
+
+    private async Task SaveCredentialAsync(object? value)
+    {
+        if (_credentials is null || value is not ApiCredentialEditor editor || string.IsNullOrWhiteSpace(editor.PendingValue)) return;
+        await _credentials.SaveAsync(editor.Profile, editor.PendingValue);
+        editor.PendingValue = string.Empty;
+        editor.MaskedValue = await _credentials.GetMaskedAsync(editor.Profile);
+        editor.Status = "Credencial guardada";
+    }
+
+    private async Task VerifyCredentialAsync(object? value)
+    {
+        if (_credentials is null || value is not ApiCredentialEditor editor || string.IsNullOrEmpty(editor.PendingValue)) return;
+        editor.Status = await _credentials.VerifyAsync(editor.Profile, editor.PendingValue) ? "Credencial válida" : "No coincide";
+        editor.PendingValue = string.Empty;
+    }
+
+    private async Task DeleteCredentialAsync(object? value)
+    {
+        if (_credentials is null || value is not ApiCredentialEditor editor) return;
+        await _credentials.DeleteAsync(editor.Profile);
+        editor.PendingValue = string.Empty;
+        editor.MaskedValue = null;
+        editor.Status = "Credencial eliminada";
     }
 
     private void InitializeHierarchicalSettings()
@@ -325,6 +367,18 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private static HotkeyBinding New(HotkeyAction action, char key) => New(action, (uint)key);
     private static HotkeyBinding New(HotkeyAction action, uint key) => new(action, new(HotkeyModifiers.Control | HotkeyModifiers.Shift, key));
+}
+
+public sealed class ApiCredentialEditor(ApiCredentialProfile profile) : ViewModelBase
+{
+    private string _pendingValue = string.Empty;
+    private string? _maskedValue;
+    private string _status = string.Empty;
+    public ApiCredentialProfile Profile { get; } = profile;
+    public string DisplayName => Profile == ApiCredentialProfile.Extraction ? "Extracción" : "Composición";
+    public string PendingValue { get => _pendingValue; set { _pendingValue = value; OnPropertyChanged(); } }
+    public string? MaskedValue { get => _maskedValue; set { _maskedValue = value; OnPropertyChanged(); } }
+    public string Status { get => _status; set { _status = value; OnPropertyChanged(); } }
 }
 
 public sealed class EffectiveSettingEditor(string key, string label, string value, string provenance) : ViewModelBase

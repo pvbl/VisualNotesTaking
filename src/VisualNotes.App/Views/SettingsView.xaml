@@ -27,6 +27,23 @@
     </ItemsControl>
    </StackPanel>
   </Border>
+  <Border Background="White" CornerRadius="10" Padding="28" Margin="0,0,0,18">
+   <StackPanel>
+    <TextBlock Text="Credenciales de API" FontSize="20" FontWeight="SemiBold" Foreground="#334155"/>
+    <TextBlock Text="Protegidas por Windows para el usuario actual. Nunca se muestra el valor guardado." Foreground="#64748B" Margin="0,4,0,14"/>
+    <ItemsControl ItemsSource="{Binding CredentialProfiles}"><ItemsControl.ItemTemplate><DataTemplate>
+     <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="130"/><ColumnDefinition Width="190"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="140"/></Grid.ColumnDefinitions>
+      <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+      <TextBlock Grid.Column="1" Text="{Binding MaskedValue, TargetNullValue=No configurada}" VerticalAlignment="Center"/>
+      <PasswordBox Grid.Column="2" PasswordChanged="CredentialPasswordChanged" Margin="4,0" AutomationProperties.Name="Nueva credencial"/>
+      <Button Grid.Column="3" Content="Guardar" Command="{Binding DataContext.SaveCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="3,0"/>
+      <Button Grid.Column="4" Content="Verificar" Command="{Binding DataContext.VerifyCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="3,0"/>
+      <Button Grid.Column="5" Content="Eliminar" Command="{Binding DataContext.DeleteCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="3,0"/>
+      <TextBlock Grid.Column="6" Text="{Binding Status}" VerticalAlignment="Center" Margin="8,0"/>
+     </Grid>
+    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+   </StackPanel>
+  </Border>
   <Border Background="White" CornerRadius="10" Padding="28">
    <StackPanel>
     <TextBlock Text="Atajos globales" FontSize="20" FontWeight="SemiBold" Foreground="#334155"/>
