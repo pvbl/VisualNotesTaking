@@ -1,0 +1,30 @@
+{
+  "language": "es",
+  "contentType": "chart",
+  "title": "Ventas",
+  "summary": "Ventas por trimestre",
+  "transcription": "Ventas por trimestre",
+  "code": [],
+  "equations": [],
+  "tables": [],
+  "coordinateSystem": "Normalized1000",
+  "regions": [
+    {
+      "label": "gráfica de barras",
+      "box": {
+        "YMin": 100,
+        "XMin": 80,
+        "YMax": 850,
+        "XMax": 920
+      },
+      "confidence": 0.93
+    }
+  ],
+  "concepts": [
+    "chart"
+  ],
+  "confidence": 0.93,
+  "warnings": [
+    "El valor de T4 está parcialmente oculto"
+  ]
+}

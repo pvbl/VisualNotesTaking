@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "datasetVersion": "1.0.0",
+  "license": "CC0-1.0",
+  "privacy": "Synthetic content only; no people, credentials, private paths, or production data.",
+  "cases": [
+    { "id": "video-player", "source": "synthetic video player frame", "expected": "cases/video-player.json" },
+    { "id": "powerpoint-slide", "source": "synthetic PowerPoint slide", "expected": "cases/powerpoint-slide.json" },
+    { "id": "jupyter-notebook", "source": "synthetic Jupyter notebook", "expected": "cases/jupyter-notebook.json" },
+    { "id": "vscode-editor", "source": "synthetic VS Code editor", "expected": "cases/vscode-editor.json" },
+    { "id": "formula-sheet", "source": "synthetic formula sheet", "expected": "cases/formula-sheet.json" },
+    { "id": "data-table", "source": "synthetic data table", "expected": "cases/data-table.json" },
+    { "id": "chart", "source": "synthetic chart", "expected": "cases/chart.json" },
+    { "id": "diagram", "source": "synthetic architecture diagram", "expected": "cases/diagram.json" }
+  ]
+}
