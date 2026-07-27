@@ -13,6 +13,14 @@
   <Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
     <Border Background="#172033" Padding="18">
+      <DockPanel>
+       <Border DockPanel.Dock="Bottom" Background="#243149" CornerRadius="8" Padding="12" Margin="0,16,0,0">
+        <StackPanel><TextBlock Text="SESIÓN ACTIVA" Foreground="#94A3B8" FontSize="10" FontWeight="Bold"/>
+         <TextBlock Text="{Binding ActiveSessionName}" Foreground="White" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
+         <TextBlock Text="{Binding ActiveSectionName, StringFormat=§ {0}}" Foreground="#7DD3FC" TextTrimming="CharacterEllipsis" Margin="0,3,0,8"/>
+         <Button Content="{Binding SessionStatus}" Command="{Binding TogglePauseCommand}" Padding="6"/>
+        </StackPanel>
+       </Border>
       <StackPanel>
         <TextBlock Text="VisualNotes" Foreground="White" FontSize="26" FontWeight="Bold" Margin="4,10,4,30"/>
         <Button Content="Sesión" Command="{Binding NavigateCommand}" CommandParameter="Session" Style="{StaticResource NavButton}"/>
@@ -20,7 +28,7 @@
         <Button Content="Instrucciones" Command="{Binding NavigateCommand}" CommandParameter="Instructions" Style="{StaticResource NavButton}"/>
         <Button Content="Documento" Command="{Binding NavigateCommand}" CommandParameter="Document" Style="{StaticResource NavButton}"/>
         <Button Content="Configuración" Command="{Binding NavigateCommand}" CommandParameter="Settings" Style="{StaticResource NavButton}"/>
-      </StackPanel>
+      </StackPanel></DockPanel>
     </Border>
     <ContentControl Grid.Column="1" Content="{Binding CurrentViewModel}" Margin="36"/>
   </Grid>

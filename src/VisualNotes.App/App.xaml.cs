@@ -34,7 +34,10 @@ public partial class App : System.Windows.Application
             Shutdown(-1);
             return;
         }
-        _viewModel = new MainViewModel();
+        var sessions = new SessionRepository(_database);
+        var coordinator = new VisualNotes.Core.Services.SessionCoordinator(sessions, new ScreenshotRepository(_database), new SettingsRepository(_database), new UnitOfWork(_database));
+        _viewModel = new MainViewModel(coordinator, sessions);
+        await _viewModel.InitializeAsync();
         _window = new MainWindow { DataContext = _viewModel };
         _window.Closing += (_, args) =>
         {
