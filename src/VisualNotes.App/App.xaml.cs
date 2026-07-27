@@ -1,9 +1,8 @@
 using System.Drawing;
 using System.Windows;
 using Forms = System.Windows.Forms;
-using Microsoft.EntityFrameworkCore;
 using VisualNotes.App.ViewModels;
-using VisualNotes.Infrastructure.Persistence;
+using VisualNotes.Infrastructure;
 
 namespace VisualNotes.App;
 
@@ -13,30 +12,23 @@ public partial class App : System.Windows.Application
     private MainWindow? _window;
     private MainViewModel? _viewModel;
     private bool _isExiting;
-    private VisualNotesDbContext? _database;
+    private VisualNotesRuntime? _runtime;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualNotes");
-        Directory.CreateDirectory(dataDirectory);
-        _database = new VisualNotesDbContext(new DbContextOptionsBuilder<VisualNotesDbContext>()
-            .UseSqlite($"Data Source={Path.Combine(dataDirectory, "visualnotes.db")}")
-            .Options);
         try
         {
-            await new DatabaseMigrationService(_database).MigrateAsync();
+            _runtime = await VisualNotesRuntime.CreateAsync(dataDirectory, CancellationToken.None);
         }
         catch (Exception exception)
         {
             MessageBox.Show($"No se pudo preparar la base de datos local.\n\n{exception.Message}", "VisualNotes", MessageBoxButton.OK, MessageBoxImage.Error);
-            await _database.DisposeAsync();
             Shutdown(-1);
             return;
         }
-        var sessions = new SessionRepository(_database);
-        var coordinator = new VisualNotes.Core.Services.SessionCoordinator(sessions, new ScreenshotRepository(_database), new SettingsRepository(_database), new UnitOfWork(_database));
-        _viewModel = new MainViewModel(coordinator, sessions);
+        _viewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions);
         await _viewModel.InitializeAsync();
         _window = new MainWindow { DataContext = _viewModel };
         _window.Closing += (_, args) =>
@@ -84,7 +76,7 @@ public partial class App : System.Windows.Application
         _isExiting = true;
         _trayIcon?.Dispose();
         _window?.Close();
-        if (_database is not null) await _database.DisposeAsync();
+        if (_runtime is not null) await _runtime.DisposeAsync();
         Shutdown();
     }
 }

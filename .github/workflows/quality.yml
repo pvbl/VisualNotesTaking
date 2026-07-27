@@ -1,0 +1,20 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    env:
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore VisualNotes.sln
+      - run: dotnet format VisualNotes.sln --verify-no-changes --no-restore --severity error
+      - run: dotnet build VisualNotes.sln --configuration Release --no-restore /warnaserror
+      - run: dotnet test VisualNotes.sln --configuration Release --no-build
