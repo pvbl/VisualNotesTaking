@@ -4,7 +4,7 @@ namespace VisualNotes.Core.Services;
 
 public interface IScreenCaptureService
 {
-    Task<CapturedFrame> CaptureAsync(CaptureRegion region, CancellationToken cancellationToken = default);
+    Task<CapturedFrame?> CaptureAsync(CaptureRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IContentAnalysisService

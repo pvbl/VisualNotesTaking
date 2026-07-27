@@ -95,6 +95,13 @@ public sealed class ScreenshotContext : Entity
     public string? WindowTitle { get; set; }
     public string? ApplicationName { get; set; }
     public string? SourceUri { get; set; }
+    public string? MonitorDeviceName { get; set; }
+    public long? WindowHandle { get; set; }
+    public ScreenCaptureMode? CaptureMode { get; set; }
+    public int PhysicalX { get; set; }
+    public int PhysicalY { get; set; }
+    public uint DpiX { get; set; } = 96;
+    public uint DpiY { get; set; } = 96;
     public string? MetadataJson { get; set; }
 }
 
@@ -173,6 +180,40 @@ public sealed class AppSetting : Entity
 }
 
 public sealed record CaptureRegion(int X, int Y, int Width, int Height);
-public sealed record CapturedFrame(Guid Id, DateTimeOffset CapturedAt, CaptureRegion Region, byte[] ImageData, string MediaType = "image/png");
+public sealed record CapturedFrame(Guid Id, DateTimeOffset CapturedAt, CaptureRegion Region, byte[] ImageData, string MediaType = "image/png", CaptureMetadata? Metadata = null);
 public sealed record ExtractedContent(string Text, IReadOnlyDictionary<string, string>? Metadata = null);
 public sealed record ExportDocument(string Title, IReadOnlyList<NoteSection> Sections, DateTimeOffset CreatedAt);
+
+public enum ScreenCaptureMode { FullVirtualDesktop, CurrentMonitor, ActiveWindow, OneTimeRegion }
+
+public sealed record PhysicalRectangle(int X, int Y, int Width, int Height)
+{
+    public int Right => checked(X + Width);
+    public int Bottom => checked(Y + Height);
+    public bool IsEmpty => Width <= 0 || Height <= 0;
+}
+
+public sealed record MonitorCaptureInfo(
+    string DeviceName,
+    PhysicalRectangle Bounds,
+    uint DpiX,
+    uint DpiY,
+    bool IsPrimary = false);
+
+public sealed record CaptureRequest(
+    ScreenCaptureMode Mode,
+    PhysicalRectangle? Region = null,
+    nint? WindowHandle = null,
+    string? MonitorDeviceName = null);
+
+public sealed record CaptureMetadata(
+    ScreenCaptureMode Mode,
+    PhysicalRectangle PhysicalBounds,
+    DateTimeOffset CapturedAt,
+    string? MonitorDeviceName,
+    nint? WindowHandle,
+    string? WindowTitle,
+    uint DpiX,
+    uint DpiY,
+    int PixelWidth,
+    int PixelHeight);
