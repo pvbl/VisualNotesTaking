@@ -200,6 +200,33 @@ public sealed record MonitorCaptureInfo(
     uint DpiY,
     bool IsPrimary = false);
 
+/// <summary>A reusable capture area stored exclusively in physical desktop pixels.</summary>
+public sealed record PersistentCaptureRegion(
+    PhysicalRectangle Bounds,
+    string MonitorDeviceName,
+    uint DpiX,
+    uint DpiY,
+    Guid SessionId,
+    PhysicalRectangle SavedMonitorBounds,
+    bool IsLocked = false,
+    bool IsHidden = false,
+    bool ShowNonCapturableBorder = true);
+
+public sealed record FavoriteCaptureRegion(string Name, PersistentCaptureRegion Region);
+
+public enum RegionRestoreStatus
+{
+    Restored,
+    AdjustedForResolution,
+    MovedToAvailableMonitor,
+    Invalid
+}
+
+public sealed record RegionRestoreResult(
+    PersistentCaptureRegion? Region,
+    RegionRestoreStatus Status,
+    string? Warning = null);
+
 public sealed record CaptureRequest(
     ScreenCaptureMode Mode,
     PhysicalRectangle? Region = null,

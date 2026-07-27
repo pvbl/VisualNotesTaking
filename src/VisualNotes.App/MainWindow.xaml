@@ -3,6 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="VisualNotes" Width="1100" Height="700" MinWidth="800" MinHeight="500"
         Background="#F4F6FA">
+  <Window.InputBindings>
+    <KeyBinding Key="C" Modifiers="Control+Shift" Command="{Binding CaptureRegionCommand}"/>
+    <KeyBinding Key="R" Modifiers="Control+Shift" Command="{Binding RedefineRegionCommand}"/>
+  </Window.InputBindings>
   <Window.Resources>
     <Style x:Key="NavButton" TargetType="Button">
       <Setter Property="Foreground" Value="White"/><Setter Property="Background" Value="Transparent"/>

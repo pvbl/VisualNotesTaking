@@ -74,6 +74,8 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             var root = new Grid(); root.Children.Add(_canvas); _canvas.Children.Add(_selection);
             var panel = new StackPanel { Orientation = Orientation.Horizontal, Background = Brushes.White, Margin = new Thickness(12), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
             panel.Children.Add(Button("Confirmar", "ConfirmSelection", () => ConfirmRequested?.Invoke()));
+            panel.Children.Add(Button("Bloquear", "LockSelection", () => { _controller.SetLocked(!_controller.IsLocked); SelectionChanged?.Invoke(); }));
+            panel.Children.Add(Button("Ocultar", "HideSelection", () => { _controller.SetHidden(!_controller.IsHidden); SelectionChanged?.Invoke(); }));
             panel.Children.Add(Button("Reiniciar", "ResetSelection", () => ResetRequested?.Invoke()));
             panel.Children.Add(Button("Cancelar", "CancelSelection", () => CancelRequested?.Invoke()));
             root.Children.Add(panel); return root;
@@ -105,11 +107,21 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             if (args.Key == Key.Escape) CancelRequested?.Invoke();
             else if (args.Key == Key.Enter) ConfirmRequested?.Invoke();
             else if (args.Key == Key.R) ResetRequested?.Invoke();
+            else if (args.Key == Key.L) { _controller.SetLocked(!_controller.IsLocked); SelectionChanged?.Invoke(); }
+            else if (args.Key == Key.H) { _controller.SetHidden(!_controller.IsHidden); SelectionChanged?.Invoke(); }
+            else if (args.Key is Key.Left or Key.Right or Key.Up or Key.Down)
+            {
+                var x = args.Key == Key.Left ? -1 : args.Key == Key.Right ? 1 : 0;
+                var y = args.Key == Key.Up ? -1 : args.Key == Key.Down ? 1 : 0;
+                if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) _controller.ResizeBy(x, y);
+                else _controller.MoveBy(x, y);
+                SelectionChanged?.Invoke(); args.Handled = true;
+            }
         }
 
         internal void RefreshSelection()
         {
-            if (_controller.Selection is not { } region) { _selection.Visibility = Visibility.Collapsed; return; }
+            if (_controller.IsHidden || _controller.Selection is not { } region) { _selection.Visibility = Visibility.Collapsed; return; }
             var intersection = ScreenCaptureGeometry.Intersect(region,
                 new(_screen.Bounds.X, _screen.Bounds.Y, _screen.Bounds.Width, _screen.Bounds.Height));
             if (intersection.IsEmpty) { _selection.Visibility = Visibility.Collapsed; return; }

@@ -3,6 +3,9 @@ using System.Windows;
 using Forms = System.Windows.Forms;
 using VisualNotes.App.ViewModels;
 using VisualNotes.Infrastructure;
+using VisualNotes.App.Services;
+using VisualNotes.Core.Models;
+using VisualNotes.Core.Services;
 
 namespace VisualNotes.App;
 
@@ -13,6 +16,11 @@ public partial class App : System.Windows.Application
     private MainViewModel? _viewModel;
     private bool _isExiting;
     private VisualNotesRuntime? _runtime;
+    private readonly JsonSettingsStore _regionSettings = new();
+    private PersistentRegionService? _regions;
+    private WindowsScreenCaptureService? _capture;
+    private PersistentRegionBorder? _regionBorder;
+    private PersistentCaptureRegion? _activeRegion;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -30,6 +38,14 @@ public partial class App : System.Windows.Application
         }
         _viewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions);
         await _viewModel.InitializeAsync();
+        _regions = new PersistentRegionService(_regionSettings);
+        _capture = new WindowsScreenCaptureService(new RegionSelectionOverlay());
+        _regionBorder = new PersistentRegionBorder();
+        _viewModel.CaptureRegionRequested += CapturePersistentRegion;
+        _viewModel.RedefineRegionRequested += RedefinePersistentRegion;
+        var restored = await _regions.RestoreAsync(WindowsScreenCaptureService.GetMonitors(),
+            _viewModel.ActiveSession?.Id ?? Guid.Empty);
+        _activeRegion = restored.Region;
         _window = new MainWindow { DataContext = _viewModel };
         _window.Closing += (_, args) =>
         {
@@ -39,12 +55,36 @@ public partial class App : System.Windows.Application
         };
         CreateTrayIcon();
         _window.Show();
+        if (_activeRegion is not null) _regionBorder.Show(_activeRegion);
+    }
+
+    private async void RedefinePersistentRegion()
+    {
+        if (_capture is null || _regions is null || _viewModel is null) return;
+        var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion));
+        if (frame?.Metadata is not { } metadata) return;
+        var monitors = WindowsScreenCaptureService.GetMonitors();
+        var monitor = monitors.FirstOrDefault(x => x.DeviceName == metadata.MonitorDeviceName) ?? monitors.First();
+        _activeRegion = new(metadata.PhysicalBounds, monitor.DeviceName, monitor.DpiX, monitor.DpiY,
+            _viewModel.ActiveSession?.Id ?? Guid.Empty, monitor.Bounds);
+        await _regions.SaveAsync(_activeRegion);
+        _regionBorder?.Show(_activeRegion);
+    }
+
+    private async void CapturePersistentRegion()
+    {
+        if (_capture is null || _activeRegion is null || _activeRegion.IsHidden) return;
+        await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
+            MonitorDeviceName: _activeRegion.MonitorDeviceName));
+        _regionBorder?.Show(_activeRegion);
     }
 
     private void CreateTrayIcon()
     {
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Abrir VisualNotes", null, (_, _) => ShowWindow());
+        menu.Items.Add("Capturar región (Ctrl+Mayús+C)", null, (_, _) => CapturePersistentRegion());
+        menu.Items.Add("Redefinir región (Ctrl+Mayús+R)", null, (_, _) => RedefinePersistentRegion());
         var pauseItem = menu.Items.Add("Pausar sesión");
         pauseItem.Click += (_, _) =>
         {
@@ -75,6 +115,7 @@ public partial class App : System.Windows.Application
     {
         _isExiting = true;
         _trayIcon?.Dispose();
+        _regionBorder?.Dispose();
         _window?.Close();
         if (_runtime is not null) await _runtime.DisposeAsync();
         Shutdown();

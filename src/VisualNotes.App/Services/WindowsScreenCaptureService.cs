@@ -18,6 +18,8 @@ public interface IRegionSelectionOverlay
 /// <summary>Captures physical desktop pixels after all VisualNotes surfaces have been hidden.</summary>
 public sealed class WindowsScreenCaptureService(IRegionSelectionOverlay overlay) : IScreenCaptureService
 {
+    public static IReadOnlyList<MonitorCaptureInfo> GetMonitors() => Forms.Screen.AllScreens.Select(GetMonitor).ToArray();
+
     public async Task<CapturedFrame?> CaptureAsync(CaptureRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

@@ -44,6 +44,8 @@ public sealed class MainViewModel : ViewModelBase
             await _coordinator.SetPausedAsync(ActiveSession, !ActiveSession.IsPaused);
             RefreshHeader();
         });
+        CaptureRegionCommand = new RelayCommand(_ => CaptureRegionRequested?.Invoke());
+        RedefineRegionCommand = new RelayCommand(_ => RedefineRegionRequested?.Invoke());
     }
 
     public SessionViewModel Sessions { get; }
@@ -54,6 +56,10 @@ public sealed class MainViewModel : ViewModelBase
     public string SessionStatus => ActiveSession is null ? "Crea o continúa una sesión" : ActiveSession.IsPaused ? "Sesión pausada" : "Sesión activa";
     public ICommand NavigateCommand { get; }
     public ICommand TogglePauseCommand { get; }
+    public ICommand CaptureRegionCommand { get; }
+    public ICommand RedefineRegionCommand { get; }
+    public event Action? CaptureRegionRequested;
+    public event Action? RedefineRegionRequested;
 
     public async Task InitializeAsync()
     {

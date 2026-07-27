@@ -36,5 +36,20 @@ public static class ScreenCaptureGeometry
         return new(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
 
+    public static bool IsValid(PhysicalRectangle value, int minimumSize = 8) =>
+        value.Width >= minimumSize && value.Height >= minimumSize &&
+        (long)value.X + value.Width <= int.MaxValue && (long)value.Y + value.Height <= int.MaxValue;
+
+    /// <summary>Keeps the size when possible and clamps the rectangle completely inside the monitor.</summary>
+    public static PhysicalRectangle ClampTo(PhysicalRectangle value, PhysicalRectangle bounds)
+    {
+        if (bounds.IsEmpty || value.IsEmpty) return new(bounds.X, bounds.Y, 0, 0);
+        var width = Math.Min(value.Width, bounds.Width);
+        var height = Math.Min(value.Height, bounds.Height);
+        var x = Math.Clamp(value.X, bounds.X, bounds.Right - width);
+        var y = Math.Clamp(value.Y, bounds.Y, bounds.Bottom - height);
+        return new(x, y, width, height);
+    }
+
     private static uint ValidateDpi(uint dpi) => dpi == 0 ? throw new ArgumentOutOfRangeException(nameof(dpi)) : dpi;
 }
