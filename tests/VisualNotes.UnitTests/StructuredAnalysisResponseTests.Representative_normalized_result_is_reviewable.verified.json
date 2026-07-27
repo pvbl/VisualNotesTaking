@@ -1,0 +1,54 @@
+{
+  "language": "es",
+  "contentType": "lecture-slide",
+  "title": "Ley de Ohm",
+  "summary": "Relación entre voltaje, corriente y resistencia.",
+  "transcription": "V = I R",
+  "code": [
+    {
+      "type": "Code",
+      "content": "var voltage = current * resistance;",
+      "box": {
+        "YMin": 100,
+        "XMin": 50,
+        "YMax": 180,
+        "XMax": 700
+      }
+    }
+  ],
+  "equations": [
+    {
+      "type": "Equation",
+      "content": "V = I R",
+      "box": null
+    }
+  ],
+  "tables": [
+    {
+      "type": "Table",
+      "content": "V | I | R",
+      "box": null
+    }
+  ],
+  "coordinateSystem": "Normalized1000",
+  "regions": [
+    {
+      "label": "formula",
+      "box": {
+        "YMin": 200,
+        "XMin": 100,
+        "YMax": 400,
+        "XMax": 900
+      },
+      "confidence": 0.98
+    }
+  ],
+  "concepts": [
+    "voltaje",
+    "resistencia"
+  ],
+  "confidence": 0.95,
+  "warnings": [
+    "La unidad de R no es visible"
+  ]
+}
