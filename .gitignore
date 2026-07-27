@@ -4,3 +4,6 @@
 *.user
 *.suo
 TestResults/
+
+**/*.received.*
+BenchmarkDotNet.Artifacts/

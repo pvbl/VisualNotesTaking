@@ -1,20 +1,52 @@
 name: Quality
-
 on:
   push:
   pull_request:
 
 jobs:
-  build-and-test:
+  core-tests:
     runs-on: windows-latest
-    env:
-      CI: true
+    timeout-minutes: 20
+    env: { CI: true }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet tool restore
       - run: dotnet restore VisualNotes.sln
       - run: dotnet format VisualNotes.sln --verify-no-changes --no-restore --severity error
       - run: dotnet build VisualNotes.sln --configuration Release --no-restore /warnaserror
-      - run: dotnet test VisualNotes.sln --configuration Release --no-build
+      - name: Unit, architecture and integration tests
+        run: dotnet test VisualNotes.sln --configuration Release --no-build --filter "Category=Unit|Category=Architecture|Category=Integration" --collect:"XPlat Code Coverage" --results-directory TestResults
+      - name: HTML and Cobertura reports
+        run: reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/CoverageReport" "-reporttypes:Html;Cobertura"
+      - uses: actions/upload-artifact@v4
+        with: { name: coverage, path: TestResults/CoverageReport }
+
+  ui-tests:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet test tests/VisualNotes.UiTests --configuration Release --filter "Category=UI"
+
+  mutations:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet tool restore
+      - run: dotnet stryker --test-project tests/VisualNotes.UnitTests/VisualNotes.UnitTests.csproj
+
+  benchmarks:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet run --configuration Release --project tests/VisualNotes.Benchmarks -- --filter "*"
