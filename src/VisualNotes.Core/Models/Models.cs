@@ -3,6 +3,7 @@ namespace VisualNotes.Core.Models;
 public enum EntityStatus { Active, Archived, Deleted }
 public enum ScreenshotStatus { Captured, Queued, Analyzing, NeedsReview, Ready, Excluded, Failed }
 public enum AnalysisJobStatus { Pending, Running, Completed, Failed, Cancelled }
+public enum SessionProcessingStatus { Pending, Processing, Ready, Failed }
 
 public abstract class Entity
 {
@@ -25,6 +26,16 @@ public sealed class NoteSession : Entity
     public Guid? CourseId { get; set; }
     public Course? Course { get; set; }
     public string Name { get; set; } = "Nueva sesión";
+    public string Module { get; set; } = string.Empty;
+    public string Topic { get; set; } = string.Empty;
+    public string? Professor { get; set; }
+    public string Language { get; set; } = "Español";
+    public string WorkingFolder { get; set; } = string.Empty;
+    public string PlannedDocumentName { get; set; } = string.Empty;
+    public string InstructionTemplate { get; set; } = string.Empty;
+    public Guid? ActiveSectionId { get; set; }
+    public SessionProcessingStatus ProcessingStatus { get; set; }
+    public DateTimeOffset? LastExportedAt { get; set; }
     public DateTimeOffset StartedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? EndedAt { get; set; }
     public bool IsPaused { get; set; }
@@ -42,6 +53,10 @@ public sealed class NoteSection : Entity
     public NoteSession? Session { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public Guid? ParentSectionId { get; set; }
+    public NoteSection? ParentSection { get; set; }
+    public ICollection<NoteSection> Children { get; set; } = [];
     public int Order { get; set; }
     public ICollection<Screenshot> Screenshots { get; set; } = [];
     public ICollection<GeneratedNote> GeneratedNotes { get; set; } = [];

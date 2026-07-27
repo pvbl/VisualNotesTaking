@@ -28,6 +28,8 @@ public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> 
         }
         modelBuilder.Entity<NoteSession>().HasIndex(x => x.CourseId);
         modelBuilder.Entity<NoteSection>().HasIndex(x => x.SessionId);
+        modelBuilder.Entity<NoteSection>().HasOne(x => x.ParentSection).WithMany(x => x.Children).HasForeignKey(x => x.ParentSectionId).OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<NoteSession>().HasOne<NoteSection>().WithMany().HasForeignKey(x => x.ActiveSectionId).OnDelete(DeleteBehavior.SetNull);
         modelBuilder.Entity<Screenshot>().HasIndex(x => x.SessionId);
         modelBuilder.Entity<Screenshot>().HasIndex(x => x.SectionId);
         modelBuilder.Entity<Screenshot>().HasIndex(x => x.CapturedAt);
