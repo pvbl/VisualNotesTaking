@@ -1,8 +1,23 @@
 <Project>
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- .NET 8 ships with the C# 12 compiler. Pinning avoids silent language upgrades. -->
+    <LangVersion>12.0</LangVersion>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>8.0-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile Condition="'$(IsTestProject)' != 'true' and '$(OutputType)' != 'WinExe'">true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release' or '$(CI)' == 'true'">true</TreatWarningsAsErrors>
+    <!-- Legacy public APIs are not fully documented yet. Keep this exception to the
+         specific compiler diagnostic while XML output is introduced incrementally. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" />
+    <Compile Include="$(MSBuildThisFileDirectory)GlobalSuppressions.cs" Link="GlobalSuppressions.cs" />
+  </ItemGroup>
 </Project>

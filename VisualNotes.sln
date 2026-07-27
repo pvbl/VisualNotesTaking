@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VisualNotes.Infrastructure"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VisualNotes.Tests", "tests\VisualNotes.Tests\VisualNotes.Tests.csproj", "{460B05E3-C86C-4169-A376-E841F56FBB84}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VisualNotes.ArchitectureTests", "tests\VisualNotes.ArchitectureTests\VisualNotes.ArchitectureTests.csproj", "{CE4B5A27-E052-4CBF-802F-FE38951C86CD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,5 +35,9 @@ Global
 		{460B05E3-C86C-4169-A376-E841F56FBB84}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{460B05E3-C86C-4169-A376-E841F56FBB84}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{460B05E3-C86C-4169-A376-E841F56FBB84}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE4B5A27-E052-4CBF-802F-FE38951C86CD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE4B5A27-E052-4CBF-802F-FE38951C86CD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE4B5A27-E052-4CBF-802F-FE38951C86CD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE4B5A27-E052-4CBF-802F-FE38951C86CD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
