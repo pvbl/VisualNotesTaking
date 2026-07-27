@@ -28,15 +28,18 @@ public sealed class MainViewModel : ViewModelBase
     private ViewModelBase _currentViewModel;
     private NoteSession? _activeSession;
 
-    public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository)
+    private readonly SettingsViewModel? _settings;
+
+    public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository, IGlobalHotkeyService? hotkeys = null)
     {
         _coordinator = coordinator; _repository = repository;
+        _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys);
         Sessions = new SessionViewModel(coordinator, repository, Activate);
         _currentViewModel = Sessions;
         NavigateCommand = new RelayCommand(page => CurrentViewModel = page switch
         {
             "Captures" => new CapturesViewModel(), "Instructions" => new InstructionsViewModel(),
-            "Document" => new DocumentViewModel(), "Settings" => new SettingsViewModel(), _ => Sessions
+            "Document" => new DocumentViewModel(), "Settings" => _settings ?? new SettingsViewModel(), _ => Sessions
         });
         TogglePauseCommand = new RelayCommand(async _ =>
         {
@@ -60,6 +63,9 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand RedefineRegionCommand { get; }
     public event Action? CaptureRegionRequested;
     public event Action? RedefineRegionRequested;
+    public Action? UndoRequested { get; set; }
+    public Action? MarkImportantRequested { get; set; }
+    public Action? AddContextRequested { get; set; }
 
     public async Task InitializeAsync()
     {
@@ -111,4 +117,62 @@ public sealed class SessionViewModel : ViewModelBase
 public sealed class CapturesViewModel : ViewModelBase;
 public sealed class InstructionsViewModel : ViewModelBase;
 public sealed class DocumentViewModel : ViewModelBase;
-public sealed class SettingsViewModel : ViewModelBase;
+public sealed class SettingsViewModel : ViewModelBase
+{
+    private readonly IGlobalHotkeyService? _hotkeys;
+    private string _conflictMessage = string.Empty;
+
+    public SettingsViewModel() => SaveCommand = new RelayCommand(_ => { });
+
+    public SettingsViewModel(IGlobalHotkeyService hotkeys)
+    {
+        _hotkeys = hotkeys;
+        Bindings = new(DefaultBindings().Select(binding => new HotkeyBindingEditor(binding)));
+        SaveCommand = new RelayCommand(_ => Save());
+    }
+
+    public ObservableCollection<HotkeyBindingEditor> Bindings { get; } = [];
+    public string ConflictMessage { get => _conflictMessage; private set { _conflictMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasConflict)); } }
+    public bool HasConflict => !string.IsNullOrEmpty(ConflictMessage);
+    public ICommand SaveCommand { get; }
+
+    public void ReplaceBinding(HotkeyAction action, HotkeyGesture gesture)
+    {
+        var current = Bindings.First(binding => binding.Action == action);
+        var index = Bindings.IndexOf(current);
+        current.Modifiers = gesture.Modifiers;
+        current.VirtualKey = gesture.VirtualKey;
+    }
+
+    private void Save()
+    {
+        var result = _hotkeys!.Apply(Bindings.Select(binding => binding.ToBinding()).ToArray());
+        ConflictMessage = result.Succeeded
+            ? string.Empty
+            : string.Join(Environment.NewLine, result.Conflicts.Select(conflict => conflict.Message).Distinct());
+    }
+
+    public static IReadOnlyList<HotkeyBinding> DefaultBindings() =>
+    [
+        New(HotkeyAction.CaptureFullDesktop, '1'), New(HotkeyAction.CaptureCurrentMonitor, '2'),
+        New(HotkeyAction.CaptureActiveWindow, '3'), New(HotkeyAction.CaptureRegion, '4'),
+        New(HotkeyAction.TogglePause, 'P'), New(HotkeyAction.NextSection, 0x22),
+        New(HotkeyAction.PreviousSection, 0x21), New(HotkeyAction.Undo, 'Z'),
+        New(HotkeyAction.MarkImportant, 'I'), New(HotkeyAction.AddContext, 'K')
+    ];
+
+    private static HotkeyBinding New(HotkeyAction action, char key) => New(action, (uint)key);
+    private static HotkeyBinding New(HotkeyAction action, uint key) => new(action, new(HotkeyModifiers.Control | HotkeyModifiers.Shift, key));
+}
+
+public sealed class HotkeyBindingEditor(HotkeyBinding binding) : ViewModelBase
+{
+    private HotkeyModifiers _modifiers = binding.Gesture.Modifiers;
+    private uint _virtualKey = binding.Gesture.VirtualKey;
+    public HotkeyAction Action { get; } = binding.Action;
+    public HotkeyModifiers Modifiers { get => _modifiers; set { _modifiers = value; OnPropertyChanged(); OnPropertyChanged(nameof(Gesture)); } }
+    public uint VirtualKey { get => _virtualKey; set { _virtualKey = value; OnPropertyChanged(); OnPropertyChanged(nameof(Gesture)); } }
+    public bool IsEnabled { get; set; } = binding.IsEnabled;
+    public HotkeyGesture Gesture => new(Modifiers, VirtualKey);
+    public HotkeyBinding ToBinding() => new(Action, Gesture, IsEnabled);
+}
