@@ -64,3 +64,7 @@ Antes de publicar cambios de captura, repita en una sesión interactiva de Windo
 5. Compruebe que los metadatos conservan dispositivo, HWND/título, rectángulo físico, DPI, dimensiones, modo y fecha UTC.
 
 Registre el hardware, resolución, disposición, escalados y resultado en la incidencia de entrega. Estas comprobaciones necesitan una sesión de escritorio real y no se sustituyen por el job de CI sin escritorio.
+
+## Language-model provider tests
+
+Provider protocol and contract tests use a simulated `HttpMessageHandler` and run in the `Unit` category. Tests that contact Gemini or OpenAI must use the `External` category, require credentials supplied outside the repository, and remain skipped by default. The pull-request workflow selects only `Unit`, `Architecture`, and `Integration`, so external tests—including pull requests from forks—cannot consume API credentials.
