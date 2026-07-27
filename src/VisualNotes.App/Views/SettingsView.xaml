@@ -4,7 +4,28 @@
   <TextBlock Text="Configuración" FontSize="32" FontWeight="SemiBold" Foreground="#172033"/>
   <TextBlock Text="Personaliza VisualNotes y sus opciones de exportación." FontSize="16" Foreground="#64748B" Margin="0,8,0,30"/>
   <Border Background="White" CornerRadius="10" Padding="28">
-   <TextBlock Text="Preferencias de la aplicación" FontSize="17" Foreground="#334155" TextWrapping="Wrap"/>
+   <StackPanel>
+    <TextBlock Text="Atajos globales" FontSize="20" FontWeight="SemiBold" Foreground="#334155"/>
+    <TextBlock Text="Los atajos funcionan aunque VisualNotes esté minimizado." Foreground="#64748B" Margin="0,4,0,14"/>
+    <ItemsControl ItemsSource="{Binding Bindings}">
+     <ItemsControl.ItemTemplate>
+      <DataTemplate>
+       <DockPanel Margin="0,4">
+        <TextBlock Text="{Binding Action}" Width="220" VerticalAlignment="Center"/>
+        <CheckBox IsChecked="{Binding IsEnabled}" Content="Activo" Width="70" VerticalAlignment="Center"/>
+        <TextBox Text="{Binding Modifiers, UpdateSourceTrigger=PropertyChanged}" Width="130" Margin="0,0,8,0"
+                 ToolTip="Modificadores: Control, Shift, Alt o Windows"/>
+        <TextBox Text="{Binding VirtualKey, UpdateSourceTrigger=PropertyChanged}" Width="70"
+                 ToolTip="Código de tecla virtual de Windows"/>
+       </DockPanel>
+      </DataTemplate>
+     </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <TextBlock AutomationProperties.AutomationId="HotkeyConflictMessage" Text="{Binding ConflictMessage}"
+               Foreground="#B91C1C" TextWrapping="Wrap" Margin="0,12,0,0"/>
+    <Button AutomationProperties.AutomationId="SaveHotkeysButton" Content="Guardar atajos"
+            Command="{Binding SaveCommand}" Width="150" HorizontalAlignment="Left" Margin="0,14,0,0"/>
+   </StackPanel>
   </Border>
  </StackPanel>
 </UserControl>
