@@ -196,21 +196,38 @@ public sealed class DocumentViewModel : ViewModelBase;
 public sealed class SettingsViewModel : ViewModelBase
 {
     private readonly IGlobalHotkeyService? _hotkeys;
+    private readonly EffectiveSettingsResolver _settingsResolver = new();
+    private readonly Dictionary<SettingsLevel, SettingsValues> _layers = [];
     private string _conflictMessage = string.Empty;
+    private SettingsLevel _selectedLevel = SettingsLevel.Global;
 
-    public SettingsViewModel() => SaveCommand = new RelayCommand(_ => { });
+    public SettingsViewModel()
+    {
+        SaveCommand = new RelayCommand(_ => { });
+        InitializeHierarchicalSettings();
+    }
 
     public SettingsViewModel(IGlobalHotkeyService hotkeys)
     {
         _hotkeys = hotkeys;
         Bindings = new(DefaultBindings().Select(binding => new HotkeyBindingEditor(binding)));
         SaveCommand = new RelayCommand(_ => Save());
+        InitializeHierarchicalSettings();
     }
 
     public ObservableCollection<HotkeyBindingEditor> Bindings { get; } = [];
     public string ConflictMessage { get => _conflictMessage; private set { _conflictMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasConflict)); } }
     public bool HasConflict => !string.IsNullOrEmpty(ConflictMessage);
     public ICommand SaveCommand { get; }
+    public IReadOnlyList<SettingsLevel> Levels { get; } = Enum.GetValues<SettingsLevel>();
+    public ObservableCollection<EffectiveSettingEditor> EffectiveValues { get; } = [];
+    public SettingsLevel SelectedLevel
+    {
+        get => _selectedLevel;
+        set { _selectedLevel = value; OnPropertyChanged(); RefreshEffectiveValues(); }
+    }
+    public ICommand OverrideSettingCommand { get; private set; } = null!;
+    public ICommand RestoreSettingCommand { get; private set; } = null!;
 
     public void ReplaceBinding(HotkeyAction action, HotkeyGesture gesture)
     {
@@ -228,6 +245,75 @@ public sealed class SettingsViewModel : ViewModelBase
             : string.Join(Environment.NewLine, result.Conflicts.Select(conflict => conflict.Message).Distinct());
     }
 
+    private void InitializeHierarchicalSettings()
+    {
+        _layers[SettingsLevel.ApplicationDefaults] = new()
+        {
+            Language = "Español", Provider = "OpenAI", Model = "gpt-4.1-mini",
+            PromptTemplate = "Genera apuntes claros y estructurados.", IncludeImages = true,
+            MaximumImageSide = 2560
+        };
+        _layers[SettingsLevel.Global] = new();
+        _layers[SettingsLevel.Session] = new();
+        _layers[SettingsLevel.Section] = new();
+        _layers[SettingsLevel.ScreenshotOverride] = new();
+        OverrideSettingCommand = new RelayCommand(value => { if (value is EffectiveSettingEditor row) Override(row); });
+        RestoreSettingCommand = new RelayCommand(value => { if (value is EffectiveSettingEditor row) Restore(row); });
+        RefreshEffectiveValues();
+    }
+
+    private void Override(EffectiveSettingEditor row)
+    {
+        if (SelectedLevel == SettingsLevel.ApplicationDefaults) return;
+        var values = _layers[SelectedLevel];
+        _layers[SelectedLevel] = row.Key switch
+        {
+            nameof(SettingsValues.Language) => values with { Language = row.EditValue },
+            nameof(SettingsValues.Provider) => values with { Provider = row.EditValue },
+            nameof(SettingsValues.Model) => values with { Model = row.EditValue },
+            nameof(SettingsValues.PromptTemplate) => values with { PromptTemplate = row.EditValue },
+            nameof(SettingsValues.IncludeImages) when bool.TryParse(row.EditValue, out var parsed) => values with { IncludeImages = parsed },
+            nameof(SettingsValues.MaximumImageSide) when int.TryParse(row.EditValue, out var parsed) && parsed > 0 => values with { MaximumImageSide = parsed },
+            _ => values
+        };
+        RefreshEffectiveValues();
+    }
+
+    private void Restore(EffectiveSettingEditor row)
+    {
+        if (SelectedLevel == SettingsLevel.ApplicationDefaults) return;
+        var values = _layers[SelectedLevel];
+        _layers[SelectedLevel] = row.Key switch
+        {
+            nameof(SettingsValues.Language) => values with { Language = null },
+            nameof(SettingsValues.Provider) => values with { Provider = null },
+            nameof(SettingsValues.Model) => values with { Model = null },
+            nameof(SettingsValues.PromptTemplate) => values with { PromptTemplate = null },
+            nameof(SettingsValues.IncludeImages) => values with { IncludeImages = null },
+            nameof(SettingsValues.MaximumImageSide) => values with { MaximumImageSide = null },
+            _ => values
+        };
+        RefreshEffectiveValues();
+    }
+
+    private void RefreshEffectiveValues()
+    {
+        var effective = _settingsResolver.Resolve(new(
+            _layers[SettingsLevel.ApplicationDefaults], _layers[SettingsLevel.Global],
+            _layers[SettingsLevel.Session], _layers[SettingsLevel.Section],
+            _layers[SettingsLevel.ScreenshotOverride]));
+        EffectiveValues.Clear();
+        Add(nameof(SettingsValues.Language), "Idioma", effective.Language.Value, effective.Language.Provenance);
+        Add(nameof(SettingsValues.Provider), "Proveedor", effective.Provider.Value, effective.Provider.Provenance);
+        Add(nameof(SettingsValues.Model), "Modelo", effective.Model.Value, effective.Model.Provenance);
+        Add(nameof(SettingsValues.PromptTemplate), "Plantilla", effective.PromptTemplate.Value, effective.PromptTemplate.Provenance);
+        Add(nameof(SettingsValues.IncludeImages), "Incluir imágenes", effective.IncludeImages.Value, effective.IncludeImages.Provenance);
+        Add(nameof(SettingsValues.MaximumImageSide), "Tamaño máximo", effective.MaximumImageSide.Value, effective.MaximumImageSide.Provenance);
+    }
+
+    private void Add(string key, string label, object value, string provenance) =>
+        EffectiveValues.Add(new(key, label, value.ToString() ?? string.Empty, provenance));
+
     public static IReadOnlyList<HotkeyBinding> DefaultBindings() =>
     [
         New(HotkeyAction.CaptureFullDesktop, '1'), New(HotkeyAction.CaptureCurrentMonitor, '2'),
@@ -239,6 +325,16 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private static HotkeyBinding New(HotkeyAction action, char key) => New(action, (uint)key);
     private static HotkeyBinding New(HotkeyAction action, uint key) => new(action, new(HotkeyModifiers.Control | HotkeyModifiers.Shift, key));
+}
+
+public sealed class EffectiveSettingEditor(string key, string label, string value, string provenance) : ViewModelBase
+{
+    private string _editValue = value;
+    public string Key { get; } = key;
+    public string Label { get; } = label;
+    public string EffectiveValue { get; } = value;
+    public string Provenance { get; } = provenance;
+    public string EditValue { get => _editValue; set { _editValue = value; OnPropertyChanged(); } }
 }
 
 public sealed class HotkeyBindingEditor(HotkeyBinding binding) : ViewModelBase
