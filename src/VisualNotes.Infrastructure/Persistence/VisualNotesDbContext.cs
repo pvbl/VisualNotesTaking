@@ -11,6 +11,7 @@ public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> 
     public DbSet<Screenshot> Screenshots => Set<Screenshot>();
     public DbSet<ScreenshotImage> ScreenshotImages => Set<ScreenshotImage>();
     public DbSet<ScreenshotContext> ScreenshotContexts => Set<ScreenshotContext>();
+    public DbSet<CaptureRevision> CaptureRevisions => Set<CaptureRevision>();
     public DbSet<AnalysisJob> AnalysisJobs => Set<AnalysisJob>();
     public DbSet<CaptureAnalysis> CaptureAnalyses => Set<CaptureAnalysis>();
     public DbSet<VisualRegion> VisualRegions => Set<VisualRegion>();
@@ -37,6 +38,8 @@ public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> 
         modelBuilder.Entity<Screenshot>().HasIndex(x => x.PerceptualHash);
         modelBuilder.Entity<Screenshot>().HasOne(x => x.Image).WithOne(x => x.Screenshot).HasForeignKey<ScreenshotImage>(x => x.ScreenshotId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Screenshot>().HasOne(x => x.Context).WithOne(x => x.Screenshot).HasForeignKey<ScreenshotContext>(x => x.ScreenshotId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<CaptureRevision>().HasIndex(x => new { x.ScreenshotId, x.RevisionNumber }).IsUnique();
+        modelBuilder.Entity<Screenshot>().HasMany(x => x.Revisions).WithOne(x => x.Screenshot).HasForeignKey(x => x.ScreenshotId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<AnalysisJob>().HasOne(x => x.Result).WithOne(x => x.AnalysisJob).HasForeignKey<CaptureAnalysis>(x => x.AnalysisJobId).OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<AppSetting>().HasIndex(x => x.Key).IsUnique();
         modelBuilder.Entity<ScreenshotImage>().Property(x => x.RelativePath).HasMaxLength(1024);

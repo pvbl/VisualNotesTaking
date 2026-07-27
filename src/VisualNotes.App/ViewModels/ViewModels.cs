@@ -114,7 +114,26 @@ public sealed class SessionViewModel : ViewModelBase
     private static NoteSession NewDraft() => new() { WorkingFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), PlannedDocumentName = "Apuntes.md" };
 }
 
-public sealed class CapturesViewModel : ViewModelBase;
+public sealed class CapturesViewModel : ViewModelBase
+{
+    private Screenshot? _selectedCapture;
+    private bool _isQuickContextOpen;
+    public CapturesViewModel()
+    {
+        ApplyChipCommand = new RelayCommand(value => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); });
+        CloseQuickContextCommand = new RelayCommand(_ => IsQuickContextOpen = false);
+        ReanalyzeCommand = new RelayCommand(_ => { if (SelectedCapture is not null) SelectedCapture.ProcessingStatus = ScreenshotStatus.Queued; });
+        RegenerateNoteCommand = new RelayCommand(_ => { if (SelectedCapture is not null) SelectedCapture.ProcessingStatus = ScreenshotStatus.NeedsReview; });
+    }
+    public ObservableCollection<Screenshot> Captures { get; } = [];
+    public IReadOnlyCollection<string> QuickChips => CaptureInstructionResolver.QuickChips;
+    public Screenshot? SelectedCapture { get => _selectedCapture; set { _selectedCapture = value; OnPropertyChanged(); IsQuickContextOpen = value is not null; } }
+    public bool IsQuickContextOpen { get => _isQuickContextOpen; set { _isQuickContextOpen = value; OnPropertyChanged(); } }
+    public ICommand ApplyChipCommand { get; }
+    public ICommand CloseQuickContextCommand { get; }
+    public ICommand ReanalyzeCommand { get; }
+    public ICommand RegenerateNoteCommand { get; }
+}
 public sealed class InstructionsViewModel : ViewModelBase;
 public sealed class DocumentViewModel : ViewModelBase;
 public sealed class SettingsViewModel : ViewModelBase

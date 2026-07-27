@@ -41,4 +41,21 @@ public sealed class PersistenceTests : IAsyncLifetime
         var columns = await _db.Database.SqlQueryRaw<string>("SELECT name AS Value FROM pragma_table_info('ScreenshotImages')").ToListAsync().WaitAsync(TimeSpan.FromSeconds(10));
         columns.ShouldNotContain(x => x.Contains("Data", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public async Task Restart_does_not_lose_partially_saved_capture_context()
+    {
+        var session = TestData.Session();
+        var capture = TestData.Capture(session.Id);
+        capture.UserContext = "explicación parcial antes del reinicio";
+        session.Screenshots.Add(capture);
+        await new SessionRepository(_db).AddAsync(session);
+        await new UnitOfWork(_db).SaveChangesAsync();
+
+        // Clearing the tracker simulates constructing a fresh runtime after shutdown.
+        _db.ChangeTracker.Clear();
+        var restored = await new ScreenshotRepository(_db).GetAsync(capture.Id);
+
+        restored.ShouldNotBeNull().UserContext.ShouldBe("explicación parcial antes del reinicio");
+    }
 }
