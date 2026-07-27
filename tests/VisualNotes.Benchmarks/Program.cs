@@ -8,6 +8,7 @@ using SixLabors.ImageSharp.PixelFormats;
 
 BenchmarkRunner.Run<DocumentBenchmarks>();
 BenchmarkRunner.Run<ScreenshotStorageBenchmarks>();
+BenchmarkRunner.Run<CaptureListBenchmarks>();
 
 [MemoryDiagnoser]
 public class DocumentBenchmarks
@@ -39,4 +40,23 @@ public class ScreenshotStorageBenchmarks
         new(Guid.NewGuid(), Guid.NewGuid(), new MemoryStream(_source)));
 
     [GlobalCleanup] public void Cleanup() { if (Directory.Exists(_root)) Directory.Delete(_root, true); }
+}
+
+[MemoryDiagnoser]
+public class CaptureListBenchmarks
+{
+    private CaptureLibrary _library = null!;
+    [GlobalSetup]
+    public void Setup() => _library = new CaptureLibrary(Enumerable.Range(0, 1_000).Select(i => new Screenshot
+    {
+        CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(i), Tags = i % 4 == 0 ? "diagram" : "lecture",
+        ProcessingStatus = i % 10 == 0 ? ScreenshotStatus.NeedsReview : ScreenshotStatus.Ready,
+        Image = new ScreenshotImage { RelativePath = $"captures/{i}.png", ByteLength = 12_000_000 }
+    }));
+
+    [Benchmark(Description = "Carga y filtro de 1.000 capturas")]
+    public IReadOnlyList<Screenshot> Filter() => _library.Query(new(Tag: "diagram", Review: ReviewFilter.Pending));
+
+    [Benchmark(Description = "Scroll virtualizado (40 ventanas)")]
+    public int ScrollWindows() => Enumerable.Range(0, 40).Sum(page => _library.Captures.Skip(page * 20).Take(30).Count());
 }

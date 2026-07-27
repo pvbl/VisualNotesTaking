@@ -116,23 +116,80 @@ public sealed class SessionViewModel : ViewModelBase
 
 public sealed class CapturesViewModel : ViewModelBase
 {
+    private readonly CaptureLibrary _library;
     private Screenshot? _selectedCapture;
     private bool _isQuickContextOpen;
-    public CapturesViewModel()
+    private Guid? _sectionFilter;
+    private Guid? _targetSectionId;
+    private string _tagFilter = string.Empty;
+    private ScreenshotStatus? _statusFilter;
+    private CaptureImportance? _importanceFilter;
+    private ReviewFilter _reviewFilter;
+
+    public CapturesViewModel(IEnumerable<Screenshot>? captures = null)
     {
-        ApplyChipCommand = new RelayCommand(value => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); });
+        _library = new CaptureLibrary(captures ?? []);
+        Sections = _library.Captures.Where(capture => capture.Section is not null).Select(capture => capture.Section!).DistinctBy(section => section.Id).OrderBy(section => section.Order).ToArray();
+        SelectedCaptures.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectionCount));
+        ApplyChipCommand = new RelayCommand(value => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); Refresh(); });
         CloseQuickContextCommand = new RelayCommand(_ => IsQuickContextOpen = false);
-        ReanalyzeCommand = new RelayCommand(_ => { if (SelectedCapture is not null) SelectedCapture.ProcessingStatus = ScreenshotStatus.Queued; });
-        RegenerateNoteCommand = new RelayCommand(_ => { if (SelectedCapture is not null) SelectedCapture.ProcessingStatus = ScreenshotStatus.NeedsReview; });
+        ReanalyzeCommand = new RelayCommand(_ => Run(_library.Reprocess));
+        RegenerateNoteCommand = new RelayCommand(_ => Run(ids => { _library.Reprocess(ids); foreach (var capture in Selected()) capture.ProcessingStatus = ScreenshotStatus.NeedsReview; }));
+        ExcludeCommand = new RelayCommand(_ => Run(_library.Exclude));
+        DeleteCommand = new RelayCommand(_ => Run(_library.Delete));
+        RestoreCommand = new RelayCommand(_ => Run(_library.Restore));
+        UndoCommand = new RelayCommand(_ => { if (_library.Undo()) Refresh(); });
+        MoveToSectionCommand = new RelayCommand(value => { if (value is Guid id) Run(ids => _library.MoveToSection(ids, id)); });
+        ReorderCommand = new RelayCommand(value => { if (value is int index) Run(ids => _library.Reorder(ids, index)); });
+        ClearFiltersCommand = new RelayCommand(_ => { SectionFilter = null; TagFilter = string.Empty; StatusFilter = null; ImportanceFilter = null; ReviewFilter = VisualNotes.Core.Services.ReviewFilter.All; });
+        Refresh();
     }
+
     public ObservableCollection<Screenshot> Captures { get; } = [];
+    public ObservableCollection<Screenshot> SelectedCaptures { get; } = [];
     public IReadOnlyCollection<string> QuickChips => CaptureInstructionResolver.QuickChips;
+    public IReadOnlyList<NoteSection> Sections { get; }
+    public IReadOnlyList<ScreenshotStatus> Statuses { get; } = Enum.GetValues<ScreenshotStatus>();
+    public IReadOnlyList<CaptureImportance> Importances { get; } = Enum.GetValues<CaptureImportance>();
+    public IReadOnlyList<ReviewFilter> ReviewOptions { get; } = Enum.GetValues<ReviewFilter>();
+    public int SelectionCount => SelectedCaptures.Count;
     public Screenshot? SelectedCapture { get => _selectedCapture; set { _selectedCapture = value; OnPropertyChanged(); IsQuickContextOpen = value is not null; } }
     public bool IsQuickContextOpen { get => _isQuickContextOpen; set { _isQuickContextOpen = value; OnPropertyChanged(); } }
+    public Guid? SectionFilter { get => _sectionFilter; set { _sectionFilter = value; OnPropertyChanged(); Refresh(); } }
+    public Guid? TargetSectionId { get => _targetSectionId; set { _targetSectionId = value; OnPropertyChanged(); } }
+    public string TagFilter { get => _tagFilter; set { _tagFilter = value; OnPropertyChanged(); Refresh(); } }
+    public ScreenshotStatus? StatusFilter { get => _statusFilter; set { _statusFilter = value; OnPropertyChanged(); Refresh(); } }
+    public CaptureImportance? ImportanceFilter { get => _importanceFilter; set { _importanceFilter = value; OnPropertyChanged(); Refresh(); } }
+    public ReviewFilter ReviewFilter { get => _reviewFilter; set { _reviewFilter = value; OnPropertyChanged(); Refresh(); } }
     public ICommand ApplyChipCommand { get; }
     public ICommand CloseQuickContextCommand { get; }
     public ICommand ReanalyzeCommand { get; }
     public ICommand RegenerateNoteCommand { get; }
+    public ICommand ExcludeCommand { get; }
+    public ICommand DeleteCommand { get; }
+    public ICommand RestoreCommand { get; }
+    public ICommand UndoCommand { get; }
+    public ICommand MoveToSectionCommand { get; }
+    public ICommand ReorderCommand { get; }
+    public ICommand ClearFiltersCommand { get; }
+
+    public void ReplaceSelection(IEnumerable<Screenshot> selection)
+    {
+        SelectedCaptures.Clear();
+        foreach (var capture in selection) SelectedCaptures.Add(capture);
+        SelectedCapture = SelectedCaptures.LastOrDefault();
+    }
+
+    private IReadOnlyCollection<Guid> SelectedIds() => Selected().Select(capture => capture.Id).ToArray();
+    private IEnumerable<Screenshot> Selected() => SelectedCaptures.Count == 0 && SelectedCapture is not null ? [SelectedCapture] : SelectedCaptures;
+    private void Run(Action<IReadOnlyCollection<Guid>> action) { action(SelectedIds()); Refresh(); }
+    private void Refresh()
+    {
+        var selectedIds = SelectedCaptures.Select(capture => capture.Id).ToHashSet();
+        Captures.Clear();
+        foreach (var capture in _library.Query(new(SectionFilter, TagFilter, StatusFilter, ImportanceFilter, ReviewFilter))) Captures.Add(capture);
+        ReplaceSelection(Captures.Where(capture => selectedIds.Contains(capture.Id)));
+    }
 }
 public sealed class InstructionsViewModel : ViewModelBase;
 public sealed class DocumentViewModel : ViewModelBase;
