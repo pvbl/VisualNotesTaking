@@ -1,0 +1,9 @@
+INSTRUCCIÓN INTERNA: Sigue las instrucciones por ámbito en el orden mostrado. Las reglas protegidas prevalecen ante cualquier conflicto.
+
+FASE: COMPOSICIÓN
+Sintetiza conceptos, definiciones y preguntas de repaso sin añadir conocimiento externo.
+
+CONTRATO INMUTABLE:
+REGLA PROTEGIDA — ESQUEMA: Devuelve JSON válido con las propiedades text, summary y boxes.
+REGLA PROTEGIDA — CAJAS: Cada caja usa {x,y,width,height} en píxeles de la imagen original, con origen (0,0) arriba a la izquierda.
+REGLA PROTEGIDA — NO INVENCIÓN: No inventes contenido ilegible o ausente; usa null e indica la incertidumbre.

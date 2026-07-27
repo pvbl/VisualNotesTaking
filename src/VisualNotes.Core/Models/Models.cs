@@ -134,6 +134,8 @@ public sealed class AnalysisJob : Entity
     public AnalysisJobStatus JobStatus { get; set; } = AnalysisJobStatus.Pending;
     public int Attempts { get; set; }
     public string? Error { get; set; }
+    /// <summary>Template version and exact effective prompt used for this run; never contains provider secrets.</summary>
+    public string? EffectivePromptSnapshotJson { get; set; }
     public CaptureAnalysis? Result { get; set; }
 }
 
