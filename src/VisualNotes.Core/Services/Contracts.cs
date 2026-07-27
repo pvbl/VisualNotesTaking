@@ -27,3 +27,26 @@ public interface ISettingsStore
     Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);
     Task SetAsync<T>(string key, T value, CancellationToken cancellationToken = default);
 }
+
+public interface IScreenshotStorageService
+{
+    Task<StoredScreenshot> StoreAsync(ScreenshotStorageRequest request, CancellationToken cancellationToken = default);
+}
+
+public enum ScreenshotContentKind { VideoOrImage, CodeOrSmallText }
+public enum ScreenshotSizePreset { Default2560, FullHd1920, Original, Custom }
+
+public sealed record ScreenshotStorageRequest(
+    Guid SessionId,
+    Guid ScreenshotId,
+    Stream Content,
+    ScreenshotContentKind ContentKind = ScreenshotContentKind.VideoOrImage,
+    ScreenshotSizePreset SizePreset = ScreenshotSizePreset.Default2560,
+    int? CustomMaximumSide = null,
+    int ThumbnailMaximumSide = 320);
+
+public sealed record StoredImageMetadata(
+    string RelativePath, int OriginalWidth, int OriginalHeight, int FinalWidth, int FinalHeight,
+    double Scale, string Format, int? Quality, string Sha256, long Size);
+
+public sealed record StoredScreenshot(StoredImageMetadata Original, StoredImageMetadata Optimized, StoredImageMetadata Thumbnail);
