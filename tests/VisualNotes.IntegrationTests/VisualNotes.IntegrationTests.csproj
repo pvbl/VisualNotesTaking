@@ -7,6 +7,7 @@
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="Verify.Xunit" />
+    <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
     <ProjectReference Include="..\..\src\VisualNotes.Core\VisualNotes.Core.csproj" />
     <ProjectReference Include="..\..\src\VisualNotes.Infrastructure\VisualNotes.Infrastructure.csproj" />

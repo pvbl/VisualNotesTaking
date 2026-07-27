@@ -1,0 +1,31 @@
+{
+  "Parts": [
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"
+  ],
+  "Elements": [
+    "p",
+    "p",
+    "p",
+    "p",
+    "p",
+    "p",
+    "p",
+    "tbl",
+    "sectPr"
+  ],
+  "Styles": [
+    "Normal",
+    "Title",
+    "Subtitle",
+    "Heading1",
+    "Heading2",
+    "Code",
+    "Context",
+    "Caption",
+    "TableGrid"
+  ],
+  "Text": "ÍndiceTOC \\o \"1-3\" \\h \\z \\uArquitecturaComponentesEl paquete es independiente de Word.dotnet testContexto del estudiantePartePropósitoMainContenido"
+}
