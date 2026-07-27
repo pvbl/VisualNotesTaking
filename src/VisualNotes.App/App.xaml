@@ -1,0 +1,14 @@
+<Application x:Class="VisualNotes.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VisualNotes.App.ViewModels"
+             xmlns:views="clr-namespace:VisualNotes.App.Views"
+             ShutdownMode="OnExplicitShutdown">
+  <Application.Resources>
+    <DataTemplate DataType="{x:Type vm:SessionViewModel}"><views:SessionView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:CapturesViewModel}"><views:CapturesView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:InstructionsViewModel}"><views:InstructionsView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:DocumentViewModel}"><views:DocumentView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
+  </Application.Resources>
+</Application>
