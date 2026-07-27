@@ -1,0 +1,11 @@
+{
+  "stryker-config": {
+    "project": "src/VisualNotes.Core/VisualNotes.Core.csproj",
+    "test-projects": ["tests/VisualNotes.UnitTests/VisualNotes.UnitTests.csproj"],
+    "mutate": [
+      "**/BoundingBoxNormalizer.cs",
+      "**/SyntheticImageCropper.cs"
+    ],
+    "thresholds": { "high": 90, "low": 75, "break": 60 }
+  }
+}

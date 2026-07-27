@@ -76,6 +76,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             panel.Children.Add(Button("Confirmar", "ConfirmSelection", () => ConfirmRequested?.Invoke()));
             panel.Children.Add(Button("Bloquear", "LockSelection", () => { _controller.SetLocked(!_controller.IsLocked); SelectionChanged?.Invoke(); }));
             panel.Children.Add(Button("Ocultar", "HideSelection", () => { _controller.SetHidden(!_controller.IsHidden); SelectionChanged?.Invoke(); }));
+            panel.Children.Add(Button("Eliminar", "DeleteSelection", () => { _controller.Delete(); SelectionChanged?.Invoke(); }));
             panel.Children.Add(Button("Reiniciar", "ResetSelection", () => ResetRequested?.Invoke()));
             panel.Children.Add(Button("Cancelar", "CancelSelection", () => CancelRequested?.Invoke()));
             root.Children.Add(panel); return root;
@@ -109,6 +110,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             else if (args.Key == Key.R) ResetRequested?.Invoke();
             else if (args.Key == Key.L) { _controller.SetLocked(!_controller.IsLocked); SelectionChanged?.Invoke(); }
             else if (args.Key == Key.H) { _controller.SetHidden(!_controller.IsHidden); SelectionChanged?.Invoke(); }
+            else if (args.Key == Key.Delete) { _controller.Delete(); SelectionChanged?.Invoke(); }
             else if (args.Key is Key.Left or Key.Right or Key.Up or Key.Down)
             {
                 var x = args.Key == Key.Left ? -1 : args.Key == Key.Right ? 1 : 0;
