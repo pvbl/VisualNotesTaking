@@ -1,0 +1,22 @@
+{
+  "language": "es",
+  "contentType": "table",
+  "title": "Mediciones",
+  "summary": "Muestra | Valor",
+  "transcription": "Muestra | Valor",
+  "code": [],
+  "equations": [],
+  "tables": [
+    {
+      "type": "Table",
+      "content": "| Muestra | Valor |\n|---|---:|\n| A-01 | 12.50 |"
+    }
+  ],
+  "coordinateSystem": "Normalized1000",
+  "regions": [],
+  "concepts": [
+    "table"
+  ],
+  "confidence": 0.99,
+  "warnings": []
+}

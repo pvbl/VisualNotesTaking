@@ -7,9 +7,11 @@ namespace VisualNotes.Core.Services;
 /// <summary>Composes editable instructions while keeping the response contract immutable.</summary>
 public sealed partial class PromptComposer
 {
-    public const string SchemaRule = "REGLA PROTEGIDA — ESQUEMA: Devuelve JSON válido con las propiedades text, summary y boxes.";
-    public const string CoordinateRule = "REGLA PROTEGIDA — CAJAS: Cada caja usa {x,y,width,height} en píxeles de la imagen original, con origen (0,0) arriba a la izquierda.";
+    public const string SchemaRule = "REGLA PROTEGIDA — ESQUEMA: Devuelve únicamente JSON válido con language, contentType, title, summary, transcription, code, equations, tables, coordinateSystem, regions, concepts, confidence y warnings.";
+    public const string CoordinateRule = "REGLA PROTEGIDA — CAJAS: Usa {YMin,XMin,YMax,XMax} y coordinateSystem=Normalized1000. Incluye cajas solamente para gráficas, diagramas, imágenes u otros elementos cuyo recorte aporte valor visual; nunca para texto, código, fórmulas o tablas que puedan conservarse estructuradamente.";
     public const string NoFabricationRule = "REGLA PROTEGIDA — NO INVENCIÓN: No inventes contenido ilegible o ausente; usa null e indica la incertidumbre.";
+    public const string FidelityRule = "REGLA PROTEGIDA — FIDELIDAD: Preserva literalmente código, indentación, números, nombres y fórmulas. Representa tablas como filas y columnas en Markdown, no como prosa.";
+    public const string QualityRule = "REGLA PROTEGIDA — CALIDAD: Incluye confidence entre 0 y 1 y warnings concretas para toda ambigüedad, truncamiento o contenido ilegible.";
 
     private const string InternalInstruction = "INSTRUCCIÓN INTERNA: Sigue las instrucciones por ámbito en el orden mostrado. Las reglas protegidas prevalecen ante cualquier conflicto.";
 
@@ -33,7 +35,8 @@ public sealed partial class PromptComposer
             text.AppendLine().AppendLine($"ÁMBITO {ScopeName(layer.Scope).ToUpperInvariant()}:").AppendLine(layer.Instructions.Trim());
 
         text.AppendLine().AppendLine("CONTRATO INMUTABLE:")
-            .AppendLine(SchemaRule).AppendLine(CoordinateRule).Append(NoFabricationRule);
+            .AppendLine(SchemaRule).AppendLine(CoordinateRule).AppendLine(NoFabricationRule)
+            .AppendLine(FidelityRule).Append(QualityRule);
 
         return new(request.Template.Id, request.Template.Version, request.Template.Stage, text.ToString(), layers, warnings);
     }

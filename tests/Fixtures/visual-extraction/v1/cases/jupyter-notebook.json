@@ -1,0 +1,22 @@
+{
+  "language": "es",
+  "contentType": "notebook",
+  "title": "Regresión",
+  "summary": "x = np.array([1, 2, 3])\nmodel.fit(x.reshape(-1, 1), y)",
+  "transcription": "x = np.array([1, 2, 3])\nmodel.fit(x.reshape(-1, 1), y)",
+  "code": [
+    {
+      "type": "Code",
+      "content": "x = np.array([1, 2, 3])\nmodel.fit(x.reshape(-1, 1), y)"
+    }
+  ],
+  "equations": [],
+  "tables": [],
+  "coordinateSystem": "Normalized1000",
+  "regions": [],
+  "concepts": [
+    "notebook"
+  ],
+  "confidence": 0.97,
+  "warnings": []
+}

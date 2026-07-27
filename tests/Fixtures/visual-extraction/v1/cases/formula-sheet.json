@@ -1,0 +1,22 @@
+{
+  "language": "es",
+  "contentType": "formula-sheet",
+  "title": "Identidades",
+  "summary": "E = m c^2",
+  "transcription": "E = m c^2",
+  "code": [],
+  "equations": [
+    {
+      "type": "Equation",
+      "content": "E = m c^2"
+    }
+  ],
+  "tables": [],
+  "coordinateSystem": "Normalized1000",
+  "regions": [],
+  "concepts": [
+    "formula-sheet"
+  ],
+  "confidence": 0.96,
+  "warnings": []
+}

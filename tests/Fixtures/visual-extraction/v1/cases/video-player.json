@@ -1,0 +1,17 @@
+{
+  "language": "es",
+  "contentType": "video-frame",
+  "title": "Reproductor",
+  "summary": "00:12 / 03:45",
+  "transcription": "00:12 / 03:45",
+  "code": [],
+  "equations": [],
+  "tables": [],
+  "coordinateSystem": "Normalized1000",
+  "regions": [],
+  "concepts": [
+    "video-frame"
+  ],
+  "confidence": 0.94,
+  "warnings": []
+}

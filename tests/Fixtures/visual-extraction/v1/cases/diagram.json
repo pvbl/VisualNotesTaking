@@ -1,0 +1,28 @@
+{
+  "language": "es",
+  "contentType": "diagram",
+  "title": "Pipeline",
+  "summary": "Carga → Normalización → Validación",
+  "transcription": "Carga → Normalización → Validación",
+  "code": [],
+  "equations": [],
+  "tables": [],
+  "coordinateSystem": "Normalized1000",
+  "regions": [
+    {
+      "label": "diagrama del pipeline",
+      "box": {
+        "YMin": 120,
+        "XMin": 50,
+        "YMax": 900,
+        "XMax": 950
+      },
+      "confidence": 0.97
+    }
+  ],
+  "concepts": [
+    "diagram"
+  ],
+  "confidence": 0.97,
+  "warnings": []
+}

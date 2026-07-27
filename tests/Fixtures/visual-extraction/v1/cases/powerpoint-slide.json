@@ -1,0 +1,22 @@
+{
+  "language": "es",
+  "contentType": "presentation-slide",
+  "title": "Ley de Ohm",
+  "summary": "V = I R",
+  "transcription": "V = I R",
+  "code": [],
+  "equations": [
+    {
+      "type": "Equation",
+      "content": "V = I R"
+    }
+  ],
+  "tables": [],
+  "coordinateSystem": "Normalized1000",
+  "regions": [],
+  "concepts": [
+    "presentation-slide"
+  ],
+  "confidence": 0.98,
+  "warnings": []
+}
