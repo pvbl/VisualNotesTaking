@@ -1,0 +1,48 @@
+{
+  "Title": "Cálculo",
+  "Sections": [
+    {
+      "StableKey": "section:10000000-0000-0000-0000-000000000001",
+      "Type": "Section",
+      "Content": "Derivadas",
+      "Children": [
+        {
+          "StableKey": "student:20000000-0000-0000-0000-000000000001",
+          "Type": "Context",
+          "Origin": "StudentComment",
+          "Content": "Recordar el orden exterior → interior",
+          "Sources": [
+            "20000000-0000-0000-0000-000000000001"
+          ]
+        },
+        {
+          "StableKey": "heading",
+          "Type": "Heading",
+          "Origin": "Observed",
+          "Content": "Regla de la cadena",
+          "Sources": [
+            "20000000-0000-0000-0000-000000000001"
+          ]
+        },
+        {
+          "StableKey": "formula",
+          "Type": "Equation",
+          "Origin": "Observed",
+          "Content": "(f∘g)'=(f'∘g)g'",
+          "Sources": [
+            "20000000-0000-0000-0000-000000000001"
+          ]
+        },
+        {
+          "StableKey": "why",
+          "Type": "Paragraph",
+          "Origin": "GeneratedExplanation",
+          "Content": "Deriva la función exterior y multiplica por la interior.",
+          "Sources": [
+            "20000000-0000-0000-0000-000000000001"
+          ]
+        }
+      ]
+    }
+  ]
+}
