@@ -1,0 +1,47 @@
+name: Accept Codex pull requests
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: codex-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  enable-auto-merge:
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'codex/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable squash auto-merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh pr merge "$PR_NUMBER" --repo "$GH_REPO" --squash --auto
+
+  delete-merged-branch:
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.event.pull_request.head.ref, 'codex/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Codex branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if gh api "repos/${GH_REPO}/git/ref/heads/${HEAD_REF}" >/dev/null 2>&1; then
+            gh api --method DELETE "repos/${GH_REPO}/git/refs/heads/${HEAD_REF}"
+          fi
