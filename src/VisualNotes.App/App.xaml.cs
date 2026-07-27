@@ -1,7 +1,9 @@
 using System.Drawing;
 using System.Windows;
 using Forms = System.Windows.Forms;
+using Microsoft.EntityFrameworkCore;
 using VisualNotes.App.ViewModels;
+using VisualNotes.Infrastructure.Persistence;
 
 namespace VisualNotes.App;
 
@@ -11,10 +13,27 @@ public partial class App : System.Windows.Application
     private MainWindow? _window;
     private MainViewModel? _viewModel;
     private bool _isExiting;
+    private VisualNotesDbContext? _database;
 
-    protected override void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualNotes");
+        Directory.CreateDirectory(dataDirectory);
+        _database = new VisualNotesDbContext(new DbContextOptionsBuilder<VisualNotesDbContext>()
+            .UseSqlite($"Data Source={Path.Combine(dataDirectory, "visualnotes.db")}")
+            .Options);
+        try
+        {
+            await new DatabaseMigrationService(_database).MigrateAsync();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show($"No se pudo preparar la base de datos local.\n\n{exception.Message}", "VisualNotes", MessageBoxButton.OK, MessageBoxImage.Error);
+            await _database.DisposeAsync();
+            Shutdown(-1);
+            return;
+        }
         _viewModel = new MainViewModel();
         _window = new MainWindow { DataContext = _viewModel };
         _window.Closing += (_, args) =>
@@ -57,11 +76,12 @@ public partial class App : System.Windows.Application
         _window.Activate();
     }
 
-    private void ExitApplication()
+    private async void ExitApplication()
     {
         _isExiting = true;
         _trayIcon?.Dispose();
         _window?.Close();
+        if (_database is not null) await _database.DisposeAsync();
         Shutdown();
     }
 }
