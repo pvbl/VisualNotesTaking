@@ -57,6 +57,7 @@ public partial class App : System.Windows.Application
     private Forms.NotifyIcon? _trayIcon;
     private MainWindow? _window;
     private Views.CapturePanelWindow? _capturePanel;
+    private Views.ContextPanelWindow? _contextPanel;
     private CapturePanelViewModel? _capturePanelViewModel;
     private MainViewModel? _viewModel;
     private bool _isExiting;
@@ -160,14 +161,35 @@ public partial class App : System.Windows.Application
             _viewModel.ActiveSession?.Id ?? Guid.Empty);
         _activeRegion = restored.Region;
         _window = new MainWindow { DataContext = _viewModel };
-        _capturePanelViewModel = new CapturePanelViewModel(_viewModel);
+        _capturePanelViewModel = new CapturePanelViewModel(
+            _viewModel,
+            SetRegionLockAsync,
+            _activeRegion?.IsLocked == true);
         _capturePanelViewModel.CaptureRequested += CaptureFromPanel;
         _capturePanel = new Views.CapturePanelWindow { DataContext = _capturePanelViewModel };
+        _contextPanel = new Views.ContextPanelWindow
+        {
+            DataContext = _capturePanelViewModel,
+            Anchor = _capturePanel
+        };
+        _capturePanelViewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(CapturePanelViewModel.ContextPlacement))
+                UpdateContextPanelVisibility();
+        };
+        _contextPanel.Closing += (_, args) =>
+        {
+            if (_isExiting) return;
+            args.Cancel = true;
+            _capturePanelViewModel.ContextPlacement = ContextEditorPlacement.Dentro;
+            _contextPanel.Hide();
+        };
         _capturePanel.Closing += (_, args) =>
         {
             if (_isExiting) return;
             args.Cancel = true;
             _capturePanel.Hide();
+            _contextPanel.Hide();
         };
         _viewModel.SessionActivated += ShowCapturePanel;
         _window.Closing += (_, args) =>
@@ -181,6 +203,7 @@ public partial class App : System.Windows.Application
         // Keep capture controls independent so minimizing or hiding the main window
         // does not remove them from the screen during a capture session.
         _capturePanel.Show();
+        UpdateContextPanelVisibility();
         if (_activeRegion is not null) _regionBorder.Show(_activeRegion);
     }
 
@@ -188,14 +211,37 @@ public partial class App : System.Windows.Application
     private async Task RedefinePersistentRegionAsync()
     {
         if (_capture is null || _regions is null || _viewModel is null) return;
+        if (_activeRegion?.IsLocked == true)
+        {
+            MessageBox.Show("Desbloquea la región desde el panel de control antes de redefinirla.",
+                "Región bloqueada", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion));
         if (frame?.Metadata is not { } metadata) return;
         var monitors = WindowsScreenCaptureService.GetMonitors();
         var monitor = monitors.FirstOrDefault(x => x.DeviceName == metadata.MonitorDeviceName) ?? monitors.First();
         _activeRegion = new(metadata.PhysicalBounds, monitor.DeviceName, monitor.DpiX, monitor.DpiY,
-            _viewModel.ActiveSession?.Id ?? Guid.Empty, monitor.Bounds);
+            _viewModel.ActiveSession?.Id ?? Guid.Empty, monitor.Bounds,
+            IsLocked: metadata.RegionIsLocked,
+            IsHidden: metadata.RegionIsHidden);
+        await _regions.SaveAsync(_activeRegion);
+        _capturePanelViewModel?.SetRegionLockState(_activeRegion.IsLocked);
+        _regionBorder?.Show(_activeRegion);
+    }
+
+    private async Task<bool> SetRegionLockAsync(bool isLocked)
+    {
+        if (_activeRegion is null || _regions is null)
+        {
+            MessageBox.Show("Define primero una región de captura.",
+                "Sin región", MessageBoxButton.OK, MessageBoxImage.Information);
+            return false;
+        }
+        _activeRegion = _activeRegion with { IsLocked = isLocked };
         await _regions.SaveAsync(_activeRegion);
         _regionBorder?.Show(_activeRegion);
+        return true;
     }
 
     private async void CapturePersistentRegion() => await CapturePersistentRegionAsync();
@@ -265,6 +311,20 @@ public partial class App : System.Windows.Application
         if (!_capturePanel.IsVisible) _capturePanel.Show();
         if (_capturePanel.WindowState == WindowState.Minimized) _capturePanel.WindowState = WindowState.Normal;
         _capturePanel.Activate();
+        UpdateContextPanelVisibility();
+    }
+
+    private void UpdateContextPanelVisibility()
+    {
+        if (_contextPanel is null || _capturePanelViewModel is null || _isExiting) return;
+        if (_capturePanelViewModel.ContextPlacement == ContextEditorPlacement.Dentro || _capturePanel?.IsVisible != true)
+        {
+            _contextPanel.Hide();
+            return;
+        }
+        if (!_contextPanel.IsVisible) _contextPanel.Show();
+        if (_contextPanel.WindowState == WindowState.Minimized) _contextPanel.WindowState = WindowState.Normal;
+        _contextPanel.ApplyPlacement();
     }
 
     private async void ExitApplication() => await ExitApplicationAsync();
@@ -274,6 +334,7 @@ public partial class App : System.Windows.Application
         _trayIcon?.Dispose();
         _applicationIcon?.Dispose();
         _regionBorder?.Dispose();
+        _contextPanel?.Close();
         _capturePanel?.Close();
         _hotkeys?.Dispose();
         _window?.Close();

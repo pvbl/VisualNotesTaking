@@ -17,8 +17,10 @@ namespace VisualNotes.App.Services;
 
 public interface IRegionSelectionOverlay
 {
-    Task<PhysicalRectangle?> SelectAsync(CancellationToken cancellationToken);
+    Task<RegionSelectionResult?> SelectAsync(CancellationToken cancellationToken);
 }
+
+public sealed record RegionSelectionResult(PhysicalRectangle Bounds, bool IsLocked, bool IsHidden);
 
 /// <summary>Captures physical desktop pixels after all VisualNotes surfaces have been hidden.</summary>
 public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay overlay) : IScreenCaptureService
@@ -42,7 +44,7 @@ public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay 
             var bytes = await Task.Run(() => EncodePng(target.Bounds), cancellationToken).ConfigureAwait(false);
             var metadata = new CaptureMetadata(request.Mode, target.Bounds, capturedAt, target.Monitor?.DeviceName,
                 target.Window, target.WindowTitle, target.Monitor?.DpiX ?? 96, target.Monitor?.DpiY ?? 96,
-                target.Bounds.Width, target.Bounds.Height);
+                target.Bounds.Width, target.Bounds.Height, target.RegionIsLocked, target.RegionIsHidden);
             return new CapturedFrame(Guid.NewGuid(), capturedAt,
                 new CaptureRegion(target.Bounds.X, target.Bounds.Y, target.Bounds.Width, target.Bounds.Height),
                 bytes, "image/png", metadata);
@@ -60,14 +62,19 @@ public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay 
     {
         if (request.Mode == ScreenCaptureMode.OneTimeRegion)
         {
-            var selected = request.Region ?? await overlay.SelectAsync(cancellationToken).ConfigureAwait(true);
-            return selected is null || selected.IsEmpty ? null : new(selected, FindMonitor(selected), null, null);
+            var selection = request.Region is null
+                ? await overlay.SelectAsync(cancellationToken).ConfigureAwait(true)
+                : null;
+            var selected = request.Region ?? selection?.Bounds;
+            return selected is null || selected.IsEmpty
+                ? null
+                : new(selected, FindMonitor(selected), null, null, selection?.IsLocked ?? false, selection?.IsHidden ?? false);
         }
 
         if (request.Mode == ScreenCaptureMode.FullVirtualDesktop)
         {
             var area = Forms.SystemInformation.VirtualScreen;
-            return new(new(area.X, area.Y, area.Width, area.Height), null, null, null);
+            return new(new(area.X, area.Y, area.Width, area.Height), null, null, null, false, false);
         }
 
         if (request.Mode == ScreenCaptureMode.ActiveWindow)
@@ -75,14 +82,14 @@ public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay 
             var window = request.WindowHandle ?? NativeMethods.GetForegroundWindow();
             if (window == 0 || !NativeMethods.GetWindowRect(window, out var rectangle)) return null;
             var bounds = new PhysicalRectangle(rectangle.Left, rectangle.Top, rectangle.Right - rectangle.Left, rectangle.Bottom - rectangle.Top);
-            return new(bounds, FindMonitor(bounds), window, GetWindowTitle(window));
+            return new(bounds, FindMonitor(bounds), window, GetWindowTitle(window), false, false);
         }
 
         var screen = request.MonitorDeviceName is null
             ? Forms.Screen.FromPoint(Forms.Cursor.Position)
             : Forms.Screen.AllScreens.FirstOrDefault(x => x.DeviceName == request.MonitorDeviceName) ?? Forms.Screen.PrimaryScreen!;
         var monitor = GetMonitor(screen);
-        return new(monitor.Bounds, monitor, null, null);
+        return new(monitor.Bounds, monitor, null, null, false, false);
     }
 
     private static byte[] EncodePng(PhysicalRectangle bounds)
@@ -117,7 +124,13 @@ public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay 
         return value.ToString();
     }
 
-    private sealed record CaptureTarget(PhysicalRectangle Bounds, MonitorCaptureInfo? Monitor, nint? Window, string? WindowTitle);
+    private sealed record CaptureTarget(
+        PhysicalRectangle Bounds,
+        MonitorCaptureInfo? Monitor,
+        nint? Window,
+        string? WindowTitle,
+        bool RegionIsLocked,
+        bool RegionIsHidden);
 
     private static partial class NativeMethods
     {

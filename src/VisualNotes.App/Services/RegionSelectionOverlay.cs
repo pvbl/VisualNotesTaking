@@ -25,20 +25,24 @@ namespace VisualNotes.App.Services;
 /// <summary>One transparent, DPI-aware selection surface per monitor.</summary>
 public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
 {
-    public Task<PhysicalRectangle?> SelectAsync(CancellationToken cancellationToken)
+    public Task<RegionSelectionResult?> SelectAsync(CancellationToken cancellationToken)
     {
-        var completion = new TaskCompletionSource<PhysicalRectangle?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completion = new TaskCompletionSource<RegionSelectionResult?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var controller = new RegionSelectionController();
         var windows = Forms.Screen.AllScreens.Select(screen => new SelectionWindow(screen, controller)).ToList();
 
-        void Close(PhysicalRectangle? result)
+        void Close(RegionSelectionResult? result)
         {
             foreach (var window in windows) window.Close();
             completion.TrySetResult(result);
         }
         foreach (var window in windows)
         {
-            window.ConfirmRequested += () => { if (controller.Confirm()) Close(controller.Selection); };
+            window.ConfirmRequested += () =>
+            {
+                if (controller.Confirm() && controller.Selection is { } bounds)
+                    Close(new(bounds, controller.IsLocked, controller.IsHidden));
+            };
             window.CancelRequested += () => { controller.Cancel(); Close(null); };
             window.ResetRequested += () => { controller.Reset(); foreach (var item in windows) item.RefreshSelection(); };
             window.SelectionChanged += () => { foreach (var item in windows) item.RefreshSelection(); };
@@ -48,7 +52,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
         return AwaitAndDisposeAsync(completion.Task, registration);
     }
 
-    private static async Task<PhysicalRectangle?> AwaitAndDisposeAsync(Task<PhysicalRectangle?> task, CancellationTokenRegistration registration)
+    private static async Task<RegionSelectionResult?> AwaitAndDisposeAsync(Task<RegionSelectionResult?> task, CancellationTokenRegistration registration)
     {
         try { return await task.ConfigureAwait(false); }
         finally { registration.Dispose(); }

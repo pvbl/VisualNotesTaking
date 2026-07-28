@@ -1,26 +1,38 @@
 using System.Windows;
 using System.Windows.Input;
 
+using VisualNotes.Core.Models;
+
 namespace VisualNotes.App.ViewModels;
 
 public enum CapturePanelMode { Region, Monitor, Desktop, Window }
 public enum CapturePanelPlacement { Flotante, Derecha, Arriba, Abajo }
+public enum ContextEditorPlacement { Dentro, Izquierda, Derecha, Debajo, Flotante }
 
 /// <summary>State and commands exposed by the always-on-top capture controller.</summary>
 public sealed class CapturePanelViewModel : ViewModelBase
 {
     private readonly MainViewModel _main;
+    private readonly Func<bool, Task<bool>>? _setRegionLock;
     private CapturePanelMode _mode = CapturePanelMode.Region;
     private int _queuedCaptures;
     private int _captureCount;
     private bool _isMinimal;
     private double _panelOpacity = 0.94;
     private CapturePanelPlacement _placement = CapturePanelPlacement.Derecha;
+    private ContextEditorPlacement _contextPlacement = ContextEditorPlacement.Dentro;
     private string _contextMarkdown = string.Empty;
+    private string _newSectionName = string.Empty;
+    private bool _isRegionLocked;
 
-    public CapturePanelViewModel(MainViewModel main)
+    public CapturePanelViewModel(
+        MainViewModel main,
+        Func<bool, Task<bool>>? setRegionLock = null,
+        bool isRegionLocked = false)
     {
         _main = main;
+        _setRegionLock = setRegionLock;
+        _isRegionLocked = isRegionLocked;
         CaptureCommand = new RelayCommand(_ => CaptureRequested?.Invoke(Mode, ContextMarkdown));
         AddTextNoteCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
         {
@@ -29,6 +41,20 @@ public sealed class CapturePanelViewModel : ViewModelBase
             ContextMarkdown = string.Empty;
         });
         RunSessionBatchCommand = _main.Captures.RunSessionBatchCommand;
+        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
+        {
+            var section = await _main.AddSectionAsync(NewSectionName, cancellationToken);
+            NewSectionName = string.Empty;
+            OnPropertyChanged(nameof(Sections));
+            OnPropertyChanged(nameof(SelectedSectionId));
+            OnPropertyChanged(nameof(SectionName));
+        });
+        ToggleRegionLockCommand = new AsyncRelayCommand(async (_, _) =>
+        {
+            var requested = !IsRegionLocked;
+            if (_setRegionLock is not null && await _setRegionLock(requested))
+                SetRegionLockState(requested);
+        });
         TogglePauseCommand = main.TogglePauseCommand;
         NextSectionCommand = new RelayCommand(_ => ChangeSection(1));
         PreviousSectionCommand = new RelayCommand(_ => ChangeSection(-1));
@@ -46,6 +72,20 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public string SessionName => _main.ActiveSessionName;
     public string SectionName => _main.ActiveSectionName;
     public string SessionStatus => _main.SessionStatus;
+    public IReadOnlyList<NoteSection> Sections => _main.ActiveSession?.Sections.OrderBy(section => section.Order).ToArray() ?? [];
+    public Guid? SelectedSectionId
+    {
+        get => _main.ActiveSession?.ActiveSectionId;
+        set
+        {
+            if (value is not { } id || id == _main.ActiveSession?.ActiveSectionId) return;
+            var section = Sections.FirstOrDefault(item => item.Id == id);
+            if (section is not null) _main.Sessions.ActivateSectionCommand.Execute(section);
+        }
+    }
+    public string NewSectionName { get => _newSectionName; set { _newSectionName = value; OnPropertyChanged(); } }
+    public bool IsRegionLocked => _isRegionLocked;
+    public string RegionLockLabel => IsRegionLocked ? "Desbloquear región" : "Bloquear región";
     public CapturePanelMode Mode { get => _mode; set { _mode = value; OnPropertyChanged(); } }
     public IReadOnlyList<CapturePanelMode> Modes { get; } = Enum.GetValues<CapturePanelMode>();
     public CapturePanelPlacement Placement
@@ -60,6 +100,21 @@ public sealed class CapturePanelViewModel : ViewModelBase
         }
     }
     public IReadOnlyList<CapturePanelPlacement> Placements { get; } = Enum.GetValues<CapturePanelPlacement>();
+    public ContextEditorPlacement ContextPlacement
+    {
+        get => _contextPlacement;
+        set
+        {
+            if (_contextPlacement == value) return;
+            _contextPlacement = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ContextInsideVisibility));
+        }
+    }
+    public IReadOnlyList<ContextEditorPlacement> ContextPlacements { get; } = Enum.GetValues<ContextEditorPlacement>();
+    public Visibility ContextInsideVisibility => ContextPlacement == ContextEditorPlacement.Dentro
+        ? Visibility.Visible
+        : Visibility.Collapsed;
     public bool IsVerticalLayout => Placement == CapturePanelPlacement.Derecha;
     public int QueuedCaptures { get => _queuedCaptures; set { _queuedCaptures = Math.Max(0, value); OnPropertyChanged(); } }
     public int CaptureCount { get => _captureCount; private set { _captureCount = value; OnPropertyChanged(); } }
@@ -70,6 +125,8 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public ICommand CaptureCommand { get; }
     public ICommand AddTextNoteCommand { get; }
     public ICommand RunSessionBatchCommand { get; }
+    public ICommand AddSectionCommand { get; }
+    public ICommand ToggleRegionLockCommand { get; }
     public ICommand TogglePauseCommand { get; }
     public ICommand NextSectionCommand { get; }
     public ICommand PreviousSectionCommand { get; }
@@ -84,6 +141,14 @@ public sealed class CapturePanelViewModel : ViewModelBase
         CaptureCount++;
         QueuedCaptures = Math.Max(0, QueuedCaptures - 1);
         if (clearContext) ContextMarkdown = string.Empty;
+    }
+
+    public void SetRegionLockState(bool isLocked)
+    {
+        if (_isRegionLocked == isLocked) return;
+        _isRegionLocked = isLocked;
+        OnPropertyChanged(nameof(IsRegionLocked));
+        OnPropertyChanged(nameof(RegionLockLabel));
     }
 
     public static Rect ConstrainToWorkArea(Rect requested, Rect workArea)
@@ -107,12 +172,40 @@ public sealed class CapturePanelViewModel : ViewModelBase
         }
 
         var horizontalWidth = Math.Min(1040, workArea.Width);
-        var horizontalHeight = Math.Min(300, workArea.Height);
+        var horizontalHeight = Math.Min(390, workArea.Height);
         var left = workArea.Left + ((workArea.Width - horizontalWidth) / 2);
         var top = placement == CapturePanelPlacement.Arriba
             ? workArea.Top
             : workArea.Bottom - horizontalHeight;
         return new(left, top, horizontalWidth, horizontalHeight);
+    }
+
+    public static Rect GetContextBounds(
+        ContextEditorPlacement placement,
+        Rect controlBounds,
+        System.Windows.Size contextSize,
+        Rect floatingBounds)
+    {
+        const double gap = 8;
+        return placement switch
+        {
+            ContextEditorPlacement.Izquierda => new(
+                controlBounds.Left - contextSize.Width - gap,
+                controlBounds.Top,
+                contextSize.Width,
+                contextSize.Height),
+            ContextEditorPlacement.Derecha => new(
+                controlBounds.Right + gap,
+                controlBounds.Top,
+                contextSize.Width,
+                contextSize.Height),
+            ContextEditorPlacement.Debajo => new(
+                controlBounds.Left,
+                controlBounds.Bottom + gap,
+                contextSize.Width,
+                contextSize.Height),
+            _ => floatingBounds
+        };
     }
 
     private void ChangeSection(int offset)
@@ -126,6 +219,10 @@ public sealed class CapturePanelViewModel : ViewModelBase
 
     private void RefreshSession()
     {
-        OnPropertyChanged(nameof(SessionName)); OnPropertyChanged(nameof(SectionName)); OnPropertyChanged(nameof(SessionStatus));
+        OnPropertyChanged(nameof(SessionName));
+        OnPropertyChanged(nameof(SectionName));
+        OnPropertyChanged(nameof(SessionStatus));
+        OnPropertyChanged(nameof(Sections));
+        OnPropertyChanged(nameof(SelectedSectionId));
     }
 }

@@ -1,13 +1,54 @@
 using System.Windows;
 
+using NSubstitute;
+
 using Shouldly;
 
 using VisualNotes.App.ViewModels;
+using VisualNotes.Core.Models;
+using VisualNotes.Core.Services;
 
 namespace VisualNotes.UiTests;
 
 public sealed class CapturePanelUiTests
 {
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public async Task Region_lock_is_kept_by_the_panel_until_explicitly_unlocked()
+    {
+        bool? persisted = null;
+        var main = CreateMain();
+        var panel = new CapturePanelViewModel(main, value =>
+        {
+            persisted = value;
+            return Task.FromResult(true);
+        });
+
+        await ((AsyncRelayCommand)panel.ToggleRegionLockCommand).ExecuteAsync();
+
+        persisted.GetValueOrDefault().ShouldBeTrue();
+        panel.IsRegionLocked.ShouldBeTrue();
+        panel.RegionLockLabel.ShouldBe("Desbloquear región");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public async Task Section_can_be_created_and_changed_from_capture_panel()
+    {
+        var main = CreateMain();
+        await main.InitializeAsync();
+        var session = await main.EnsureActiveSessionAsync();
+        var general = session.Sections.Single();
+        var panel = new CapturePanelViewModel(main) { NewSectionName = "Ejemplos" };
+
+        await ((AsyncRelayCommand)panel.AddSectionCommand).ExecuteAsync();
+
+        session.Sections.Count.ShouldBe(2);
+        panel.Sections.Single(section => section.Title == "Ejemplos").Id.ShouldBe(session.ActiveSectionId!.Value);
+        panel.SelectedSectionId.ShouldBe(session.ActiveSectionId);
+
+        panel.SelectedSectionId = general.Id;
+        session.ActiveSectionId.ShouldBe(general.Id);
+    }
+
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
     public void Panel_defaults_to_the_right_side()
     {
@@ -63,6 +104,21 @@ public sealed class CapturePanelUiTests
         result.Top.ShouldBe(workArea.Top);
     }
 
+    [Theory, Trait("Category", "UI"), Trait("Category", "Windows")]
+    [InlineData(ContextEditorPlacement.Izquierda)]
+    [InlineData(ContextEditorPlacement.Derecha)]
+    [InlineData(ContextEditorPlacement.Debajo)]
+    public void Detached_context_editor_is_positioned_relative_to_capture_controls(ContextEditorPlacement placement)
+    {
+        var controls = new Rect(500, 200, 430, 300);
+        var result = CapturePanelViewModel.GetContextBounds(
+            placement, controls, new Size(380, 225), new Rect(100, 100, 380, 225));
+
+        if (placement == ContextEditorPlacement.Izquierda) result.Right.ShouldBe(controls.Left - 8);
+        if (placement == ContextEditorPlacement.Derecha) result.Left.ShouldBe(controls.Right + 8);
+        if (placement == ContextEditorPlacement.Debajo) result.Top.ShouldBe(controls.Bottom + 8);
+    }
+
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
     public void Panel_xaml_provides_keyboard_shortcuts_and_screen_reader_names()
     {
@@ -84,6 +140,24 @@ public sealed class CapturePanelUiTests
         xaml.ShouldContain("AutomationProperties.AutomationId=\"AddTextNoteButton\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"RunSessionBatchButton\"");
         xaml.ShouldContain("Text=\"{Binding ContextMarkdown, UpdateSourceTrigger=PropertyChanged}\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"ContextPlacementSelector\"");
+        xaml.ShouldContain("ItemsSource=\"{Binding ContextPlacements}\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"ToggleRegionLockButton\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelSectionSelector\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelAddSectionButton\"");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Detached_context_window_shares_markdown_and_can_return_inside()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+            "src", "VisualNotes.App", "Views", "ContextPanelWindow.xaml");
+        var xaml = File.ReadAllText(Path.GetFullPath(path));
+
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"ContextPanelWindow\"");
+        xaml.ShouldContain("Text=\"{Binding ContextMarkdown, UpdateSourceTrigger=PropertyChanged}\"");
+        xaml.ShouldContain("SelectedItem=\"{Binding ContextPlacement}\"");
+        xaml.ShouldContain("Path=DockInsideCommand");
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
@@ -150,5 +224,17 @@ public sealed class CapturePanelUiTests
         acquireInstance.ShouldBeGreaterThanOrEqualTo(0);
         activateExisting.ShouldBeGreaterThan(acquireInstance);
         createHotkeys.ShouldBeGreaterThan(activateExisting);
+    }
+
+    private static MainViewModel CreateMain()
+    {
+        var sessions = Substitute.For<ISessionRepository>();
+        sessions.ListAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<NoteSession>>([]));
+        return new MainViewModel(new SessionCoordinator(
+            sessions,
+            Substitute.For<IScreenshotRepository>(),
+            Substitute.For<ISettingsRepository>(),
+            Substitute.For<IUnitOfWork>()), sessions);
     }
 }

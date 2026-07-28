@@ -327,4 +327,6 @@ public sealed record CaptureMetadata(
     uint DpiX,
     uint DpiY,
     int PixelWidth,
-    int PixelHeight);
+    int PixelHeight,
+    bool RegionIsLocked = false,
+    bool RegionIsHidden = false);

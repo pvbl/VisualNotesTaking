@@ -247,6 +247,17 @@ public sealed class MainViewModel : ViewModelBase
         await CaptureAddedAsync(note);
     }
 
+    public async Task<NoteSection> AddSectionAsync(string title, CancellationToken cancellationToken = default)
+    {
+        var session = await EnsureActiveSessionAsync(cancellationToken);
+        var section = await _coordinator.AddSectionAsync(session,
+            string.IsNullOrWhiteSpace(title) ? "Nueva sección" : title.Trim(),
+            ct: cancellationToken);
+        Sessions.SelectedSection = section;
+        RefreshHeader();
+        return section;
+    }
+
     public async Task ResumeActiveSessionAsync(CancellationToken cancellationToken = default)
     {
         if (ActiveSession is not { IsPaused: true } session) return;
