@@ -199,27 +199,28 @@ public partial class App : System.Windows.Application
     }
 
     private async void CapturePersistentRegion() => await CapturePersistentRegionAsync();
-    private async Task CapturePersistentRegionAsync()
+    private Task CapturePersistentRegionAsync() => CapturePersistentRegionAsync(string.Empty, false);
+    private async Task CapturePersistentRegionAsync(string contextMarkdown, bool clearContext)
     {
         if (_capture is null || _activeRegion is null || _activeRegion.IsHidden || _viewModel is null) return;
         await _viewModel.EnsureActiveSessionAsync();
         await _viewModel.ResumeActiveSessionAsync();
         var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
             MonitorDeviceName: _activeRegion.MonitorDeviceName));
-        if (frame is not null) await PersistCapturedFrameAsync(frame);
+        if (frame is not null) await PersistCapturedFrameAsync(frame, contextMarkdown, clearContext);
         _regionBorder?.Show(_activeRegion);
     }
 
-    private async void CaptureFromPanel(CapturePanelMode mode) => await CaptureFromPanelAsync(mode);
-    private async Task CaptureFromPanelAsync(CapturePanelMode mode)
+    private async void CaptureFromPanel(CapturePanelMode mode, string contextMarkdown) => await CaptureFromPanelAsync(mode, contextMarkdown);
+    private async Task CaptureFromPanelAsync(CapturePanelMode mode, string contextMarkdown)
     {
         if (_capture is null || _viewModel is null) return;
         await _viewModel.EnsureActiveSessionAsync();
         await _viewModel.ResumeActiveSessionAsync();
-        if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(); return; }
+        if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(contextMarkdown, true); return; }
         var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
         var frame = await _capture.CaptureAsync(new(captureMode));
-        if (frame is not null) await PersistCapturedFrameAsync(frame);
+        if (frame is not null) await PersistCapturedFrameAsync(frame, contextMarkdown, true);
     }
 
     private void CreateTrayIcon()
@@ -289,7 +290,7 @@ public partial class App : System.Windows.Application
 
     private static void ShowError(UserFacingError error) => MessageBox.Show(error.Message, error.Title, MessageBoxButton.OK, MessageBoxImage.Error);
 
-    private async Task PersistCapturedFrameAsync(CapturedFrame frame)
+    private async Task PersistCapturedFrameAsync(CapturedFrame frame, string contextMarkdown = "", bool clearContext = false)
     {
         if (_runtime is null || _viewModel?.ActiveSession is not { } session)
         {
@@ -324,6 +325,7 @@ public partial class App : System.Windows.Application
                 Width = metadata?.PixelWidth ?? frame.Region.Width,
                 Height = metadata?.PixelHeight ?? frame.Region.Height,
                 PerceptualHash = stored.Optimized.Sha256,
+                UserContext = contextMarkdown.Trim(),
                 Image = new ScreenshotImage
                 {
                     ScreenshotId = frame.Id,
@@ -347,7 +349,7 @@ public partial class App : System.Windows.Application
             };
             await _runtime.Coordinator.AddCaptureAsync(session, capture);
             await _viewModel.CaptureAddedAsync(capture);
-            _capturePanelViewModel?.CaptureCompleted();
+            _capturePanelViewModel?.CaptureCompleted(clearContext);
         }
         catch (Exception exception)
         {

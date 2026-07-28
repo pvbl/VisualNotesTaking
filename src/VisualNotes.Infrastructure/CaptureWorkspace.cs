@@ -43,7 +43,10 @@ internal sealed class CaptureWorkspace(VisualNotesDbContext database, IScreensho
         if (capture.SectionId is not { } sectionId) return null;
         var analysis = capture.AnalysisJobs.Where(x => x.JobStatus == AnalysisJobStatus.Completed && x.Result is not null)
             .OrderBy(x => x.CompletedAt).LastOrDefault()?.Result;
-        if (analysis is null) return null;
+        if (analysis is null)
+            return capture.Image is null && !string.IsNullOrWhiteSpace(capture.UserContext)
+                ? new(capture.Id, sectionId, capture.CapturedAt, [], capture.UserContext)
+                : null;
         var nodes = new List<SemanticNode>();
         if (!string.IsNullOrWhiteSpace(analysis.NormalizedResponseJson))
         {

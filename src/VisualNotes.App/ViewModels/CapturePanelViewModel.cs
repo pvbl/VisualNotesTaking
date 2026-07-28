@@ -16,11 +16,19 @@ public sealed class CapturePanelViewModel : ViewModelBase
     private bool _isMinimal;
     private double _panelOpacity = 0.94;
     private CapturePanelPlacement _placement = CapturePanelPlacement.Derecha;
+    private string _contextMarkdown = string.Empty;
 
     public CapturePanelViewModel(MainViewModel main)
     {
         _main = main;
-        CaptureCommand = new RelayCommand(_ => CaptureRequested?.Invoke(Mode));
+        CaptureCommand = new RelayCommand(_ => CaptureRequested?.Invoke(Mode, ContextMarkdown));
+        AddTextNoteCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(ContextMarkdown)) return;
+            await _main.AddTextNoteAsync(ContextMarkdown, cancellationToken);
+            ContextMarkdown = string.Empty;
+        });
+        RunSessionBatchCommand = _main.Captures.RunSessionBatchCommand;
         TogglePauseCommand = main.TogglePauseCommand;
         NextSectionCommand = new RelayCommand(_ => ChangeSection(1));
         PreviousSectionCommand = new RelayCommand(_ => ChangeSection(-1));
@@ -57,8 +65,11 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public int CaptureCount { get => _captureCount; private set { _captureCount = value; OnPropertyChanged(); } }
     public bool IsMinimal { get => _isMinimal; set { _isMinimal = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandedVisibility)); } }
     public double PanelOpacity { get => _panelOpacity; set { _panelOpacity = Math.Clamp(value, 0.55, 1); OnPropertyChanged(); } }
+    public string ContextMarkdown { get => _contextMarkdown; set { _contextMarkdown = value; OnPropertyChanged(); } }
     public Visibility ExpandedVisibility => IsMinimal ? Visibility.Collapsed : Visibility.Visible;
     public ICommand CaptureCommand { get; }
+    public ICommand AddTextNoteCommand { get; }
+    public ICommand RunSessionBatchCommand { get; }
     public ICommand TogglePauseCommand { get; }
     public ICommand NextSectionCommand { get; }
     public ICommand PreviousSectionCommand { get; }
@@ -66,9 +77,14 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public ICommand MarkImportantCommand { get; }
     public ICommand AddContextCommand { get; }
     public ICommand ToggleMinimalCommand { get; }
-    public event Action<CapturePanelMode>? CaptureRequested;
+    public event Action<CapturePanelMode, string>? CaptureRequested;
 
-    public void CaptureCompleted() { CaptureCount++; QueuedCaptures = Math.Max(0, QueuedCaptures - 1); }
+    public void CaptureCompleted(bool clearContext = false)
+    {
+        CaptureCount++;
+        QueuedCaptures = Math.Max(0, QueuedCaptures - 1);
+        if (clearContext) ContextMarkdown = string.Empty;
+    }
 
     public static Rect ConstrainToWorkArea(Rect requested, Rect workArea)
     {
@@ -91,7 +107,7 @@ public sealed class CapturePanelViewModel : ViewModelBase
         }
 
         var horizontalWidth = Math.Min(1040, workArea.Width);
-        var horizontalHeight = Math.Min(190, workArea.Height);
+        var horizontalHeight = Math.Min(300, workArea.Height);
         var left = workArea.Left + ((workArea.Width - horizontalWidth) / 2);
         var top = placement == CapturePanelPlacement.Arriba
             ? workArea.Top

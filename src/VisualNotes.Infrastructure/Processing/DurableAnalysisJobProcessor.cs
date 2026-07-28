@@ -65,15 +65,17 @@ public sealed class DurableAnalysisJobProcessor : IAnalysisJobProcessor, IAsyncD
 
     public Task<int> RunAutomaticAsync(CancellationToken cancellationToken = default) => DrainAsync([AnalysisJobTrigger.Automatic], cancellationToken);
     public Task<int> RunManualAsync(CancellationToken cancellationToken = default) => DrainAsync([AnalysisJobTrigger.Manual], cancellationToken);
-    public Task<int> RunBatchAsync(CancellationToken cancellationToken = default) => DrainAsync([AnalysisJobTrigger.Batch], cancellationToken);
+    public Task<int> RunBatchAsync(Guid? sessionId = null, CancellationToken cancellationToken = default) =>
+        DrainAsync([AnalysisJobTrigger.Batch], cancellationToken, sessionId);
     public Task<int> RunSessionEndAsync(CancellationToken cancellationToken = default) => DrainAsync([AnalysisJobTrigger.SessionEnd], cancellationToken);
 
-    public async Task<int> DrainAsync(IReadOnlyCollection<AnalysisJobTrigger> triggers, CancellationToken cancellationToken = default)
+    public async Task<int> DrainAsync(IReadOnlyCollection<AnalysisJobTrigger> triggers,
+        CancellationToken cancellationToken = default, Guid? sessionId = null)
     {
         var count = 0;
         while (!cancellationToken.IsCancellationRequested)
         {
-            var claimed = await ClaimAsync(triggers, cancellationToken);
+            var claimed = await ClaimAsync(triggers, cancellationToken, sessionId);
             if (claimed.Count == 0) break;
             await Task.WhenAll(claimed.Select(x => ExecuteClaimedAsync(x, cancellationToken)));
             count += claimed.Count;
@@ -109,7 +111,10 @@ public sealed class DurableAnalysisJobProcessor : IAnalysisJobProcessor, IAsyncD
         await db.SaveChangesAsync(token);
     }
 
-    private async Task<List<AnalysisJob>> ClaimAsync(IReadOnlyCollection<AnalysisJobTrigger> triggers, CancellationToken token)
+    private async Task<List<AnalysisJob>> ClaimAsync(
+        IReadOnlyCollection<AnalysisJobTrigger> triggers,
+        CancellationToken token,
+        Guid? sessionId)
     {
         await using var db = await _contexts.CreateDbContextAsync(token);
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, token);
@@ -119,6 +124,7 @@ public sealed class DurableAnalysisJobProcessor : IAnalysisJobProcessor, IAsyncD
         var batch = triggers.Contains(AnalysisJobTrigger.Batch);
         var sessionEnd = triggers.Contains(AnalysisJobTrigger.SessionEnd);
         var candidates = await db.AnalysisJobs
+            .Where(x => sessionId == null || x.Screenshot!.SessionId == sessionId)
             .Where(x =>
                 (automatic && x.Trigger == AnalysisJobTrigger.Automatic) ||
                 (manual && x.Trigger == AnalysisJobTrigger.Manual) ||

@@ -80,6 +80,10 @@ public sealed class CapturePanelUiTests
         xaml.ShouldContain("FocusManager.FocusedElement=\"{Binding ElementName=CaptureNowButton, Mode=OneWay}\"");
         xaml.ShouldContain("{Binding SessionStatus, Mode=OneWay}");
         xaml.ShouldContain("{Binding CaptureCount, Mode=OneWay}");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"CaptureContextMarkdownInput\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"AddTextNoteButton\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"RunSessionBatchButton\"");
+        xaml.ShouldContain("Text=\"{Binding ContextMarkdown, UpdateSourceTrigger=PropertyChanged}\"");
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]

@@ -18,6 +18,7 @@ public interface IAnalysisJobProcessor
 {
     Task<AnalysisJob> EnqueueAsync(AnalysisJob job, CancellationToken cancellationToken = default);
     Task<int> RunManualAsync(CancellationToken cancellationToken = default);
+    Task<int> RunBatchAsync(Guid? sessionId = null, CancellationToken cancellationToken = default);
     Task CancelAsync(Guid jobId, CancellationToken cancellationToken = default);
     Task RetryAsync(Guid jobId, CancellationToken cancellationToken = default);
 }

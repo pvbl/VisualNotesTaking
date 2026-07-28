@@ -51,6 +51,38 @@ public sealed class VisualAnalysisPrivacyTests : IAsyncDisposable
         (await db.Screenshots.SingleAsync()).ProcessingStatus.ShouldBe(ScreenshotStatus.Ready);
     }
 
+    [Fact]
+    public async Task Batch_prompt_contains_capture_context_and_markdown_notes_without_images()
+    {
+        var (factory, job) = await ArrangeAsync();
+        await using (var db = await factory.CreateDbContextAsync())
+        {
+            var screenshot = await db.Screenshots.SingleAsync();
+            screenshot.UserContext = "**Contexto de la diapositiva**";
+            db.Screenshots.Add(new Screenshot
+            {
+                SessionId = screenshot.SessionId,
+                CapturedAt = screenshot.CapturedAt.AddSeconds(1),
+                UserContext = "## Mi apunte\nRelacionar con el tema anterior.",
+                ProcessingStatus = ScreenshotStatus.Ready
+            });
+            db.AnalysisJobs.Add(job);
+            await db.SaveChangesAsync();
+        }
+        job.Trigger = AnalysisJobTrigger.Batch;
+        var provider = new DeterministicVlmProvider();
+        var handler = new VisualAnalysisJobHandler(factory, root, new CredentialStore(true), new Consent(true),
+            new FileExtractionArtifactStore(root), (_, _) => provider);
+
+        await handler.ExecuteAsync(job, default);
+
+        provider.LastPrompt.ShouldContain("## Contexto Markdown de la sesión");
+        provider.LastPrompt.ShouldContain("## Información de la sesión");
+        provider.LastPrompt.ShouldContain("**Contexto de la diapositiva**");
+        provider.LastPrompt.ShouldContain("## Mi apunte");
+        provider.LastPrompt.ShouldContain("Apunte sin captura");
+    }
+
     private async Task<(Factory Factory, AnalysisJob Job)> ArrangeAsync()
     {
         Directory.CreateDirectory(root);
@@ -84,9 +116,11 @@ public sealed class VisualAnalysisPrivacyTests : IAsyncDisposable
     private sealed class DeterministicVlmProvider : IVisionLanguageModelProvider
     {
         public int RequestCount { get; private set; }
+        public string LastPrompt { get; private set; } = string.Empty;
         public Task<LanguageModelResponse> GenerateAsync(VisionLanguageModelRequest request, CancellationToken cancellationToken = default)
         {
             RequestCount++;
+            LastPrompt = request.Prompt;
             const string json = """{"language":"en","contentType":"slide","title":"Deterministic","summary":"Stable result","transcription":"Deterministic transcription","code":[],"equations":[],"tables":[],"coordinateSystem":"Normalized1000","regions":[],"concepts":[],"confidence":1,"warnings":[]}""";
             return Task.FromResult(new LanguageModelResponse(json, request.Options.Model, new(null, null)));
         }

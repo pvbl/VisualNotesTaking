@@ -230,6 +230,23 @@ public sealed class MainViewModel : ViewModelBase
         if (_captureWorkspace is not null) await Captures.LoadAsync();
     }
 
+    public async Task AddTextNoteAsync(string markdown, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(markdown)) return;
+        var session = await EnsureActiveSessionAsync(cancellationToken);
+        await ResumeActiveSessionAsync(cancellationToken);
+        var note = new Screenshot
+        {
+            SessionId = session.Id,
+            SectionId = session.ActiveSectionId,
+            CapturedAt = DateTimeOffset.UtcNow,
+            ProcessingStatus = ScreenshotStatus.Ready,
+            UserContext = markdown.Trim()
+        };
+        await _coordinator.AddCaptureAsync(session, note, cancellationToken);
+        await CaptureAddedAsync(note);
+    }
+
     public async Task ResumeActiveSessionAsync(CancellationToken cancellationToken = default)
     {
         if (ActiveSession is not { IsPaused: true } session) return;
@@ -388,6 +405,7 @@ public sealed class CapturesViewModel : ViewModelBase
         CloseQuickContextCommand = new RelayCommand(_ => IsQuickContextOpen = false);
         ReanalyzeCommand = new AsyncRelayCommand(async (_, cancellationToken) => await QueueAnalysisAsync());
         RegenerateNoteCommand = new AsyncRelayCommand(async (_, cancellationToken) => await QueueAnalysisAsync());
+        RunSessionBatchCommand = new AsyncRelayCommand(async (_, cancellationToken) => await RunSessionBatchAsync(cancellationToken));
         CancelAnalysisCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.CancelAsync(job.Id); await LoadAsync(); } });
         RetryAnalysisCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.RetryAsync(job.Id); await _analysisJobs.RunManualAsync(); await LoadAsync(); } });
         ExcludeCommand = new AsyncRelayCommand(async (_, cancellationToken) => await RunAsync(_library.Exclude));
@@ -420,6 +438,7 @@ public sealed class CapturesViewModel : ViewModelBase
     public ICommand CloseQuickContextCommand { get; }
     public ICommand ReanalyzeCommand { get; }
     public ICommand RegenerateNoteCommand { get; }
+    public ICommand RunSessionBatchCommand { get; }
     public ICommand CancelAnalysisCommand { get; }
     public ICommand RetryAnalysisCommand { get; }
     public ICommand ExcludeCommand { get; }
@@ -465,7 +484,8 @@ public sealed class CapturesViewModel : ViewModelBase
     private async Task QueueAnalysisAsync()
     {
         if (_analysisJobs is null) { await RunAsync(_library.Reprocess); return; }
-        foreach (var capture in Selected().ToArray())
+        var visualCaptures = Selected().Where(capture => capture.Image is not null).ToArray();
+        foreach (var capture in visualCaptures)
         {
             capture.ProcessingStatus = ScreenshotStatus.Queued;
             await _analysisJobs.EnqueueAsync(new AnalysisJob
@@ -475,8 +495,31 @@ public sealed class CapturesViewModel : ViewModelBase
                 IdempotencyKey = $"manual:{capture.Id:N}:{Guid.NewGuid():N}"
             });
         }
-        await PersistAndRefreshAsync(Selected().ToArray());
+        await PersistAndRefreshAsync(visualCaptures);
         await _analysisJobs.RunManualAsync();
+        await LoadAsync();
+    }
+
+    private async Task RunSessionBatchAsync(CancellationToken cancellationToken)
+    {
+        if (_analysisJobs is null || _activeSession?.Invoke() is not { } session || _workspace is null) return;
+        var captures = (await _workspace.LoadAsync(session.Id, cancellationToken))
+            .Where(capture => capture.Status != EntityStatus.Deleted &&
+                capture.Image is not null &&
+                capture.ProcessingStatus is not (ScreenshotStatus.Analyzing or ScreenshotStatus.Queued))
+            .ToArray();
+        foreach (var capture in captures)
+        {
+            capture.ProcessingStatus = ScreenshotStatus.Queued;
+            await _analysisJobs.EnqueueAsync(new AnalysisJob
+            {
+                ScreenshotId = capture.Id,
+                Trigger = AnalysisJobTrigger.Batch,
+                IdempotencyKey = $"batch:{session.Id:N}:{capture.Id:N}:{Guid.NewGuid():N}"
+            }, cancellationToken);
+        }
+        await _workspace.SaveAsync(captures, cancellationToken);
+        await _analysisJobs.RunBatchAsync(session.Id, cancellationToken);
         await LoadAsync();
     }
     private async Task PersistAndRefreshAsync(IReadOnlyCollection<Screenshot> changed)

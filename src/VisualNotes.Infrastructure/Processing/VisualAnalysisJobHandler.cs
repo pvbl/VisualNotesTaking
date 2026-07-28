@@ -72,11 +72,12 @@ public sealed class VisualAnalysisJobHandler(
         var provider = providerFactory?.Invoke(providerName, apiKey) ?? CreateProvider(providerName, apiKey, endpoint);
         var imagePath = StoragePath.Resolve(dataDirectory, screenshot.Image.RelativePath);
         var bytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
+        var prompt = await BuildPromptAsync(db, screenshot, job.Trigger, effective.PromptTemplate.Value, cancellationToken);
         var persistedJob = await db.AnalysisJobs.SingleAsync(x => x.Id == job.Id, cancellationToken);
-        persistedJob.EffectivePromptSnapshotJson = JsonSerializer.Serialize(new { Provider = providerName, Model = model, Template = effective.PromptTemplate.Value });
+        persistedJob.EffectivePromptSnapshotJson = JsonSerializer.Serialize(new { Provider = providerName, Model = model, Template = prompt });
         await db.SaveChangesAsync(cancellationToken);
         var result = await new VisualExtractionPipeline(new ImageSharpVisualSourceNormalizer(), provider, artifacts,
-                extractionPrompt: effective.PromptTemplate.Value)
+                extractionPrompt: prompt)
             .ExtractAsync(new(Path.GetFileName(imagePath), screenshot.Image.MediaType, bytes, screenshot.Width, screenshot.Height),
                 new(model, endpoint), cancellationToken);
         return new CaptureAnalysis { ExtractedText = result.Note, Summary = result.Response.Summary, RawResultRelativePath = result.Extraction.ExtractionId };
@@ -91,4 +92,75 @@ public sealed class VisualAnalysisJobHandler(
 
     private static LanguageModelException Configuration(string message) =>
         new(LanguageModelErrorKind.InvalidRequest, message, retryable: false);
+
+    private static async Task<string> BuildPromptAsync(
+        VisualNotesDbContext db,
+        Screenshot screenshot,
+        AnalysisJobTrigger trigger,
+        string template,
+        CancellationToken cancellationToken)
+    {
+        var entries = trigger == AnalysisJobTrigger.Batch
+            ? await db.Screenshots.AsNoTracking()
+                .Where(item => item.SessionId == screenshot.SessionId &&
+                    item.Status != EntityStatus.Deleted &&
+                    (item.UserContext != string.Empty || item.CaptureInstruction != string.Empty))
+                .Select(item => new { item.Id, item.CapturedAt, item.UserContext, item.CaptureInstruction, HasImage = item.Image != null })
+                .ToListAsync(cancellationToken)
+            :
+            [
+                new
+                {
+                    screenshot.Id,
+                    screenshot.CapturedAt,
+                    screenshot.UserContext,
+                    screenshot.CaptureInstruction,
+                    HasImage = screenshot.Image is not null
+                }
+            ];
+        entries = entries.OrderBy(item => item.CapturedAt).ToList();
+
+        var context = string.Join("\n\n", entries
+            .Select(item =>
+            {
+                var instructionLine = string.IsNullOrWhiteSpace(item.CaptureInstruction)
+                    ? string.Empty
+                    : $"\n\nInstrucción: {item.CaptureInstruction}";
+                return $"### {(item.HasImage ? "Contexto de captura" : "Apunte sin captura")} {item.CapturedAt:O}\n{item.UserContext}{instructionLine}";
+            }));
+        var instruction = trigger == AnalysisJobTrigger.Batch || string.IsNullOrWhiteSpace(screenshot.CaptureInstruction)
+            ? string.Empty
+            : $"\n\n## Instrucción específica de esta captura\n{screenshot.CaptureInstruction}";
+        var sessionInformation = trigger == AnalysisJobTrigger.Batch
+            ? await BuildSessionInformationAsync(db, screenshot.SessionId, cancellationToken)
+            : string.Empty;
+        return $"{template}{sessionInformation}" +
+            (string.IsNullOrWhiteSpace(context) ? instruction : $"\n\n## Contexto Markdown de la sesión\n{context}{instruction}");
+    }
+
+    private static async Task<string> BuildSessionInformationAsync(
+        VisualNotesDbContext db,
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        var session = await db.Sessions.AsNoTracking().Include(item => item.Sections)
+            .SingleAsync(item => item.Id == sessionId, cancellationToken);
+        var sections = string.Join("\n", session.Sections.OrderBy(item => item.Order)
+            .Select(item => $"- {item.Title}: {item.Description}".TrimEnd(' ', ':')));
+        return $"""
+
+## Información de la sesión
+- Nombre: {session.Name}
+- Módulo: {session.Module}
+- Tema: {session.Topic}
+- Profesor: {session.Professor}
+- Idioma: {session.Language}
+
+### Secciones
+{sections}
+
+### Instrucciones de la sesión
+{session.InstructionTemplate}
+""";
+    }
 }
