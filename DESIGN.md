@@ -196,6 +196,8 @@ La adaptación depende del redimensionado nativo, columnas flexibles y `ScrollVi
 
 **The Compact Tool Rule.** Paneles flotantes y barras de acción reducen espacio, pero nunca el tamaño mínimo efectivo de los controles ni el recorrido de teclado.
 
+**The Two-Axis Context Rule.** La sesión de trabajo y la ruta académica son contextos distintos. El Centro de captura muestra primero la sesión y después `Curso › Módulo › Sección`; nunca presenta curso o módulo como límites de toda la sesión.
+
 ## Elevation & Depth
 
 El sistema es plano y tonal. No hay sombras declaradas: la profundidad se comunica mediante el Azul Archivo de la carcasa, el Papel Frío del lienzo, las superficies blancas, bordes de un píxel y agrupaciones con radio. Las capas flotantes conservan un borde oscuro para permanecer legibles sobre escritorios variables.
@@ -245,7 +247,11 @@ La navegación lateral usa texto blanco de 15px, alineado a la izquierda, sobre 
 
 ### Capture Timeline Row
 
-La fila de captura combina una miniatura fija de 100×68px, un bloque flexible de título y metadatos, y un área de estado alineada a la derecha. Las filas se separan con un borde inferior; la jerarquía no depende de tarjetas individuales.
+La fila de captura combina una miniatura fija de 100×68px, un bloque flexible de título y metadatos, y un área de estado alineada a la derecha. Los metadatos incluyen la ruta académica completa `Curso › Módulo › Sección` para distinguir títulos repetidos. Las filas se separan con un borde inferior; la jerarquía no depende de tarjetas individuales.
+
+### Capture Target Controls
+
+El selector nombra los modos con lenguaje de usuario: **Pantalla**, **Región**, **Ventana** y **Todos los monitores**. Pantalla es el valor inicial. Región acompaña el selector con estado textual y acciones separadas para definir/redefinir y bloquear/desbloquear; una acción no cambia de significado sin actualizar también su etiqueta accesible.
 
 ### Dock Choice
 

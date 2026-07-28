@@ -10,7 +10,7 @@ windows
 
 VisualNotes está dirigido principalmente a estudiantes, investigadores y profesionales que necesitan convertir material visible en pantalla en apuntes reutilizables mientras estudian, investigan, asisten a una clase o reunión, o documentan un flujo de trabajo.
 
-Su trabajo principal consiste en capturar información sin interrumpir la actividad en curso, organizarla por sesiones y secciones, revisarla y convertirla en un documento estructurado.
+Su trabajo principal consiste en capturar información sin interrumpir la actividad en curso, agruparla en sesiones de trabajo, asignarla a `Curso > Módulo > Sección`, revisarla y convertirla en un documento estructurado.
 
 ## Product Purpose
 
@@ -20,14 +20,14 @@ El éxito significa que una persona puede pasar de una sesión de captura a un d
 
 ## Positioning
 
-La propuesta diferencial es un flujo continuo de captura, organización por sesiones y secciones, análisis visual opcional mediante IA y composición documental. VisualNotes no se limita a almacenar imágenes: conserva su contexto, permite revisarlas y las transforma en una estructura de apuntes preparada para exportación.
+La propuesta diferencial es un flujo continuo de captura, sesiones transversales a varios cursos, organización académica por curso, módulo y sección, análisis visual opcional mediante IA y composición documental. VisualNotes no se limita a almacenar imágenes: conserva su contexto, permite revisarlas y las transforma en una estructura de apuntes preparada para exportación.
 
 ## Operating Context
 
 - Aplicación de escritorio nativa para Windows que puede permanecer en la bandeja del sistema.
-- Captura de una región, ventana, monitor o escritorio virtual, incluidos entornos con varios monitores y diferentes escalas DPI.
+- Captura predeterminada del monitor bajo el cursor, región persistente, ventana elegida o escritorio virtual, incluidos entornos con varios monitores y diferentes escalas DPI.
 - Uso mediante ventana principal, panel flotante, atajos con foco y atajos globales.
-- Organización local por sesiones, secciones jerárquicas y capturas.
+- Organización local por sesiones de trabajo y destinos académicos `Curso > Módulo > Sección`; una sesión puede abarcar varios cursos.
 - Revisión, clasificación, edición, deduplicación, reprocesado e inclusión o exclusión del contenido.
 - Vista previa semántica y exportación prevista a documentos Word (`.docx`).
 - Análisis visual opcional mediante OpenAI o Google Gemini, sujeto a configuración y consentimiento.
@@ -41,7 +41,7 @@ La propuesta diferencial es un flujo continuo de captura, organización por sesi
 - La captura y la gestión local deben funcionar sin una clave de proveedor de IA.
 - El envío de imágenes o texto a un proveedor externo requiere configuración y consentimiento explícito.
 - El producto sigue en desarrollo y no tiene todavía una versión estable ni binarios firmados para uso general.
-- El flujo principal todavía tiene integraciones incompletas entre captura, análisis remoto y exportación; la interfaz existente también sirve para desarrollar y validar el flujo previsto.
+- La captura, revisión y exportación local están conectadas; el análisis remoto continúa siendo opcional y conserva áreas de integración en desarrollo según proveedor y configuración.
 - El idioma inicial del producto es español.
 
 ## Brand Commitments

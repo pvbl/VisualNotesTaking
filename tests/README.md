@@ -79,10 +79,12 @@ En pull requests, `core-tests` ejecuta unitarias, arquitectura e integración. `
 Antes de publicar cambios de captura, repita en una sesión interactiva de Windows con escalado de **100 %, 125 %, 150 % y 200 %**:
 
 1. Coloque un monitor a la izquierda y otro por encima del principal (orígenes negativos), y asigne escalados distintos.
-2. Compruebe `FullVirtualDesktop`, `CurrentMonitor` y `ActiveWindow` contra un patrón de color conocido.
-3. En `OneTimeRegion`, arrastre dentro de cada monitor y cruzando monitores; compruebe confirmar, `Enter`, cancelar, `Esc` y reiniciar (`R`).
-4. Verifique píxel a píxel las dimensiones y que overlay, borde y panel de VisualNotes no estén en el PNG.
-5. Compruebe que los metadatos conservan dispositivo, HWND/título, rectángulo físico, DPI, dimensiones, modo y fecha UTC.
+2. Compruebe **Pantalla** (`CurrentMonitor`) con el cursor en cada monitor y **Todos los monitores** (`FullVirtualDesktop`) contra un patrón de color conocido.
+3. En **Ventana** (`ActiveWindow`), elija explícitamente una ventana de la lista, compruebe que VisualNotes no aparece y valide el rectángulo capturado.
+4. En **Región** (`OneTimeRegion`), defina desde el panel, arrastre dentro de cada monitor y cruzando monitores; compruebe confirmar, `Enter`, cancelar, `Esc` y reiniciar (`R`).
+5. Capture de nuevo para comprobar que la región se recuerda; bloquéela, verifique que no se puede redefinir y desbloquéela.
+6. Verifique píxel a píxel las dimensiones y que overlay, borde y panel de VisualNotes no estén en el PNG.
+7. Compruebe que los metadatos conservan dispositivo, HWND/título, rectángulo físico, DPI, dimensiones, modo y fecha UTC.
 
 Registre el hardware, resolución, disposición, escalados y resultado en la incidencia de entrega. Estas comprobaciones necesitan una sesión de escritorio real y no se sustituyen por el job de CI sin escritorio.
 

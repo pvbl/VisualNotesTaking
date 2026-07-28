@@ -1,9 +1,10 @@
 # VisualNotes
 
 VisualNotes es una aplicación de escritorio para Windows que convierte capturas de
-pantalla en apuntes estructurados. Organiza el trabajo por sesiones y secciones,
-permite capturar una región, una ventana, un monitor o todo el escritorio, y ofrece
-una vista previa antes de exportar el resultado a Word (`.docx`).
+pantalla en apuntes estructurados. Separa las sesiones de trabajo de la organización
+académica por curso, módulo y sección, permite capturar una región, una ventana, un
+monitor o todo el escritorio y ofrece una vista previa antes de exportar el resultado
+a Word (`.docx`).
 
 > [!IMPORTANT]
 > El proyecto sigue en desarrollo: todavía no hay una versión estable ni binarios
@@ -12,8 +13,9 @@ una vista previa antes de exportar el resultado a Word (`.docx`).
 
 ## Qué incluye
 
-- Captura del escritorio virtual, monitor actual, ventana activa o región persistente.
-- Sesiones con secciones jerárquicas, pausa, reanudación y recuperación local.
+- Captura del escritorio virtual, monitor actual, ventana elegida o región persistente.
+- Sesiones de trabajo que pueden reunir secciones de varios cursos y módulos.
+- Jerarquía académica `Curso > Módulo > Sección del curso`.
 - Clasificación, edición, deduplicación y reprocesado de capturas.
 - Adaptadores para análisis visual con OpenAI y Google Gemini.
 - Vista previa semántica y exportación Open XML (`.docx`).
@@ -150,12 +152,14 @@ los archivos `.credential`.
 
 ### Flujo básico
 
-1. **Crea o recupera una sesión.** En **Sesión**, rellena al menos un nombre que te
-   permita identificarla y pulsa **Crear desde cero**. Para retomar trabajo anterior,
-   selecciónalo en **Sesiones recientes** y pulsa **Continuar**.
-2. **Organiza el contenido.** Selecciona una sección, edita su título y descripción y
-   usa **Crear subsección** cuando necesites otro bloque. Pulsa **Cambiar a esta
-   sección** para convertirla en el destino activo.
+1. **Crea o recupera una sesión.** Una sesión representa el periodo durante el que
+   estás tomando apuntes y puede abarcar varios cursos. En **Sesión**, indica un
+   nombre y un curso y módulo iniciales; pulsa **Crear desde cero**. Para retomar
+   trabajo anterior, selecciónalo en **Sesiones recientes** y pulsa **Continuar**.
+2. **Elige el destino académico.** En el panel de captura selecciona o escribe el
+   curso y el módulo, y elige una sección existente o crea otra. Cada captura y
+   apunte se guarda en la sección activa. Puedes cambiar de curso o módulo sin cerrar
+   la sesión.
 3. **Elige qué capturar.** Utiliza el panel flotante, que permanece por encima de
    otras ventanas, selecciona un modo y pulsa **Capturar**.
 4. **Pausa cuando sea necesario.** El botón **Pausar / reanudar** detiene o recupera
@@ -172,17 +176,40 @@ principal no termina necesariamente el proceso: VisualNotes continúa en la band
 para que puedas seguir capturando. Utiliza el menú del icono para volver a abrirla o
 salir.
 
+### Modelo de organización
+
+VisualNotes distingue dos estructuras que cumplen funciones diferentes:
+
+```text
+Sesión de trabajo
+├─ captura o apunte → Curso A › Módulo 1 › Sección X
+├─ captura o apunte → Curso A › Módulo 2 › Sección Y
+└─ captura o apunte → Curso B › Módulo 1 › Sección Z
+```
+
+- **Sesión:** periodo continuo de toma de notas. Conserva pausa, reanudación, fecha,
+  documento previsto y el conjunto de capturas.
+- **Curso:** agrupación académica principal.
+- **Módulo:** parte de un curso.
+- **Sección del curso:** destino activo de las capturas y apuntes. Es la unidad que
+  se ordena y compone en el documento.
+
+El curso y módulo indicados al crear una sesión son sólo el destino inicial. No
+limitan el contenido posterior de esa sesión.
+
 ### Modos de captura
 
 | Modo del panel | Qué captura | Comportamiento |
 |---|---|---|
-| **Region** | Una parte rectangular de la pantalla | Si ya hay una región persistente, la reutiliza; de lo contrario permite seleccionar una región puntual. |
-| **Monitor** | El monitor actual | Captura la pantalla en la que se encuentra el punto de referencia activo. |
-| **Desktop** | Todo el escritorio virtual | Incluye el área combinada de todos los monitores. |
-| **Window** | La ventana activa | Captura la ventana que estaba activa antes de iniciar la acción. |
+| **Pantalla** | Un monitor completo | Es el modo predeterminado y captura el monitor donde se encuentra el cursor. |
+| **Región** | Una parte rectangular de la pantalla | Si existe una región guardada, la reutiliza. Si no existe, abre el selector y recuerda la nueva región. |
+| **Ventana** | Una ventana visible elegida por el usuario | Abre una lista de ventanas capturables y excluye las ventanas de VisualNotes para evitar autocapturas. |
+| **Todos los monitores** | Todo el escritorio virtual | Incluye el área combinada de todas las pantallas conectadas. |
 
-Para definir o cambiar la región persistente usa **Ctrl+Mayús+R**. Durante la
-selección:
+El panel muestra si la región está **sin definir**, **lista** o **bloqueada**. Usa
+**Definir región** o **Redefinir región** desde el propio panel; también puedes usar
+**Ctrl+Mayús+R**. Una región bloqueada debe desbloquearse antes de redefinirla. Durante
+la selección:
 
 - arrastra para marcar el rectángulo;
 - pulsa **Intro** para confirmar o **Esc** para cancelar;
@@ -191,12 +218,15 @@ selección:
   eliminar la selección.
 
 Una vez definida, **Ctrl+Mayús+C** captura esa región. También puedes hacerlo desde
-el menú del icono de la bandeja.
+el menú del icono de la bandeja. **Bloquear** evita cambios accidentales, pero no
+impide seguir capturando la región guardada.
 
 ### Panel flotante y atajos
 
 El panel flotante permite trabajar sin regresar a la ventana principal:
 
+- **Contexto de los apuntes:** cambia la sesión de trabajo y el destino
+  `Curso › Módulo › Sección` sin interrumpir la captura.
 - **Ctrl+C:** capturar con el modo seleccionado cuando el panel tiene el foco.
 - **Espacio:** pausar o reanudar la sesión cuando el panel tiene el foco.
 - **Ctrl+M:** alternar el modo mínimo del panel.
@@ -221,17 +251,18 @@ reprocesar o mover varios elementos de una sola vez. En el panel de detalle pued
 - aplicar etiquetas rápidas o escribir etiquetas propias;
 - volver a analizar la captura o regenerar su nota.
 
+Cada fila muestra la ruta académica completa
+`Curso › Módulo › Sección`, por lo que dos secciones con el mismo título siguen
+siendo distinguibles. La pestaña **Markdown previo** es de sólo lectura; **Resultado**
+sí permite editar y guardar el Markdown final.
+
 En **Documento**, revisa cualquier aviso de contenido pendiente o archivos ausentes.
 Selecciona una fila para incluirla, excluirla o cambiar su posición. El alcance de
 exportación determina si se prepara todo el documento o solo una parte.
 
-> [!WARNING]
-> En la versión de desarrollo actual, el selector de pantalla y el contador del panel
-> funcionan, pero la captura todavía no se incorpora al repositorio de la sesión. Por
-> ello, **Capturas** puede aparecer vacío y **Documento → Exportar** todavía no escribe
-> un archivo desde el flujo principal. Los botones **Importante**, **Contexto** y las
-> acciones de análisis dependen igualmente de esa conexión pendiente. Estas pantallas
-> describen el flujo previsto y sirven para desarrollar y validar la interfaz.
+Las capturas y los apuntes de texto se incorporan al repositorio local de la sesión
+en cuanto se crean. Si una imagen no puede escribirse o registrarse, VisualNotes
+muestra el detalle recuperable y deja constancia en los diagnósticos.
 
 ## Datos locales y reinicio de la configuración
 
@@ -245,6 +276,12 @@ exportación determina si se prepara todo el documento o solo una parte.
 La carpeta de datos puede ser distinta si la elegiste en el asistente o definiste
 `VISUALNOTES_DATA_DIRECTORY`. Actualizar, reparar o desinstalar la aplicación conserva
 deliberadamente sesiones, configuración y credenciales.
+
+Al abrir una versión nueva, VisualNotes aplica las migraciones de SQLite antes de
+mostrar la interfaz. En la migración a la jerarquía académica por sección, cada
+sección antigua hereda automáticamente el curso y módulo que tenía su sesión. Los
+campos históricos se conservan internamente para compatibilidad; no es necesario
+recrear sesiones ni capturas.
 
 Antes de borrar datos, cierra VisualNotes y guarda una copia si la necesitas. Para
 repetir únicamente el asistente inicial, elimina `bootstrap.json`; esto no elimina la
@@ -282,10 +319,21 @@ VisualNotes y selecciona **Abrir VisualNotes** antes de iniciar otra instancia.
 
 - Ejecuta la captura de prueba del asistente.
 - Comprueba que la sesión de Windows esté desbloqueada.
+- En **Región**, usa **Definir región** antes de bloquearla. Si ya está bloqueada,
+  pulsa **Desbloquear** antes de redefinirla.
+- En **Ventana**, comprueba que la ventana de destino esté visible y tenga título; las
+  ventanas de VisualNotes se omiten deliberadamente.
 - Prueba primero con una pantalla local; Escritorio remoto, máquinas virtuales y
   software de protección pueden limitar la captura.
 - Revisa los archivos JSON de `diagnostics`, eliminando información sensible antes
   de compartirlos.
+
+### La pestaña Capturas está vacía
+
+Comprueba que estás en la sesión correcta y que tiene una sección activa. Las
+capturas nuevas se asignan a esa sección. Usa **Limpiar filtros** y desactiva
+**Papelera** para volver a la cronología normal. Las capturas de otras sesiones no se
+mezclan en la vista actual.
 
 ### La clave está guardada pero el análisis no funciona
 
