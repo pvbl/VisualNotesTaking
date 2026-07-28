@@ -32,6 +32,24 @@ public sealed class CapturePanelUiTests
         xaml.ShouldContain("AutomationProperties.AutomationId=\"MarkImportantButton\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"AddContextButton\"");
         xaml.ShouldContain("Key=\"Z\" Modifiers=\"Control\" Command=\"{Binding UndoCommand}\"");
+        xaml.ShouldContain("FocusManager.FocusedElement=\"{Binding ElementName=CaptureNowButton, Mode=OneWay}\"");
+        xaml.ShouldContain("{Binding SessionStatus, Mode=OneWay}");
+        xaml.ShouldContain("{Binding CaptureCount, Mode=OneWay}");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Panel_owner_is_assigned_after_the_main_window_is_shown()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        var showMain = source.IndexOf("_window.Show();", StringComparison.Ordinal);
+        var assignOwner = source.IndexOf("_capturePanel.Owner = _window;", StringComparison.Ordinal);
+        var showPanel = source.IndexOf("_capturePanel.Show();", StringComparison.Ordinal);
+
+        showMain.ShouldBeGreaterThanOrEqualTo(0);
+        assignOwner.ShouldBeGreaterThan(showMain);
+        showPanel.ShouldBeGreaterThan(assignOwner);
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
@@ -42,5 +60,20 @@ public sealed class CapturePanelUiTests
         source.ShouldContain("HotkeyAction.Undo: ExecuteIfAvailable(_viewModel.UndoCommand)");
         source.ShouldContain("HotkeyAction.MarkImportant: ExecuteIfAvailable(_viewModel.MarkImportantCommand)");
         source.ShouldContain("HotkeyAction.AddContext: ExecuteIfAvailable(_viewModel.AddContextCommand)");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void A_second_instance_activates_the_running_window_before_registering_hotkeys()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        var acquireInstance = source.IndexOf("new Mutex(true, SingleInstanceMutexName", StringComparison.Ordinal);
+        var activateExisting = source.IndexOf("NativeWindow.ActivateRunningInstance();", StringComparison.Ordinal);
+        var createHotkeys = source.IndexOf("new GlobalHotkeyService", StringComparison.Ordinal);
+
+        acquireInstance.ShouldBeGreaterThanOrEqualTo(0);
+        activateExisting.ShouldBeGreaterThan(acquireInstance);
+        createHotkeys.ShouldBeGreaterThan(activateExisting);
     }
 }

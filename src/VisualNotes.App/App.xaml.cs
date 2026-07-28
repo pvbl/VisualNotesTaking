@@ -19,6 +19,36 @@ namespace VisualNotes.App;
 
 public partial class App : System.Windows.Application
 {
+    private const string SingleInstanceMutexName = @"Local\VisualNotes.App.SingleInstance";
+
+    private static class NativeWindow
+    {
+        private const int ShowNormal = 1;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern nint FindWindow(string? className, string windowName);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(nint window);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ShowWindow(nint window, int command);
+
+        public static void ActivateRunningInstance()
+        {
+            var window = FindWindow(null, "VisualNotes");
+            if (window == 0)
+            {
+                return;
+            }
+
+            ShowWindow(window, ShowNormal);
+            SetForegroundWindow(window);
+        }
+    }
+
     private sealed class MessageBoxNotificationService : INotificationService
     {
         public void ShowError(string message) => MessageBox.Show(message, "Operación no completada", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -40,12 +70,23 @@ public partial class App : System.Windows.Application
     private Serilog.ILogger? _serilog;
     private GlobalExceptionHandler? _exceptions;
     private VisualNotesTelemetry? _telemetry;
+    private Mutex? _singleInstanceMutex;
 
     protected override async void OnStartup(StartupEventArgs e) => await StartAsync(e);
 
     private async Task StartAsync(StartupEventArgs e)
     {
         base.OnStartup(e);
+        _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out var isPrimaryInstance);
+        if (!isPrimaryInstance)
+        {
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+            NativeWindow.ActivateRunningInstance();
+            Shutdown();
+            return;
+        }
+
         AsyncRelayCommand.DefaultNotificationService = new MessageBoxNotificationService();
         if (e.Args is ["--smoke-test", var markerPath])
         {
@@ -120,7 +161,7 @@ public partial class App : System.Windows.Application
         _window = new MainWindow { DataContext = _viewModel };
         _capturePanelViewModel = new CapturePanelViewModel(_viewModel);
         _capturePanelViewModel.CaptureRequested += CaptureFromPanel;
-        _capturePanel = new Views.CapturePanelWindow { DataContext = _capturePanelViewModel, Owner = _window };
+        _capturePanel = new Views.CapturePanelWindow { DataContext = _capturePanelViewModel };
         _window.Closing += (_, args) =>
         {
             if (_isExiting) return;
@@ -129,6 +170,7 @@ public partial class App : System.Windows.Application
         };
         CreateTrayIcon();
         _window.Show();
+        _capturePanel.Owner = _window;
         _capturePanel.Show();
         if (_activeRegion is not null) _regionBorder.Show(_activeRegion);
     }
@@ -213,6 +255,9 @@ public partial class App : System.Windows.Application
         _telemetry?.Dispose();
         _loggerFactory?.Dispose();
         (_serilog as IDisposable)?.Dispose();
+        _singleInstanceMutex?.ReleaseMutex();
+        _singleInstanceMutex?.Dispose();
+        _singleInstanceMutex = null;
         Shutdown();
     }
 

@@ -48,6 +48,28 @@ public sealed class DiagnosticsTests
     }
 
     [Fact]
+    public void Logs_keep_safe_exception_structure_without_messages_or_paths()
+    {
+        var sink = new CollectingSink();
+        using var logger = new LoggerConfiguration().WriteTo.Sink(new RedactingSink(sink)).CreateLogger();
+
+        try
+        {
+            ThrowSensitiveException();
+        }
+        catch (Exception exception)
+        {
+            logger.Error(exception, "Controlled failure");
+        }
+
+        var diagnostic = sink.Events.Single().Exception!.ToString();
+        diagnostic.ShouldContain(typeof(InvalidOperationException).FullName!);
+        diagnostic.ShouldContain(nameof(ThrowSensitiveException));
+        diagnostic.ShouldNotContain("private user content");
+        diagnostic.ShouldNotContain("C:\\Users");
+    }
+
+    [Fact]
     public void Global_handler_exposes_friendly_error_and_keeps_technical_diagnostics()
     {
         var sink = new CollectingSink();
@@ -80,6 +102,9 @@ public sealed class DiagnosticsTests
     }
 
     private sealed class ControlledBoundaryException(string? message = null) : Exception(message);
+    private static void ThrowSensitiveException() =>
+        throw new InvalidOperationException("private user content");
+
     private sealed class CollectingSink : ILogEventSink
     {
         public List<LogEvent> Events { get; } = [];

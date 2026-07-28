@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
 
 using Microsoft.Extensions.Logging;
@@ -98,6 +100,11 @@ public static class VisualNotesActivity { public static readonly ActivitySource 
 public sealed partial class RedactingSink(ILogEventSink inner) : ILogEventSink, IDisposable
 {
     private const string Redacted = "[REDACTED]";
+    private sealed class SanitizedDiagnosticException(string details) : Exception
+    {
+        public override string ToString() => details;
+    }
+
     public void Emit(LogEvent logEvent)
     {
         var properties = logEvent.Properties.ToDictionary(x => x.Key, x => IsSensitive(x.Key) ? new ScalarValue(Redacted) : Redact(x.Value));
@@ -114,7 +121,43 @@ public sealed partial class RedactingSink(ILogEventSink inner) : ILogEventSink, 
         DictionaryValue dictionary => new DictionaryValue(dictionary.Elements.ToDictionary(x => x.Key, x => Redact(x.Value))),
         _ => value
     };
-    private static Exception? RedactException(Exception? error) => error is null ? null : new Exception($"{error.GetType().Name}: diagnostic details redacted");
+    private static Exception? RedactException(Exception? error)
+    {
+        if (error is null)
+        {
+            return null;
+        }
+
+        var details = new StringBuilder();
+        for (var current = error; current is not null; current = current.InnerException)
+        {
+            if (details.Length > 0)
+            {
+                details.AppendLine(" --->");
+            }
+
+            details.Append(current.GetType().FullName);
+            foreach (var frame in new StackTrace(current, false).GetFrames() ?? [])
+            {
+                if (frame.GetMethod() is not { } method)
+                {
+                    continue;
+                }
+
+                details.AppendLine();
+                details.Append("   at ");
+                details.Append(FormatMethod(method));
+            }
+        }
+
+        return new SanitizedDiagnosticException(details.ToString());
+    }
+
+    private static string FormatMethod(MethodBase method)
+    {
+        var typeName = method.DeclaringType?.FullName;
+        return string.IsNullOrWhiteSpace(typeName) ? method.Name : $"{typeName}.{method.Name}";
+    }
     public void Dispose()
     {
         if (inner is IDisposable disposable)
