@@ -2,11 +2,28 @@
   "stryker-config": {
     "project": "src/VisualNotes.Core/VisualNotes.Core.csproj",
     "test-projects": ["tests/VisualNotes.UnitTests/VisualNotes.UnitTests.csproj"],
+    "reporters": ["progress", "html"],
     "mutate": [
       "**/BoundingBoxNormalizer.cs",
       "**/SyntheticImageCropper.cs",
-      "**/CaptureDuplicateDetection.cs"
+      "**/ScreenCaptureGeometry.cs",
+      "**/PersistentRegionService.cs",
+      "**/EffectiveSettingsResolver.cs",
+      "**/HierarchicalSettings.cs",
+      "**/CaptureDuplicateDetection.cs",
+      "**/CaptureLibrary.cs",
+      "**/LocalSearchIndex.cs",
+      "**/SessionCoordinator.cs",
+      "**/StructuredAnalysisResponses.cs",
+      "**/PromptComposer.cs",
+      "**/SemanticDocumentComposition.cs",
+      "!**/*.g.cs",
+      "!**/*.g.i.cs",
+      "!**/*.generated.cs",
+      "!**/Migrations/**/*.cs",
+      "!**/*.xaml",
+      "!**/*.xaml.cs"
     ],
-    "thresholds": { "high": 90, "low": 75, "break": 60 }
+    "thresholds": { "high": 85, "low": 70, "break": 60 }
   }
 }

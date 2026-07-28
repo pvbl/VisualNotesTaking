@@ -16,7 +16,7 @@ de CI son la fuente de verdad; no se deben copiar porcentajes a mano al README.
 | Cobertura de Core | `eng/coverage-gate.ps1` | Objetivo reforzado: 90 % de líneas y 85 % de ramas. |
 | Código crítico | `eng/coverage-gate.ps1` | 98 % de líneas y 95 % de ramas. |
 | Código nuevo | diff contra la rama base | 90 % de líneas y 85 % de ramas modificadas. |
-| Mutaciones | Stryker.NET sobre algoritmos críticos | Bloquea por debajo de 60 %; 75 % bajo, 90 % alto. |
+| Mutaciones | Stryker.NET sobre comportamiento crítico de Core | Objetivo mínimo 70 %; bloquea por debajo de 60 %. |
 | Rendimiento | BenchmarkDotNet | Se registra como tendencia; aún no hay presupuesto automático. |
 | Secretos | Gitleaks | Ningún secreto detectado. |
 
@@ -71,12 +71,24 @@ es exclusivamente ensamblado de dependencias.
 
 ```powershell
 dotnet tool restore
-dotnet stryker --test-project tests/VisualNotes.UnitTests/VisualNotes.UnitTests.csproj
+dotnet stryker
 ```
 
-Stryker muta actualmente normalización de bounding boxes, recorte sintético y
-deduplicación. Revise mutantes supervivientes: pueden revelar una aserción débil, código
-equivalente o funcionalidad no probada. El informe queda en `StrykerOutput`.
+Stryker muta inicialmente el comportamiento crítico de `VisualNotes.Core`: cajas,
+recorte y escalado; resolución de configuración; deduplicación, caché y cola; privacidad
+de respuestas; y composición de prompts y documentos. Se excluyen explícitamente código
+generado, migraciones y vistas/code-behind XAML. Aunque hoy esas exclusiones no forman
+parte de Core, quedan declaradas para evitar ampliar accidentalmente el alcance si cambia
+la estructura del proyecto. No añada una exclusión ni marque una mutación como ignorada
+sin registrar en la revisión la razón técnica y, cuando corresponda, por qué el mutante
+es equivalente.
+
+El objetivo mínimo inicial es 70 % y el build falla por debajo de 60 %. El rango alto se
+fija en 85 % para hacer visible el objetivo al que deben elevarse gradualmente los módulos
+críticos (80–85 %) cuando la suite madure; no se debe subir el gate hasta que la señal sea
+estable. Revise cada mutante superviviente y añada pruebas que observen comportamiento
+relevante, límites y efectos, no aserciones creadas únicamente para matar una mutación.
+El informe HTML queda en `StrykerOutput`.
 
 ### Rendimiento y memoria
 
@@ -110,8 +122,11 @@ artefacto `coverage` incluso si falla el gate, para permitir diagnosticar el res
 
 ## CI
 
-`.github/workflows/quality.yml` separa escaneo de secretos, tests principales, UI,
-mutaciones y benchmarks. Esto evita que requisitos de escritorio o cargas lentas
-oculten el resultado principal. Los trabajos tienen timeout y la cobertura se publica
-como artefacto. Toda modificación de estas puertas debe actualizar este documento y
-`tests/README.md` en el mismo pull request.
+`.github/workflows/quality.yml` separa escaneo de secretos, tests principales, UI y
+benchmarks. Las mutaciones viven en `.github/workflows/mutations.yml`: se ejecutan cada
+lunes, bajo demanda y en pull requests que cambien módulos críticos, sus tests o la
+propia configuración. El workflow publica siempre `StrykerOutput` (incluido el informe
+HTML) como artefacto para poder revisar supervivientes incluso cuando falla el umbral.
+Esto evita que cargas lentas oculten el resultado principal. Los trabajos tienen timeout
+y la cobertura se publica como artefacto. Toda modificación de estas puertas debe
+actualizar este documento y `tests/README.md` en el mismo pull request.
