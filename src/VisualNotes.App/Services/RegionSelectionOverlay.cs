@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Automation;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using Forms = System.Windows.Forms;
@@ -46,6 +47,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
         private readonly Forms.Screen _screen;
         private readonly RegionSelectionController _controller;
         private readonly Canvas _canvas = new();
+        private readonly TextBlock _status = new();
         private readonly Rectangle _selection = new() { Stroke = Brushes.DeepSkyBlue, StrokeThickness = 2, Fill = new SolidColorBrush(Color.FromArgb(35, 0, 160, 255)) };
         public event Action? ConfirmRequested;
         public event Action? CancelRequested;
@@ -57,6 +59,9 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             _screen = screen; _controller = controller;
             WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = new SolidColorBrush(Color.FromArgb(55, 0, 0, 0));
             Topmost = true; ShowInTaskbar = false; ResizeMode = ResizeMode.NoResize;
+            AutomationProperties.SetAutomationId(this, "RegionSelectionWindow");
+            AutomationProperties.SetName(this, "Selector de región de captura");
+            AutomationProperties.SetHelpText(this, "Arrastra para seleccionar. Enter confirma, Escape cancela, flechas mueven y Mayús más flechas cambia el tamaño.");
             var source = PresentationSource.FromVisual(Application.Current.MainWindow);
             var scaleX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1;
             var scaleY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1;
@@ -67,25 +72,36 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             PreviewMouseMove += OnMouseMove;
             PreviewMouseLeftButtonUp += (_, _) => ReleaseMouseCapture();
             PreviewKeyDown += OnKeyDown;
+            Loaded += (_, _) => Keyboard.Focus(_canvas);
         }
 
         private UIElement BuildContent()
         {
             var root = new Grid(); root.Children.Add(_canvas); _canvas.Children.Add(_selection);
-            var panel = new StackPanel { Orientation = Orientation.Horizontal, Background = Brushes.White, Margin = new Thickness(12), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
-            panel.Children.Add(Button("Confirmar", "ConfirmSelection", () => ConfirmRequested?.Invoke()));
-            panel.Children.Add(Button("Bloquear", "LockSelection", () => { _controller.SetLocked(!_controller.IsLocked); SelectionChanged?.Invoke(); }));
-            panel.Children.Add(Button("Ocultar", "HideSelection", () => { _controller.SetHidden(!_controller.IsHidden); SelectionChanged?.Invoke(); }));
-            panel.Children.Add(Button("Eliminar", "DeleteSelection", () => { _controller.Delete(); SelectionChanged?.Invoke(); }));
-            panel.Children.Add(Button("Reiniciar", "ResetSelection", () => ResetRequested?.Invoke()));
-            panel.Children.Add(Button("Cancelar", "CancelSelection", () => CancelRequested?.Invoke()));
+            _canvas.Focusable = true;
+            var panel = new StackPanel { Background = Brushes.White, Margin = new Thickness(12), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
+            var controls = new StackPanel { Orientation = Orientation.Horizontal };
+            controls.Children.Add(Button("Confirmar", "ConfirmSelection", "Confirma la región seleccionada; Enter", () => ConfirmRequested?.Invoke()));
+            controls.Children.Add(Button("Bloquear", "LockSelection", "Impide mover o redimensionar la región; L", () => { _controller.SetLocked(!_controller.IsLocked); SelectionChanged?.Invoke(); }));
+            controls.Children.Add(Button("Ocultar", "HideSelection", "Oculta o muestra el borde de la región; H", () => { _controller.SetHidden(!_controller.IsHidden); SelectionChanged?.Invoke(); }));
+            controls.Children.Add(Button("Eliminar", "DeleteSelection", "Elimina la región actual; Suprimir", () => { _controller.Delete(); SelectionChanged?.Invoke(); }));
+            controls.Children.Add(Button("Reiniciar", "ResetSelection", "Descarta la región para volver a dibujarla; R", () => ResetRequested?.Invoke()));
+            controls.Children.Add(Button("Cancelar", "CancelSelection", "Cierra el selector sin capturar; Escape", () => CancelRequested?.Invoke()));
+            panel.Children.Add(controls);
+            _status.Foreground = Brushes.Black; _status.Margin = new Thickness(6); _status.Text = "Sin región seleccionada";
+            AutomationProperties.SetAutomationId(_status, "RegionSelectionStatus");
+            AutomationProperties.SetName(_status, "Estado de selección");
+            AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
+            panel.Children.Add(_status);
             root.Children.Add(panel); return root;
         }
 
-        private static Button Button(string text, string automationId, Action action)
+        private static Button Button(string text, string automationId, string helpText, Action action)
         {
             var button = new Button { Content = text, Margin = new Thickness(4), Padding = new Thickness(10, 4, 10, 4) };
             System.Windows.Automation.AutomationProperties.SetAutomationId(button, automationId);
+            AutomationProperties.SetName(button, text);
+            AutomationProperties.SetHelpText(button, helpText);
             button.Click += (_, _) => action(); return button;
         }
 
@@ -123,6 +139,9 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
 
         internal void RefreshSelection()
         {
+            _status.Text = _controller.Selection is { } current
+                ? $"Región {current.Width} por {current.Height} píxeles. {(_controller.IsLocked ? "Bloqueada." : "Editable.")} {(_controller.IsHidden ? "Borde oculto." : "Borde visible.")}"
+                : "Sin región seleccionada";
             if (_controller.IsHidden || _controller.Selection is not { } region) { _selection.Visibility = Visibility.Collapsed; return; }
             var intersection = ScreenCaptureGeometry.Intersect(region,
                 new(_screen.Bounds.X, _screen.Bounds.Y, _screen.Bounds.Width, _screen.Bounds.Height));

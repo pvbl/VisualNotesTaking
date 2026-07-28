@@ -60,6 +60,22 @@ public sealed class UserJourneysE2ETests
         });
     }
 
+    [InteractiveDesktopFact, Trait("Category", "UI"), Trait("Category", "Accessibility")]
+    public void Primary_interactive_controls_expose_uia_identity_name_role_and_keyboard_focus()
+    {
+        Run(nameof(Primary_interactive_controls_expose_uia_identity_name_role_and_keyboard_focus), window =>
+        {
+            foreach (var id in new[] { "SessionNameInput", "CreateSessionButton", "RecentSessionsList", "NavCaptures" })
+            {
+                var element = VisualNotesApplication.ById(window, id);
+                element.AutomationId.ShouldBe(id);
+                element.Name.ShouldNotBeNullOrWhiteSpace($"{id} needs an accessible name");
+                element.ControlType.ToString().ShouldNotBe("Custom", $"{id} needs a native UI Automation role");
+                element.Properties.IsKeyboardFocusable.Value.ShouldBeTrue($"{id} must participate in keyboard navigation");
+            }
+        });
+    }
+
     [InteractiveDesktopFact, Trait("Category", "UI"), Trait("Category", "E2E"), Trait("Category", "Capture")]
     public void Capture_specific_dpi_and_monitor_preconditions_are_reported()
     {

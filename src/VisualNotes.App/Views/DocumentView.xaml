@@ -16,7 +16,7 @@
    <Button AutomationProperties.AutomationId="ExportButton" Content="Exportar" Command="{Binding ExportCommand}" Margin="20,0,0,0" Padding="16,5"/>
   </StackPanel>
   </StackPanel>
-  <ListView AutomationProperties.AutomationId="DocumentReviewList" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="White">
+  <ListView AutomationProperties.AutomationId="DocumentReviewList" AutomationProperties.Name="Contenido del documento para revisión" AutomationProperties.HelpText="Selecciona elementos para incluirlos, excluirlos o reordenarlos" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="White">
    <ListView.View><GridView>
     <GridViewColumn Header="Incluir" DisplayMemberBinding="{Binding IsIncluded}" Width="65"/>
     <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding Node.Type}" Width="100"/>

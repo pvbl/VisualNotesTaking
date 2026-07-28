@@ -1,7 +1,8 @@
 <Window x:Class="VisualNotes.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="VisualNotes" AutomationProperties.AutomationId="MainWindow" Width="1100" Height="700" MinWidth="800" MinHeight="500"
+        Title="VisualNotes" AutomationProperties.AutomationId="MainWindow" AutomationProperties.Name="Ventana principal de VisualNotes"
+        AutomationProperties.HelpText="Crea sesiones, revisa capturas y exporta tus notas" Width="1100" Height="700" MinWidth="800" MinHeight="500"
         Background="#F4F6FA">
   <Window.InputBindings>
     <KeyBinding Key="C" Modifiers="Control+Shift" Command="{Binding CaptureRegionCommand}"/>
@@ -22,7 +23,7 @@
         <StackPanel><TextBlock Text="SESIÓN ACTIVA" Foreground="#94A3B8" FontSize="10" FontWeight="Bold"/>
          <TextBlock Text="{Binding ActiveSessionName}" Foreground="White" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
          <TextBlock Text="{Binding ActiveSectionName, StringFormat=§ {0}}" Foreground="#7DD3FC" TextTrimming="CharacterEllipsis" Margin="0,3,0,8"/>
-         <Button AutomationProperties.AutomationId="SessionStatusButton" Content="{Binding SessionStatus}" Command="{Binding TogglePauseCommand}" Padding="6"/>
+         <Button AutomationProperties.AutomationId="SessionStatusButton" AutomationProperties.Name="Pausar o reanudar sesión" AutomationProperties.HelpText="Estado actual de la sesión; pulsa para alternarlo" Content="{Binding SessionStatus}" Command="{Binding TogglePauseCommand}" Padding="6"/>
         </StackPanel>
        </Border>
       <StackPanel>
@@ -34,6 +35,6 @@
         <Button AutomationProperties.AutomationId="NavSettings" Content="Configuración" Command="{Binding NavigateCommand}" CommandParameter="Settings" Style="{StaticResource NavButton}"/>
       </StackPanel></DockPanel>
     </Border>
-    <ContentControl AutomationProperties.AutomationId="PageContent" Grid.Column="1" Content="{Binding CurrentViewModel}" Margin="36"/>
+    <ContentControl AutomationProperties.AutomationId="PageContent" AutomationProperties.Name="Contenido de la página actual" Grid.Column="1" Content="{Binding CurrentViewModel}" Margin="36"/>
   </Grid>
 </Window>
