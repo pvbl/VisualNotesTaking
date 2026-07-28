@@ -6,6 +6,39 @@
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    <!-- Keep controls usable at Windows text/DPI scaling and make keyboard focus
+         visible independently from colour. Native WPF control types expose the
+         corresponding UI Automation roles. -->
+    <Style TargetType="Control">
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="MinHeight" Value="32"/>
+      <Setter Property="FocusVisualStyle">
+        <Setter.Value>
+          <Style TargetType="Control">
+            <Setter Property="Template">
+              <Setter.Value>
+                <ControlTemplate>
+                  <Border BorderBrush="#111827" BorderThickness="3" CornerRadius="2" Margin="-3"/>
+                </ControlTemplate>
+              </Setter.Value>
+            </Setter>
+          </Style>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="Window"><Setter Property="FontSize" Value="14"/></Style>
+    <Style TargetType="UserControl"><Setter Property="FontSize" Value="14"/></Style>
+    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Control}}">
+      <Setter Property="Padding" Value="10,6"/>
+      <Setter Property="AutomationProperties.Name" Value="{Binding RelativeSource={RelativeSource Self}, Path=Content}"/>
+    </Style>
+    <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type Control}}"/>
+    <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type Control}}"/>
+    <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type Control}}"/>
+    <Style TargetType="ListView" BasedOn="{StaticResource {x:Type Control}}"/>
+    <Style TargetType="Slider" BasedOn="{StaticResource {x:Type Control}}"/>
+    <Style TargetType="PasswordBox" BasedOn="{StaticResource {x:Type Control}}"/>
+    <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type Control}}"/>
     <DataTemplate DataType="{x:Type vm:SessionViewModel}"><views:SessionView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:CapturesViewModel}"><views:CapturesView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:InstructionsViewModel}"><views:InstructionsView /></DataTemplate>
