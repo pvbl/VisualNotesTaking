@@ -132,11 +132,20 @@ Esto evita que cargas lentas oculten el resultado principal. Los trabajos tienen
 y la cobertura se publica como artefacto. Toda modificación de estas puertas debe
 actualizar este documento y `tests/README.md` en el mismo pull request.
 
-Los restores de CI usan exclusivamente los `packages.lock.json` versionados mediante
-`--locked-mode`. La caché de NuGet se deriva del contenido de esos locks y no usa claves
-de fallback, de modo que una rama no puede reutilizar una caché con un grafo distinto.
+Los restores de CI pasan por `eng/restore-locked.ps1`. Durante la migración inicial, si
+no existe ningún lock, el script genera el grafo y comprueba inmediatamente una segunda
+restauración con `--locked-mode`; desde que los locks están versionados no se regeneran
+en CI y cualquier divergencia falla. La caché integrada de `setup-dotnet` permanece
+deshabilitada durante esta migración: la
+action falla antes de ejecutar el bootstrap cuando todavía no hay un lock que pueda usar
+como clave. Debe habilitarse únicamente después de versionar los locks iniciales.
 Cuando cambie una referencia, regenere los locks deliberadamente con `dotnet restore
 VisualNotes.sln --force-evaluate` y revise el diff antes de integrarlo.
+
+La política de aceptación, inventario de licencias y controles de release están en
+`docs/dependencies.md`. El workflow `release.yml` es la única ruta admitida para publicar:
+produce binarios e instalador Authenticode, SBOM SPDX, hashes SHA-256 verificados y una
+atestación de procedencia vinculada al workflow y commit.
 
 El check agregado **Quality / Required quality gate** debe configurarse como requerido
 en el ruleset de `main`, junto con al menos una aprobación y la invalidación de

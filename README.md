@@ -74,6 +74,7 @@ resultados de tests y medidas de rendimiento, además de qué puertas son obliga
 
 - [Arquitectura y flujo de datos](docs/architecture.md)
 - [Calidad, pruebas y métricas](docs/quality.md)
+- [Dependencias, licencias y cadena de suministro](docs/dependencies.md)
 - [Guía detallada de pruebas](tests/README.md)
 - [Cómo contribuir](CONTRIBUTING.md)
 

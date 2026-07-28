@@ -3,6 +3,7 @@ name: Quality
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -34,11 +35,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: moderate
+          deny-licenses: AGPL-1.0, AGPL-3.0, SSPL-1.0
+          comment-summary-in-pr: always
 
   build-and-test:
     name: Build, test and coverage
@@ -50,12 +54,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: "**/packages.lock.json"
       - name: Restore tools
         run: dotnet tool restore
       - name: Restore packages from lock files
-        run: dotnet restore VisualNotes.sln --locked-mode
+        shell: pwsh
+        run: ./eng/restore-locked.ps1 -Target VisualNotes.sln
       - name: Check formatting
         run: dotnet format VisualNotes.sln --verify-no-changes --no-restore
       - name: Build Debug with warnings as errors
@@ -78,6 +81,15 @@ jobs:
         run: ./eng/coverage-gate.ps1 -Report TestResults/CoverageReport/Cobertura.xml -BaseRef $env:COVERAGE_BASE_REF
       - name: Audit vulnerable NuGet dependencies
         run: dotnet list VisualNotes.sln package --vulnerable --include-transitive --no-restore
+      - name: Reject package versions outside central management
+        shell: pwsh
+        run: |
+          $violations = Get-ChildItem -Recurse -Filter *.csproj |
+            Select-String -Pattern '<PackageReference\s+[^>]*Version\s*='
+          if ($violations) {
+            $violations | ForEach-Object { Write-Error $_.Line }
+            throw 'Package versions must be declared in Directory.Packages.props.'
+          }
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -111,10 +123,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: "**/packages.lock.json"
       - name: Restore packages from lock files
-        run: dotnet restore tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj --locked-mode
+        shell: pwsh
+        run: ./eng/restore-locked.ps1 -Target tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj
       - name: Run UI tests
         run: >-
           dotnet test tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj
