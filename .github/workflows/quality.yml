@@ -19,6 +19,7 @@ jobs:
     env: { CI: true }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: 8.0.x }
       - run: dotnet tool restore
@@ -26,10 +27,17 @@ jobs:
       - run: dotnet format VisualNotes.sln --verify-no-changes --no-restore --severity error
       - run: dotnet build VisualNotes.sln --configuration Release --no-restore /warnaserror
       - name: Unit, architecture and integration tests
-        run: dotnet test VisualNotes.sln --configuration Release --no-build --filter "Category=Unit|Category=Architecture|Category=Integration" --collect:"XPlat Code Coverage" --results-directory TestResults
+        run: dotnet test VisualNotes.sln --configuration Release --no-build --filter "Category=Unit|Category=Architecture|Category=Integration" --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults
       - name: HTML and Cobertura reports
-        run: reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/CoverageReport" "-reporttypes:Html;Cobertura"
-      - uses: actions/upload-artifact@v4
+        run: reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/CoverageReport" "-reporttypes:Html;Cobertura;TextSummary"
+      - name: Coverage quality gates
+        shell: pwsh
+        env:
+          COVERAGE_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: ./eng/coverage-gate.ps1 -Report TestResults/CoverageReport/Cobertura.xml -BaseRef $env:COVERAGE_BASE_REF
+      - name: Publish coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
         with: { name: coverage, path: TestResults/CoverageReport }
 
   ui-tests:
