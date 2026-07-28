@@ -64,6 +64,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
         private readonly Canvas _canvas = new() { Background = WpfBrushes.Transparent };
         private readonly TextBlock _status = new();
         private readonly WpfRectangle _selection = new() { Stroke = WpfBrushes.DeepSkyBlue, StrokeThickness = 2, Fill = new SolidColorBrush(WpfColor.FromArgb(35, 0, 160, 255)) };
+        private bool _isDragging;
         public event Action? ConfirmRequested;
         public event Action? CancelRequested;
         public event Action? ResetRequested;
@@ -89,7 +90,11 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             // completing their Click event and replaces the selection with 0x0.
             _canvas.MouseLeftButtonDown += OnMouseDown;
             PreviewMouseMove += OnMouseMove;
-            PreviewMouseLeftButtonUp += (_, _) => ReleaseMouseCapture();
+            PreviewMouseLeftButtonUp += (_, _) =>
+            {
+                _isDragging = false;
+                ReleaseMouseCapture();
+            };
             PreviewKeyDown += OnKeyDown;
             Loaded += (_, _) => Keyboard.Focus(_canvas);
         }
@@ -126,14 +131,16 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
 
         private void OnMouseDown(object sender, MouseButtonEventArgs args)
         {
+            if (_controller.IsLocked) return;
             var point = PointToScreen(args.GetPosition(this));
             _controller.Begin((int)Math.Round(point.X), (int)Math.Round(point.Y));
+            _isDragging = true;
             CaptureMouse(); SelectionChanged?.Invoke();
         }
 
         private void OnMouseMove(object sender, WpfMouseEventArgs args)
         {
-            if (args.LeftButton != MouseButtonState.Pressed) return;
+            if (!_isDragging || args.LeftButton != MouseButtonState.Pressed) return;
             var point = PointToScreen(args.GetPosition(this));
             _controller.Update((int)Math.Round(point.X), (int)Math.Round(point.Y)); SelectionChanged?.Invoke();
         }

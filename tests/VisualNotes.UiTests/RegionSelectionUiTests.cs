@@ -17,6 +17,7 @@ public sealed class RegionSelectionUiTests
         source.ShouldContain("new() { Background = WpfBrushes.Transparent }");
         source.ShouldContain("_canvas.MouseLeftButtonDown += OnMouseDown;");
         source.ShouldNotContain("PreviewMouseLeftButtonDown += OnMouseDown;");
+        source.ShouldContain("if (!_isDragging || args.LeftButton != MouseButtonState.Pressed) return;");
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]

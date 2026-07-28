@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
@@ -201,9 +202,23 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (_settings is not null) { await _settings.LoadCredentialsAsync(); await _settings.LoadSettingsAsync(); }
         await Sessions.LoadAsync();
-        var restored = await _coordinator.RestoreLastOpenAsync();
-        if (restored is not null)
-            Sessions.SelectedSession = Sessions.RecentSessions.FirstOrDefault(session => session.Id == restored.Id) ?? restored;
+    }
+
+    public async Task<NoteSession> EnsureActiveSessionAsync(CancellationToken cancellationToken = default)
+    {
+        var session = ActiveSession ?? await Sessions.EnsureSelectedSessionAsync(cancellationToken);
+        if (session.ActiveSectionId is not { } activeSectionId ||
+            session.Sections.All(section => section.Id != activeSectionId))
+        {
+            var section = session.Sections.OrderBy(item => item.Order).FirstOrDefault();
+            if (section is null)
+                section = await _coordinator.AddSectionAsync(session, "General", ct: cancellationToken);
+            else
+                await _coordinator.ActivateSectionAsync(session, section.Id, cancellationToken);
+            Sessions.SelectedSection = section;
+            RefreshHeader();
+        }
+        return session;
     }
 
     public async Task CaptureAddedAsync(Screenshot capture)
@@ -255,6 +270,8 @@ public sealed class SessionViewModel : ViewModelBase
     private NoteSession _draft = NewDraft();
     private NoteSession? _selected;
     private NoteSection? _selectedSection;
+    private string _lastActionMessage = string.Empty;
+    private readonly SemaphoreSlim _automaticSessionGate = new(1, 1);
 
     public SessionViewModel(SessionCoordinator coordinator, ISessionRepository repository, Action<NoteSession> activate)
     {
@@ -263,8 +280,8 @@ public sealed class SessionViewModel : ViewModelBase
         DuplicateCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; var copy = await _coordinator.CreateAsync(NewDraft(), SelectedSession.Id); RecentSessions.Insert(0, copy); SelectedSession = copy; });
         ContinueCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; await _coordinator.ContinueAsync(SelectedSession); _activate(SelectedSession); });
         SaveCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is not null) await _coordinator.SetPausedAsync(SelectedSession, SelectedSession.IsPaused); });
-        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; SelectedSection = await _coordinator.AddSectionAsync(SelectedSession, "Nueva sección", ct: cancellationToken); _activate(SelectedSession); });
-        AddSubsectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null || SelectedSection is null) return; SelectedSection = await _coordinator.AddSectionAsync(SelectedSession, "Nueva subsección", parentId: SelectedSection.Id, ct: cancellationToken); _activate(SelectedSession); });
+        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { var session = await EnsureSelectedSessionAsync(cancellationToken); SelectedSection = await _coordinator.AddSectionAsync(session, "Nueva sección", ct: cancellationToken); _activate(session); });
+        AddSubsectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSection is null) return; var session = await EnsureSelectedSessionAsync(cancellationToken); SelectedSection = await _coordinator.AddSectionAsync(session, "Nueva subsección", parentId: SelectedSection.Id, ct: cancellationToken); _activate(session); });
         ActivateSectionCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (SelectedSession is null || value is not NoteSection section) return; await _coordinator.ActivateSectionAsync(SelectedSession, section.Id); SelectedSection = section; _activate(SelectedSession); });
         RenameSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSection is not null) await _coordinator.RenameSectionAsync(SelectedSection, SelectedSection.Title); });
         MoveUpCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null || SelectedSection is null) return; await _coordinator.ReorderSectionAsync(SelectedSession, SelectedSection.Id, SelectedSection.Order - 1); OnPropertyChanged(nameof(OrderedSections)); });
@@ -275,6 +292,7 @@ public sealed class SessionViewModel : ViewModelBase
     public NoteSession Draft { get => _draft; set { _draft = value; OnPropertyChanged(); } }
     public NoteSession? SelectedSession { get => _selected; set { _selected = value; OnPropertyChanged(); OnPropertyChanged(nameof(OrderedSections)); if (value is not null) _activate(value); } }
     public NoteSection? SelectedSection { get => _selectedSection; set { _selectedSection = value; OnPropertyChanged(); } }
+    public string LastActionMessage { get => _lastActionMessage; private set { _lastActionMessage = value; OnPropertyChanged(); } }
     public IEnumerable<NoteSection> OrderedSections => SelectedSession is null ? [] : SelectedSession.Sections.OrderBy(x => x.Order);
     public ICommand CreateCommand { get; }
     public ICommand DuplicateCommand { get; }
@@ -288,6 +306,58 @@ public sealed class SessionViewModel : ViewModelBase
     public ICommand MoveDownCommand { get; }
 
     public async Task LoadAsync() { RecentSessions.Clear(); foreach (var session in await _repository.ListAsync()) RecentSessions.Add(session); }
+
+    public async Task<NoteSession> EnsureSelectedSessionAsync(CancellationToken cancellationToken = default)
+    {
+        if (SelectedSession is not null) return SelectedSession;
+        await _automaticSessionGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (SelectedSession is not null) return SelectedSession;
+            Draft.Name = BuildAutomaticSessionName(Draft, DateTimeOffset.Now, RecentSessions.Select(session => session.Name));
+            var session = await _coordinator.CreateAsync(Draft, ct: cancellationToken);
+            RecentSessions.Insert(0, session);
+            SelectedSession = session;
+            Draft = NewDraft();
+            LastActionMessage = $"Se ha creado automáticamente la sesión «{session.Name}».";
+            return session;
+        }
+        finally
+        {
+            _automaticSessionGate.Release();
+        }
+    }
+
+    public static string BuildAutomaticSessionName(NoteSession draft, DateTimeOffset now, IEnumerable<string> existingNames)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        ArgumentNullException.ThrowIfNull(existingNames);
+        var title = string.IsNullOrWhiteSpace(draft.Name) ||
+            draft.Name.Equals("Nueva sesión", StringComparison.OrdinalIgnoreCase)
+            ? (string.IsNullOrWhiteSpace(draft.Topic) ? "Sesión" : draft.Topic)
+            : draft.Name;
+        var parts = new[] { now.ToString("yyyy-MM-dd"), title, draft.Module }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(SanitizeNamePart);
+        var baseName = string.Join("_", parts);
+        var names = existingNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!names.Contains(baseName)) return baseName;
+        for (var suffix = 2; ; suffix++)
+        {
+            var candidate = $"{baseName}_{suffix}";
+            if (!names.Contains(candidate)) return candidate;
+        }
+    }
+
+    private static string SanitizeNamePart(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
+        var cleaned = new string(value.Trim().Select(character =>
+            invalid.Contains(character) || char.IsWhiteSpace(character) ? '_' : character).ToArray());
+        while (cleaned.Contains("__", StringComparison.Ordinal)) cleaned = cleaned.Replace("__", "_", StringComparison.Ordinal);
+        return cleaned.Trim('_');
+    }
+
     private static NoteSession NewDraft() => new() { WorkingFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), PlannedDocumentName = "Apuntes.md" };
 }
 

@@ -15,7 +15,7 @@ public sealed class CapturePanelViewModel : ViewModelBase
     private int _captureCount;
     private bool _isMinimal;
     private double _panelOpacity = 0.94;
-    private CapturePanelPlacement _placement;
+    private CapturePanelPlacement _placement = CapturePanelPlacement.Derecha;
 
     public CapturePanelViewModel(MainViewModel main)
     {

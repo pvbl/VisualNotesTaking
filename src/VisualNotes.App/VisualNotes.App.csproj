@@ -11,7 +11,12 @@
     <!-- The signed distribution currently supports native x64 only. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\VisualNotes.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\VisualNotes.ico" />
+    <Resource Include="Assets\VisualNotesLogo.png" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\VisualNotes.Core\VisualNotes.Core.csproj" />
     <ProjectReference Include="..\VisualNotes.Infrastructure\VisualNotes.Infrastructure.csproj" />

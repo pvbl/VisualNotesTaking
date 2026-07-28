@@ -57,6 +57,40 @@ public sealed class CapturePersistenceIntegrationTests : IDisposable
         reloaded.Context.DpiX.ShouldBe(144u);
     }
 
+    [Fact]
+    public async Task Section_created_on_a_session_loaded_from_the_recent_list_is_persisted_before_capture()
+    {
+        Guid sessionId;
+        await using (var initial = await VisualNotesRuntime.CreateAsync(_root, CancellationToken.None))
+        {
+            var created = await initial.Coordinator.CreateAsync(new NoteSession { Name = "Sesión reciente" });
+            sessionId = created.Id;
+        }
+
+        Guid sectionId;
+        Guid screenshotId;
+        await using (var runtime = await VisualNotesRuntime.CreateAsync(_root, CancellationToken.None))
+        {
+            var recent = (await runtime.Sessions.ListAsync()).Single(session => session.Id == sessionId);
+            var section = await runtime.Coordinator.AddSectionAsync(recent, "Persistida");
+            sectionId = section.Id;
+            var screenshot = new Screenshot
+            {
+                SessionId = recent.Id,
+                SectionId = section.Id,
+                Width = 10,
+                Height = 10
+            };
+            await runtime.Coordinator.AddCaptureAsync(recent, screenshot);
+            screenshotId = screenshot.Id;
+        }
+
+        await using var restarted = await VisualNotesRuntime.CreateAsync(_root, CancellationToken.None);
+        var session = (await restarted.Sessions.ListAsync()).Single(item => item.Id == sessionId);
+        session.Sections.ShouldContain(section => section.Id == sectionId);
+        (await restarted.Screenshots.GetAsync(screenshotId)).ShouldNotBeNull().SectionId.ShouldBe(sectionId);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, true);

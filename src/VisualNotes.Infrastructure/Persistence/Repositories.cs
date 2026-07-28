@@ -11,7 +11,7 @@ public sealed class SessionRepository(VisualNotesDbContext db) : ISessionReposit
 {
     public Task<NoteSession?> GetAsync(Guid id, CancellationToken ct = default) => db.Sessions.Include(x => x.Sections).Include(x => x.Screenshots).ThenInclude(x => x.Image).SingleOrDefaultAsync(x => x.Id == id, ct);
     public async Task<IReadOnlyList<NoteSession>> ListAsync(CancellationToken ct = default) =>
-        (await db.Sessions.AsNoTracking().Include(x => x.Sections).Include(x => x.Screenshots).ToListAsync(ct))
+        (await db.Sessions.Include(x => x.Sections).Include(x => x.Screenshots).ToListAsync(ct))
         .OrderByDescending(x => x.ModifiedAt).ToList();
     public Task AddAsync(NoteSession session, CancellationToken ct = default) => db.Sessions.AddAsync(session, ct).AsTask();
     public void Remove(NoteSession session) => db.Sessions.Remove(session);

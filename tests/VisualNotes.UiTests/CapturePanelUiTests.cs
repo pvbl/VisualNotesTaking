@@ -8,6 +8,16 @@ namespace VisualNotes.UiTests;
 
 public sealed class CapturePanelUiTests
 {
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Panel_defaults_to_the_right_side()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+            "src", "VisualNotes.App", "ViewModels", "CapturePanelViewModel.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        source.ShouldContain("_placement = CapturePanelPlacement.Derecha;");
+    }
+
     [Theory, Trait("Category", "UI"), Trait("Category", "Windows")]
     [InlineData(-1920, 0, 1920, 1080, 1.0)]
     [InlineData(0, -1440, 2560, 1440, 1.25)]
@@ -105,9 +115,11 @@ public sealed class CapturePanelUiTests
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");
         var source = File.ReadAllText(Path.GetFullPath(path));
 
-        var resume = source.IndexOf("await _viewModel.ResumeActiveSessionAsync();", StringComparison.Ordinal);
+        var ensure = source.IndexOf("await _viewModel.EnsureActiveSessionAsync();", StringComparison.Ordinal);
+        var resume = source.IndexOf("await _viewModel.ResumeActiveSessionAsync();", ensure, StringComparison.Ordinal);
         var capture = source.IndexOf("var frame = await _capture.CaptureAsync(new(captureMode));", StringComparison.Ordinal);
-        resume.ShouldBeGreaterThanOrEqualTo(0);
+        ensure.ShouldBeGreaterThanOrEqualTo(0);
+        resume.ShouldBeGreaterThan(ensure);
         capture.ShouldBeGreaterThan(resume);
     }
 

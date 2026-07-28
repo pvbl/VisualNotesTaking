@@ -13,7 +13,11 @@ public sealed class RegionSelectionController
     public bool IsLocked { get; private set; }
     public bool IsHidden { get; private set; }
 
-    public void Begin(int physicalX, int physicalY) { _origin = (physicalX, physicalY); Selection = null; State = RegionSelectionState.Selecting; }
+    public void Begin(int physicalX, int physicalY)
+    {
+        if (IsLocked) return;
+        _origin = (physicalX, physicalY); Selection = null; State = RegionSelectionState.Selecting;
+    }
     public void Update(int physicalX, int physicalY)
     {
         if (_origin is not { } origin || State is RegionSelectionState.Cancelled or RegionSelectionState.Confirmed) return;
@@ -48,7 +52,11 @@ public sealed class RegionSelectionController
         if (IsLocked || Selection is null) return false;
         _origin = null; Selection = null; State = RegionSelectionState.Selecting; return true;
     }
-    public void SetLocked(bool value) => IsLocked = value;
+    public void SetLocked(bool value)
+    {
+        IsLocked = value;
+        if (value) _origin = null;
+    }
     public void SetHidden(bool value) => IsHidden = value;
     public void Reset() { _origin = null; Selection = null; IsLocked = false; IsHidden = false; State = RegionSelectionState.Selecting; }
 }

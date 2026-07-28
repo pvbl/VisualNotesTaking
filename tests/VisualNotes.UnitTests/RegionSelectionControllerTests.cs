@@ -81,6 +81,20 @@ public sealed class RegionSelectionControllerTests
     }
 
     [Fact]
+    public void Lock_prevents_a_new_drag_from_replacing_the_selection()
+    {
+        var controller = new RegionSelectionController();
+        controller.SetSelection(new(100, 120, 640, 480));
+        controller.SetLocked(true);
+
+        controller.Begin(10, 20);
+        controller.Update(30, 40);
+
+        controller.Selection.ShouldBe(new PhysicalRectangle(100, 120, 640, 480));
+        controller.State.ShouldBe(RegionSelectionState.Selected);
+    }
+
+    [Fact]
     public void Invalid_explicit_selection_is_rejected()
     {
         Should.Throw<ArgumentOutOfRangeException>(() =>

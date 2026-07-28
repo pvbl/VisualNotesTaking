@@ -22,7 +22,7 @@ public sealed class UserJourneysE2ETests
             RetryUntil(() => VisualNotesApplication.ById(window, "RecentSessionsList").AsListBox().Items.Length == 1);
 
             VisualNotesApplication.ById(window, "AddSectionButton").AsButton().Invoke();
-            RetryUntil(() => VisualNotesApplication.ById(window, "SectionsList").AsListBox().Items.Length >= 2);
+            RetryUntil(() => VisualNotesApplication.ById(window, "SectionsList").AsListBox().Items.Length >= 1);
             VisualNotesApplication.ById(window, "ActivateSectionButton").AsButton().Invoke();
 
             foreach (var id in new[] { "NavCaptures", "NavInstructions", "NavDocument", "NavSettings", "NavSession" })

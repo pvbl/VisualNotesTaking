@@ -22,6 +22,8 @@
    </Border>
 
    <TextBlock Text="Sesiones recientes" FontSize="22" FontWeight="SemiBold" Foreground="#172033" Margin="0,0,0,10"/>
+   <TextBlock Text="{Binding LastActionMessage}" Foreground="#166534" TextWrapping="Wrap" Margin="0,0,0,10"
+              AutomationProperties.LiveSetting="Polite"/>
    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="3*"/></Grid.ColumnDefinitions>
     <ListBox AutomationProperties.AutomationId="RecentSessionsList" AutomationProperties.Name="Sesiones recientes" ItemsSource="{Binding RecentSessions}" SelectedItem="{Binding SelectedSession}" Margin="0,0,16,0" MaxHeight="360">
      <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="8"><TextBlock Text="{Binding Name}" FontWeight="Bold"/><TextBlock Foreground="#64748B"><Run Text="{Binding ModifiedAt, Mode=OneWay, StringFormat={}{0:g}}"/><Run Text=" · "/><Run Text="{Binding Screenshots.Count, Mode=OneWay}"/><Run Text=" capturas"/></TextBlock><TextBlock Foreground="#64748B"><Run Text="Procesamiento: "/><Run Text="{Binding ProcessingStatus, Mode=OneWay}"/><Run Text=" · Última exportación: "/><Run Text="{Binding LastExportedAt, Mode=OneWay, TargetNullValue=—, StringFormat={}{0:g}}"/></TextBlock></StackPanel></DataTemplate></ListBox.ItemTemplate>

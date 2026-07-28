@@ -53,6 +53,7 @@ public partial class App : System.Windows.Application
     {
         public void ShowError(string message) => MessageBox.Show(message, "Operación no completada", MessageBoxButton.OK, MessageBoxImage.Error);
     }
+    private Icon? _applicationIcon;
     private Forms.NotifyIcon? _trayIcon;
     private MainWindow? _window;
     private Views.CapturePanelWindow? _capturePanel;
@@ -200,7 +201,9 @@ public partial class App : System.Windows.Application
     private async void CapturePersistentRegion() => await CapturePersistentRegionAsync();
     private async Task CapturePersistentRegionAsync()
     {
-        if (_capture is null || _activeRegion is null || _activeRegion.IsHidden) return;
+        if (_capture is null || _activeRegion is null || _activeRegion.IsHidden || _viewModel is null) return;
+        await _viewModel.EnsureActiveSessionAsync();
+        await _viewModel.ResumeActiveSessionAsync();
         var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
             MonitorDeviceName: _activeRegion.MonitorDeviceName));
         if (frame is not null) await PersistCapturedFrameAsync(frame);
@@ -211,6 +214,7 @@ public partial class App : System.Windows.Application
     private async Task CaptureFromPanelAsync(CapturePanelMode mode)
     {
         if (_capture is null || _viewModel is null) return;
+        await _viewModel.EnsureActiveSessionAsync();
         await _viewModel.ResumeActiveSessionAsync();
         if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(); return; }
         var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
@@ -220,6 +224,10 @@ public partial class App : System.Windows.Application
 
     private void CreateTrayIcon()
     {
+        var executablePath = Environment.ProcessPath;
+        if (!string.IsNullOrWhiteSpace(executablePath))
+            _applicationIcon = Icon.ExtractAssociatedIcon(executablePath);
+
         var menu = new Forms.ContextMenuStrip();
         menu.Items.Add("Abrir VisualNotes", null, (_, _) => ShowWindow());
         menu.Items.Add("Capturar región (Ctrl+Mayús+C)", null, (_, _) => CapturePersistentRegion());
@@ -235,7 +243,7 @@ public partial class App : System.Windows.Application
 
         _trayIcon = new Forms.NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = _applicationIcon ?? SystemIcons.Application,
             Text = "VisualNotes",
             ContextMenuStrip = menu,
             Visible = true
@@ -263,6 +271,7 @@ public partial class App : System.Windows.Application
     {
         _isExiting = true;
         _trayIcon?.Dispose();
+        _applicationIcon?.Dispose();
         _regionBorder?.Dispose();
         _capturePanel?.Close();
         _hotkeys?.Dispose();
@@ -343,7 +352,7 @@ public partial class App : System.Windows.Application
         catch (Exception exception)
         {
             _loggerFactory?.CreateLogger<App>().LogError(exception, "Screenshot persistence failed");
-            MessageBox.Show("No se pudo guardar la captura. Comprueba que la carpeta de datos sea accesible y que haya espacio disponible, e inténtalo de nuevo.",
+            MessageBox.Show($"No se pudo registrar la captura en la base de datos.{Environment.NewLine}{Environment.NewLine}Detalle: {exception.GetBaseException().Message}",
                 "Captura no guardada", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -374,7 +383,9 @@ public partial class App : System.Windows.Application
 
     private async Task CaptureAndPersistAsync(ScreenCaptureMode mode)
     {
-        if (_capture is null) return;
+        if (_capture is null || _viewModel is null) return;
+        await _viewModel.EnsureActiveSessionAsync();
+        await _viewModel.ResumeActiveSessionAsync();
         var frame = await _capture.CaptureAsync(new(mode));
         if (frame is not null) await PersistCapturedFrameAsync(frame);
     }
