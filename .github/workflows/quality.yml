@@ -80,7 +80,7 @@ jobs:
           COVERAGE_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: ./eng/coverage-gate.ps1 -Report TestResults/CoverageReport/Cobertura.xml -BaseRef $env:COVERAGE_BASE_REF
       - name: Audit vulnerable NuGet dependencies
-        run: dotnet list VisualNotes.sln package --vulnerable --include-transitive --no-restore
+        run: dotnet list VisualNotes.sln package --vulnerable --include-transitive
       - name: Reject package versions outside central management
         shell: pwsh
         run: |

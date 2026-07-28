@@ -14,6 +14,7 @@ public sealed class RegionSelectionUiTests
             "src", "VisualNotes.App", "Services", "RegionSelectionOverlay.cs");
         var source = File.ReadAllText(Path.GetFullPath(path));
 
+        source.ShouldContain("new() { Background = WpfBrushes.Transparent }");
         source.ShouldContain("_canvas.MouseLeftButtonDown += OnMouseDown;");
         source.ShouldNotContain("PreviewMouseLeftButtonDown += OnMouseDown;");
     }

@@ -58,7 +58,10 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
     {
         private readonly Forms.Screen _screen;
         private readonly RegionSelectionController _controller;
-        private readonly Canvas _canvas = new();
+        // A null background makes empty Canvas areas transparent to WPF hit testing.
+        // Transparent keeps the overlay visually unchanged while allowing a drag to
+        // start anywhere outside the command panel.
+        private readonly Canvas _canvas = new() { Background = WpfBrushes.Transparent };
         private readonly TextBlock _status = new();
         private readonly WpfRectangle _selection = new() { Stroke = WpfBrushes.DeepSkyBlue, StrokeThickness = 2, Fill = new SolidColorBrush(WpfColor.FromArgb(35, 0, 160, 255)) };
         public event Action? ConfirmRequested;

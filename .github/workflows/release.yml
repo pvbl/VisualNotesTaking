@@ -45,7 +45,7 @@ jobs:
         shell: pwsh
         run: ./eng/restore-locked.ps1 -Target VisualNotes.sln
       - name: Audit vulnerable NuGet dependencies
-        run: dotnet list VisualNotes.sln package --vulnerable --include-transitive --no-restore
+        run: dotnet list VisualNotes.sln package --vulnerable --include-transitive
       - name: Build and publish application
         run: >-
           dotnet publish src/VisualNotes.App/VisualNotes.App.csproj
