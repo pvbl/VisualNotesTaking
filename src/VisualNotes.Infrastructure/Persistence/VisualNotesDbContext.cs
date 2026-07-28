@@ -7,6 +7,7 @@ namespace VisualNotes.Infrastructure.Persistence;
 public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> options) : DbContext(options)
 {
     public DbSet<Course> Courses => Set<Course>();
+    public DbSet<CourseModule> CourseModules => Set<CourseModule>();
     public DbSet<NoteSession> Sessions => Set<NoteSession>();
     public DbSet<NoteSection> Sections => Set<NoteSection>();
     public DbSet<Screenshot> Screenshots => Set<Screenshot>();
@@ -38,6 +39,10 @@ public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> 
         }
 
         modelBuilder.Entity<NoteSession>().HasIndex(x => x.CourseId);
+        modelBuilder.Entity<CourseModule>().HasIndex(x => new { x.CourseId, x.Name }).IsUnique();
+        modelBuilder.Entity<CourseModule>().HasMany(x => x.Sessions).WithOne(x => x.CourseModule)
+            .HasForeignKey(x => x.CourseModuleId).OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<NoteSession>().HasIndex(x => x.CourseModuleId);
         modelBuilder.Entity<NoteSection>().HasIndex(x => x.SessionId);
         modelBuilder.Entity<NoteSection>().HasOne(x => x.ParentSection).WithMany(x => x.Children).HasForeignKey(x => x.ParentSectionId).OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<NoteSession>().HasOne<NoteSection>().WithMany().HasForeignKey(x => x.ActiveSectionId).OnDelete(DeleteBehavior.SetNull);

@@ -142,6 +142,7 @@ public partial class App : System.Windows.Application
         _viewModel = composedViewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions, _hotkeys, _runtime.ApiCredentials,
             _runtime.CaptureWorkspace, _runtime.DocumentExporter, new WindowsExportInteraction(),
             _runtime.Settings, _runtime.UnitOfWork, _runtime.AnalysisJobs, captureActions);
+        _viewModel.ReviewRequested += ShowWindow;
         _ = _runtime.RecoverIncompleteJobsAsync();
         _hotkeys.HotkeyInvoked += OnHotkeyInvoked;
         var bindings = bootstrap?.EnableHotkeys == false
@@ -164,7 +165,8 @@ public partial class App : System.Windows.Application
         _capturePanelViewModel = new CapturePanelViewModel(
             _viewModel,
             SetRegionLockAsync,
-            _activeRegion?.IsLocked == true);
+            _activeRegion?.IsLocked == true,
+            ConfirmDraftSessionChangeAsync);
         _capturePanelViewModel.CaptureRequested += CaptureFromPanel;
         _capturePanel = new Views.CapturePanelWindow { DataContext = _capturePanelViewModel };
         _contextPanel = new Views.ContextPanelWindow
@@ -245,28 +247,28 @@ public partial class App : System.Windows.Application
     }
 
     private async void CapturePersistentRegion() => await CapturePersistentRegionAsync();
-    private Task CapturePersistentRegionAsync() => CapturePersistentRegionAsync(string.Empty, false);
-    private async Task CapturePersistentRegionAsync(string contextMarkdown, bool clearContext)
+    private Task CapturePersistentRegionAsync() => CapturePersistentRegionAsync(new("", "", ""), false);
+    private async Task CapturePersistentRegionAsync(CaptureDraft draft, bool clearContext)
     {
         if (_capture is null || _activeRegion is null || _activeRegion.IsHidden || _viewModel is null) return;
         await _viewModel.EnsureActiveSessionAsync();
         await _viewModel.ResumeActiveSessionAsync();
         var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
             MonitorDeviceName: _activeRegion.MonitorDeviceName));
-        if (frame is not null) await PersistCapturedFrameAsync(frame, contextMarkdown, clearContext);
+        if (frame is not null) await PersistCapturedFrameAsync(frame, draft, clearContext);
         _regionBorder?.Show(_activeRegion);
     }
 
-    private async void CaptureFromPanel(CapturePanelMode mode, string contextMarkdown) => await CaptureFromPanelAsync(mode, contextMarkdown);
-    private async Task CaptureFromPanelAsync(CapturePanelMode mode, string contextMarkdown)
+    private async void CaptureFromPanel(CapturePanelMode mode, CaptureDraft draft) => await CaptureFromPanelAsync(mode, draft);
+    private async Task CaptureFromPanelAsync(CapturePanelMode mode, CaptureDraft draft)
     {
         if (_capture is null || _viewModel is null) return;
         await _viewModel.EnsureActiveSessionAsync();
         await _viewModel.ResumeActiveSessionAsync();
-        if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(contextMarkdown, true); return; }
+        if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(draft, true); return; }
         var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
         var frame = await _capture.CaptureAsync(new(captureMode));
-        if (frame is not null) await PersistCapturedFrameAsync(frame, contextMarkdown, true);
+        if (frame is not null) await PersistCapturedFrameAsync(frame, draft, true);
     }
 
     private void CreateTrayIcon()
@@ -351,7 +353,22 @@ public partial class App : System.Windows.Application
 
     private static void ShowError(UserFacingError error) => MessageBox.Show(error.Message, error.Title, MessageBoxButton.OK, MessageBoxImage.Error);
 
-    private async Task PersistCapturedFrameAsync(CapturedFrame frame, string contextMarkdown = "", bool clearContext = false)
+    private static Task<DraftChangeDecision> ConfirmDraftSessionChangeAsync()
+    {
+        var result = MessageBox.Show(
+            "Hay un título, etiquetas o contexto sin guardar.\n\nSí: guardarlo como apunte\nNo: descartarlo\nCancelar: permanecer en la sesión actual",
+            "Cambiar de sesión",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+        return Task.FromResult(result switch
+        {
+            MessageBoxResult.Yes => DraftChangeDecision.SaveAsNote,
+            MessageBoxResult.No => DraftChangeDecision.Discard,
+            _ => DraftChangeDecision.Cancel
+        });
+    }
+
+    private async Task PersistCapturedFrameAsync(CapturedFrame frame, CaptureDraft? draft = null, bool clearContext = false)
     {
         if (_runtime is null || _viewModel?.ActiveSession is not { } session)
         {
@@ -386,7 +403,9 @@ public partial class App : System.Windows.Application
                 Width = metadata?.PixelWidth ?? frame.Region.Width,
                 Height = metadata?.PixelHeight ?? frame.Region.Height,
                 PerceptualHash = stored.Optimized.Sha256,
-                UserContext = contextMarkdown.Trim(),
+                DisplayTitle = draft?.Title.Trim() ?? string.Empty,
+                Tags = draft?.Tags.Trim() ?? string.Empty,
+                UserContext = draft?.ContextMarkdown.Trim() ?? string.Empty,
                 Image = new ScreenshotImage
                 {
                     ScreenshotId = frame.Id,

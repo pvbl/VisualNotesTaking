@@ -6,8 +6,14 @@ using VisualNotes.Core.Models;
 namespace VisualNotes.App.ViewModels;
 
 public enum CapturePanelMode { Region, Monitor, Desktop, Window }
-public enum CapturePanelPlacement { Flotante, Derecha, Arriba, Abajo }
+public enum CapturePanelPlacement { Flotante, Izquierda, Derecha, Arriba, Abajo }
 public enum ContextEditorPlacement { Dentro, Izquierda, Derecha, Debajo, Flotante }
+public enum DraftChangeDecision { SaveAsNote, Discard, Cancel }
+public sealed record CaptureDraft(string Title, string Tags, string ContextMarkdown)
+{
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Title) &&
+        string.IsNullOrWhiteSpace(Tags) && string.IsNullOrWhiteSpace(ContextMarkdown);
+}
 
 /// <summary>State and commands exposed by the always-on-top capture controller.</summary>
 public sealed class CapturePanelViewModel : ViewModelBase
@@ -22,23 +28,31 @@ public sealed class CapturePanelViewModel : ViewModelBase
     private CapturePanelPlacement _placement = CapturePanelPlacement.Derecha;
     private ContextEditorPlacement _contextPlacement = ContextEditorPlacement.Dentro;
     private string _contextMarkdown = string.Empty;
+    private string _captureTitle = string.Empty;
+    private string _captureTags = string.Empty;
     private string _newSectionName = string.Empty;
     private bool _isRegionLocked;
+    private string _selectedCourseName = string.Empty;
+    private string _selectedModuleName = string.Empty;
+    private NoteSession? _selectedSession;
+    private readonly Func<Task<DraftChangeDecision>> _confirmDraftChange;
 
     public CapturePanelViewModel(
         MainViewModel main,
         Func<bool, Task<bool>>? setRegionLock = null,
-        bool isRegionLocked = false)
+        bool isRegionLocked = false,
+        Func<Task<DraftChangeDecision>>? confirmDraftChange = null)
     {
         _main = main;
         _setRegionLock = setRegionLock;
+        _confirmDraftChange = confirmDraftChange ?? (() => Task.FromResult(DraftChangeDecision.Discard));
         _isRegionLocked = isRegionLocked;
-        CaptureCommand = new RelayCommand(_ => CaptureRequested?.Invoke(Mode, ContextMarkdown));
+        CaptureCommand = new RelayCommand(_ => CaptureRequested?.Invoke(Mode, Draft));
         AddTextNoteCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(ContextMarkdown)) return;
-            await _main.AddTextNoteAsync(ContextMarkdown, cancellationToken);
-            ContextMarkdown = string.Empty;
+            if (Draft.IsEmpty) return;
+            await _main.AddTextNoteAsync(Draft, cancellationToken);
+            ClearDraft();
         });
         RunSessionBatchCommand = _main.Captures.RunSessionBatchCommand;
         AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
@@ -62,16 +76,66 @@ public sealed class CapturePanelViewModel : ViewModelBase
         MarkImportantCommand = main.MarkImportantCommand;
         AddContextCommand = main.AddContextCommand;
         ToggleMinimalCommand = new RelayCommand(_ => IsMinimal = !IsMinimal);
+        OpenReviewCommand = new RelayCommand(_ => _main.OpenActiveSessionReview());
+        SelectPlacementCommand = new RelayCommand(value =>
+        {
+            if (value is CapturePanelPlacement placement) Placement = placement;
+            else if (value is string text && Enum.TryParse<CapturePanelPlacement>(text, out var parsed)) Placement = parsed;
+        });
         main.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(MainViewModel.ActiveSession) or nameof(MainViewModel.ActiveSessionName)
                 or nameof(MainViewModel.ActiveSectionName) or nameof(MainViewModel.SessionStatus)) RefreshSession();
         };
+        RefreshSession();
     }
 
     public string SessionName => _main.ActiveSessionName;
     public string SectionName => _main.ActiveSectionName;
     public string SessionStatus => _main.SessionStatus;
+    public IReadOnlyList<string> Courses => _main.Sessions.RecentSessions
+        .Select(SessionCourseName).Distinct(StringComparer.CurrentCultureIgnoreCase)
+        .OrderBy(x => x).ToArray();
+    public IReadOnlyList<string> Modules => _main.Sessions.RecentSessions
+        .Where(session => SessionCourseName(session) == SelectedCourseName)
+        .Select(SessionModuleName).Distinct(StringComparer.CurrentCultureIgnoreCase)
+        .OrderBy(x => x).ToArray();
+    public IReadOnlyList<NoteSession> AvailableSessions => _main.Sessions.RecentSessions
+        .Where(session => SessionCourseName(session) == SelectedCourseName &&
+            SessionModuleName(session) == SelectedModuleName)
+        .OrderByDescending(session => session.ModifiedAt).ToArray();
+    public string SelectedCourseName
+    {
+        get => _selectedCourseName;
+        set
+        {
+            if (_selectedCourseName == value) return;
+            _selectedCourseName = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Modules));
+            SelectedModuleName = Modules.FirstOrDefault() ?? string.Empty;
+        }
+    }
+    public string SelectedModuleName
+    {
+        get => _selectedModuleName;
+        set
+        {
+            if (_selectedModuleName == value) return;
+            _selectedModuleName = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AvailableSessions));
+        }
+    }
+    public NoteSession? SelectedSession
+    {
+        get => _selectedSession;
+        set
+        {
+            if (value is null || value == _selectedSession) return;
+            _ = ChangeSessionAsync(value);
+        }
+    }
     public IReadOnlyList<NoteSection> Sections => _main.ActiveSession?.Sections.OrderBy(section => section.Order).ToArray() ?? [];
     public Guid? SelectedSectionId
     {
@@ -97,8 +161,18 @@ public sealed class CapturePanelViewModel : ViewModelBase
             _placement = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsVerticalLayout));
+            OnPropertyChanged(nameof(IsFloatingPlacement));
+            OnPropertyChanged(nameof(IsLeftPlacement));
+            OnPropertyChanged(nameof(IsRightPlacement));
+            OnPropertyChanged(nameof(IsTopPlacement));
+            OnPropertyChanged(nameof(IsBottomPlacement));
         }
     }
+    public bool IsFloatingPlacement => Placement == CapturePanelPlacement.Flotante;
+    public bool IsLeftPlacement => Placement == CapturePanelPlacement.Izquierda;
+    public bool IsRightPlacement => Placement == CapturePanelPlacement.Derecha;
+    public bool IsTopPlacement => Placement == CapturePanelPlacement.Arriba;
+    public bool IsBottomPlacement => Placement == CapturePanelPlacement.Abajo;
     public IReadOnlyList<CapturePanelPlacement> Placements { get; } = Enum.GetValues<CapturePanelPlacement>();
     public ContextEditorPlacement ContextPlacement
     {
@@ -115,12 +189,16 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public Visibility ContextInsideVisibility => ContextPlacement == ContextEditorPlacement.Dentro
         ? Visibility.Visible
         : Visibility.Collapsed;
-    public bool IsVerticalLayout => Placement == CapturePanelPlacement.Derecha;
+    public bool IsVerticalLayout => Placement is CapturePanelPlacement.Derecha or CapturePanelPlacement.Izquierda;
     public int QueuedCaptures { get => _queuedCaptures; set { _queuedCaptures = Math.Max(0, value); OnPropertyChanged(); } }
     public int CaptureCount { get => _captureCount; private set { _captureCount = value; OnPropertyChanged(); } }
     public bool IsMinimal { get => _isMinimal; set { _isMinimal = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandedVisibility)); } }
     public double PanelOpacity { get => _panelOpacity; set { _panelOpacity = Math.Clamp(value, 0.55, 1); OnPropertyChanged(); } }
-    public string ContextMarkdown { get => _contextMarkdown; set { _contextMarkdown = value; OnPropertyChanged(); } }
+    public string ContextMarkdown { get => _contextMarkdown; set { _contextMarkdown = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasDraft)); } }
+    public string CaptureTitle { get => _captureTitle; set { _captureTitle = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasDraft)); } }
+    public string CaptureTags { get => _captureTags; set { _captureTags = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasDraft)); } }
+    public bool HasDraft => !Draft.IsEmpty;
+    public CaptureDraft Draft => new(CaptureTitle, CaptureTags, ContextMarkdown);
     public Visibility ExpandedVisibility => IsMinimal ? Visibility.Collapsed : Visibility.Visible;
     public ICommand CaptureCommand { get; }
     public ICommand AddTextNoteCommand { get; }
@@ -134,13 +212,15 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public ICommand MarkImportantCommand { get; }
     public ICommand AddContextCommand { get; }
     public ICommand ToggleMinimalCommand { get; }
-    public event Action<CapturePanelMode, string>? CaptureRequested;
+    public ICommand OpenReviewCommand { get; }
+    public ICommand SelectPlacementCommand { get; }
+    public event Action<CapturePanelMode, CaptureDraft>? CaptureRequested;
 
     public void CaptureCompleted(bool clearContext = false)
     {
         CaptureCount++;
         QueuedCaptures = Math.Max(0, QueuedCaptures - 1);
-        if (clearContext) ContextMarkdown = string.Empty;
+        if (clearContext) ClearDraft();
     }
 
     public void SetRegionLockState(bool isLocked)
@@ -165,10 +245,11 @@ public sealed class CapturePanelViewModel : ViewModelBase
         if (placement == CapturePanelPlacement.Flotante)
             return ConstrainToWorkArea(floatingBounds, workArea);
 
-        if (placement == CapturePanelPlacement.Derecha)
+        if (placement is CapturePanelPlacement.Derecha or CapturePanelPlacement.Izquierda)
         {
             var width = Math.Min(workArea.Width, Math.Clamp(Math.Round(workArea.Width / 6), 220, 480));
-            return new(workArea.Right - width, workArea.Top, width, workArea.Height);
+            var dockedLeft = placement == CapturePanelPlacement.Derecha ? workArea.Right - width : workArea.Left;
+            return new(dockedLeft, workArea.Top, width, workArea.Height);
         }
 
         var horizontalWidth = Math.Min(1040, workArea.Width);
@@ -219,10 +300,55 @@ public sealed class CapturePanelViewModel : ViewModelBase
 
     private void RefreshSession()
     {
+        _selectedSession = _main.ActiveSession;
+        _selectedCourseName = _selectedSession is null ? Courses.FirstOrDefault() ?? string.Empty : SessionCourseName(_selectedSession);
+        _selectedModuleName = _selectedSession is null ? Modules.FirstOrDefault() ?? string.Empty : SessionModuleName(_selectedSession);
         OnPropertyChanged(nameof(SessionName));
         OnPropertyChanged(nameof(SectionName));
         OnPropertyChanged(nameof(SessionStatus));
         OnPropertyChanged(nameof(Sections));
         OnPropertyChanged(nameof(SelectedSectionId));
+        OnPropertyChanged(nameof(Courses));
+        OnPropertyChanged(nameof(SelectedCourseName));
+        OnPropertyChanged(nameof(Modules));
+        OnPropertyChanged(nameof(SelectedModuleName));
+        OnPropertyChanged(nameof(AvailableSessions));
+        OnPropertyChanged(nameof(SelectedSession));
+        CaptureCount = _selectedSession?.Screenshots.Count(x => x.Status != EntityStatus.Deleted) ?? 0;
     }
+
+    private async Task ChangeSessionAsync(NoteSession session)
+    {
+        if (HasDraft)
+        {
+            var decision = await _confirmDraftChange();
+            if (decision == DraftChangeDecision.Cancel)
+            {
+                OnPropertyChanged(nameof(SelectedSession));
+                return;
+            }
+            if (decision == DraftChangeDecision.SaveAsNote)
+                await _main.AddTextNoteAsync(Draft);
+            ClearDraft();
+        }
+        await _main.SwitchActiveSessionAsync(session);
+        RefreshSession();
+    }
+
+    private void ClearDraft()
+    {
+        _captureTitle = string.Empty;
+        _captureTags = string.Empty;
+        _contextMarkdown = string.Empty;
+        OnPropertyChanged(nameof(CaptureTitle));
+        OnPropertyChanged(nameof(CaptureTags));
+        OnPropertyChanged(nameof(ContextMarkdown));
+        OnPropertyChanged(nameof(HasDraft));
+    }
+
+    private static string SessionCourseName(NoteSession session) =>
+        string.IsNullOrWhiteSpace(session.Course?.Name) ? "Sin clasificar" : session.Course.Name;
+    private static string SessionModuleName(NoteSession session) =>
+        !string.IsNullOrWhiteSpace(session.CourseModule?.Name) ? session.CourseModule.Name :
+        !string.IsNullOrWhiteSpace(session.Module) ? session.Module : "Sin clasificar";
 }

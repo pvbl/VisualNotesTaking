@@ -37,4 +37,22 @@ public partial class CapturesView : WpfUserControl
         var target = (e.OriginalSource as FrameworkElement)?.DataContext as Screenshot;
         viewModel.ReorderCommand.Execute(target is null ? CaptureList.Items.Count : CaptureList.Items.IndexOf(target));
     }
+
+    private void SaveMetadata(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is CapturesViewModel viewModel)
+        {
+            if (sender is FrameworkElement { DataContext: Screenshot capture })
+                viewModel.SelectedCapture = capture;
+            if (viewModel.SaveSelectedCommand.CanExecute(null))
+            viewModel.SaveSelectedCommand.Execute(null);
+        }
+    }
+
+    private void SaveResultMarkdown(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is CapturesViewModel viewModel &&
+            viewModel.SaveResultCommand.CanExecute(null))
+            viewModel.SaveResultCommand.Execute(null);
+    }
 }

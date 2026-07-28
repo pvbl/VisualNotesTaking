@@ -16,7 +16,7 @@ public sealed class CaptureManagementUiTests
 
         viewModel.DeleteCommand.Execute(null); // bound to Delete
         captures.Take(2).ShouldAllBe(capture => capture.Status == EntityStatus.Deleted);
-        viewModel.SelectionCount.ShouldBe(2);
+        viewModel.SelectionCount.ShouldBe(0); // deleted items leave the active timeline
 
         viewModel.UndoCommand.Execute(null); // bound to Ctrl+Z
         captures.Take(2).ShouldAllBe(capture => capture.Status == EntityStatus.Active);

@@ -142,7 +142,8 @@ public sealed class MainViewModel : ViewModelBase
         _captureActions = captureActions;
         _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys, credentials, settingsRepository, unitOfWork);
         Sessions = new SessionViewModel(coordinator, repository, Activate);
-        Captures = new CapturesViewModel(workspace: captureWorkspace, activeSession: () => ActiveSession, analysisJobs: analysisJobs);
+        Captures = new CapturesViewModel(workspace: captureWorkspace, activeSession: () => ActiveSession,
+            analysisJobs: analysisJobs, settings: settingsRepository, unitOfWork: unitOfWork);
         Document = new DocumentViewModel();
         Document.ExportRequested += ExportDocument;
         _currentViewModel = Sessions;
@@ -197,6 +198,7 @@ public sealed class MainViewModel : ViewModelBase
     public event Func<Task>? CaptureRegionRequested;
     public event Func<Task>? RedefineRegionRequested;
     public event Action? SessionActivated;
+    public event Action? ReviewRequested;
 
     public async Task InitializeAsync()
     {
@@ -230,9 +232,9 @@ public sealed class MainViewModel : ViewModelBase
         if (_captureWorkspace is not null) await Captures.LoadAsync();
     }
 
-    public async Task AddTextNoteAsync(string markdown, CancellationToken cancellationToken = default)
+    public async Task AddTextNoteAsync(CaptureDraft draft, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(markdown)) return;
+        if (draft.IsEmpty) return;
         var session = await EnsureActiveSessionAsync(cancellationToken);
         await ResumeActiveSessionAsync(cancellationToken);
         var note = new Screenshot
@@ -241,10 +243,27 @@ public sealed class MainViewModel : ViewModelBase
             SectionId = session.ActiveSectionId,
             CapturedAt = DateTimeOffset.UtcNow,
             ProcessingStatus = ScreenshotStatus.Ready,
-            UserContext = markdown.Trim()
+            DisplayTitle = draft.Title.Trim(),
+            Tags = draft.Tags.Trim(),
+            UserContext = draft.ContextMarkdown.Trim()
         };
         await _coordinator.AddCaptureAsync(session, note, cancellationToken);
         await CaptureAddedAsync(note);
+    }
+
+    public async Task SwitchActiveSessionAsync(NoteSession session, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        Sessions.SelectedSession = session;
+        await _coordinator.ContinueAsync(session, cancellationToken);
+        RefreshHeader();
+        SessionActivated?.Invoke();
+    }
+
+    public void OpenActiveSessionReview()
+    {
+        NavigateCommand.Execute("Captures");
+        ReviewRequested?.Invoke();
     }
 
     public async Task<NoteSection> AddSectionAsync(string title, CancellationToken cancellationToken = default)
@@ -299,12 +318,21 @@ public sealed class SessionViewModel : ViewModelBase
     private NoteSession? _selected;
     private NoteSection? _selectedSection;
     private string _lastActionMessage = string.Empty;
+    private string _draftCourseName = "Sin clasificar";
+    private string _draftModuleName = "Sin clasificar";
     private readonly SemaphoreSlim _automaticSessionGate = new(1, 1);
 
     public SessionViewModel(SessionCoordinator coordinator, ISessionRepository repository, Action<NoteSession> activate)
     {
         _coordinator = coordinator; _repository = repository; _activate = activate;
-        CreateCommand = new AsyncRelayCommand(async (_, cancellationToken) => { var session = await _coordinator.CreateAsync(Draft); RecentSessions.Insert(0, session); SelectedSession = session; Draft = NewDraft(); });
+        CreateCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
+        {
+            PrepareHierarchy(Draft);
+            var session = await _coordinator.CreateAsync(Draft, ct: cancellationToken);
+            RecentSessions.Insert(0, session);
+            SelectedSession = session;
+            ResetDraft();
+        });
         DuplicateCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; var copy = await _coordinator.CreateAsync(NewDraft(), SelectedSession.Id); RecentSessions.Insert(0, copy); SelectedSession = copy; });
         ContinueCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; await _coordinator.ContinueAsync(SelectedSession); _activate(SelectedSession); });
         SaveCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is not null) await _coordinator.SetPausedAsync(SelectedSession, SelectedSession.IsPaused); });
@@ -321,6 +349,12 @@ public sealed class SessionViewModel : ViewModelBase
     public NoteSession? SelectedSession { get => _selected; set { _selected = value; OnPropertyChanged(); OnPropertyChanged(nameof(OrderedSections)); if (value is not null) _activate(value); } }
     public NoteSection? SelectedSection { get => _selectedSection; set { _selectedSection = value; OnPropertyChanged(); } }
     public string LastActionMessage { get => _lastActionMessage; private set { _lastActionMessage = value; OnPropertyChanged(); } }
+    public string DraftCourseName { get => _draftCourseName; set { _draftCourseName = value; OnPropertyChanged(); } }
+    public string DraftModuleName
+    {
+        get => _draftModuleName;
+        set { _draftModuleName = value; Draft.Module = value; OnPropertyChanged(); }
+    }
     public IEnumerable<NoteSection> OrderedSections => SelectedSession is null ? [] : SelectedSession.Sections.OrderBy(x => x.Order);
     public ICommand CreateCommand { get; }
     public ICommand DuplicateCommand { get; }
@@ -342,11 +376,12 @@ public sealed class SessionViewModel : ViewModelBase
         try
         {
             if (SelectedSession is not null) return SelectedSession;
+            PrepareHierarchy(Draft);
             Draft.Name = BuildAutomaticSessionName(Draft, DateTimeOffset.Now, RecentSessions.Select(session => session.Name));
             var session = await _coordinator.CreateAsync(Draft, ct: cancellationToken);
             RecentSessions.Insert(0, session);
             SelectedSession = session;
-            Draft = NewDraft();
+            ResetDraft();
             LastActionMessage = $"Se ha creado automáticamente la sesión «{session.Name}».";
             return session;
         }
@@ -364,7 +399,8 @@ public sealed class SessionViewModel : ViewModelBase
             draft.Name.Equals("Nueva sesión", StringComparison.OrdinalIgnoreCase)
             ? (string.IsNullOrWhiteSpace(draft.Topic) ? "Sesión" : draft.Topic)
             : draft.Name;
-        var parts = new[] { now.ToString("yyyy-MM-dd"), title, draft.Module }
+        var parts = new[] { now.ToString("yyyy-MM-dd"), title,
+                draft.Module.Equals("Sin clasificar", StringComparison.OrdinalIgnoreCase) ? string.Empty : draft.Module }
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(SanitizeNamePart);
         var baseName = string.Join("_", parts);
@@ -387,7 +423,38 @@ public sealed class SessionViewModel : ViewModelBase
     }
 
     private static NoteSession NewDraft() => new() { WorkingFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), PlannedDocumentName = "Apuntes.md" };
+
+    private void PrepareHierarchy(NoteSession draft)
+    {
+        var courseName = string.IsNullOrWhiteSpace(DraftCourseName) ? "Sin clasificar" : DraftCourseName.Trim();
+        var moduleName = !string.IsNullOrWhiteSpace(draft.Module) &&
+            !draft.Module.Equals("Sin clasificar", StringComparison.OrdinalIgnoreCase)
+            ? draft.Module.Trim()
+            : string.IsNullOrWhiteSpace(DraftModuleName) ? "Sin clasificar" : DraftModuleName.Trim();
+        var existingCourse = RecentSessions.Select(x => x.Course).FirstOrDefault(x =>
+            x is not null && x.Name.Equals(courseName, StringComparison.CurrentCultureIgnoreCase));
+        var course = existingCourse ?? new Course { Name = courseName };
+        var module = RecentSessions.Where(x => x.Course?.Id == course.Id).Select(x => x.CourseModule)
+            .FirstOrDefault(x => x is not null && x.Name.Equals(moduleName, StringComparison.CurrentCultureIgnoreCase))
+            ?? course.Modules.FirstOrDefault(x => x.Name.Equals(moduleName, StringComparison.CurrentCultureIgnoreCase))
+            ?? new CourseModule { CourseId = course.Id, Course = course, Name = moduleName, Order = course.Modules.Count };
+        if (!course.Modules.Contains(module)) course.Modules.Add(module);
+        draft.CourseId = course.Id;
+        draft.Course = course;
+        draft.CourseModuleId = module.Id;
+        draft.CourseModule = module;
+        draft.Module = module.Name;
+    }
+
+    private void ResetDraft()
+    {
+        Draft = NewDraft();
+        DraftCourseName = "Sin clasificar";
+        DraftModuleName = "Sin clasificar";
+    }
 }
+
+public enum ReviewWorkspaceTab { Entries, MarkdownPreview, Result }
 
 public sealed class CapturesViewModel : ViewModelBase
 {
@@ -395,6 +462,8 @@ public sealed class CapturesViewModel : ViewModelBase
     private readonly ICaptureWorkspace? _workspace;
     private readonly Func<NoteSession?>? _activeSession;
     private readonly IAnalysisJobProcessor? _analysisJobs;
+    private readonly ISettingsRepository? _settings;
+    private readonly IUnitOfWork? _unitOfWork;
     private Screenshot? _selectedCapture;
     private bool _isQuickContextOpen;
     private Guid? _sectionFilter;
@@ -403,12 +472,22 @@ public sealed class CapturesViewModel : ViewModelBase
     private ScreenshotStatus? _statusFilter;
     private CaptureImportance? _importanceFilter;
     private ReviewFilter _reviewFilter;
+    private bool _showTrash;
+    private string _previewMarkdown = string.Empty;
+    private string _resultMarkdown = string.Empty;
+    private ReviewWorkspaceTab _activeTab;
+    private string _saveStatus = string.Empty;
+    private string _batchStatus = string.Empty;
+    private string _resultStatus = string.Empty;
 
     public CapturesViewModel(IEnumerable<Screenshot>? captures = null, ICaptureWorkspace? workspace = null,
-        Func<NoteSession?>? activeSession = null, IAnalysisJobProcessor? analysisJobs = null)
+        Func<NoteSession?>? activeSession = null, IAnalysisJobProcessor? analysisJobs = null,
+        ISettingsRepository? settings = null, IUnitOfWork? unitOfWork = null)
     {
         _workspace = workspace; _activeSession = activeSession;
         _analysisJobs = analysisJobs;
+        _settings = settings;
+        _unitOfWork = unitOfWork;
         _library = new CaptureLibrary(captures ?? []);
         Sections = _library.Captures.Where(capture => capture.Section is not null).Select(capture => capture.Section!).DistinctBy(section => section.Id).OrderBy(section => section.Order).ToArray();
         SelectedCaptures.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectionCount));
@@ -417,6 +496,11 @@ public sealed class CapturesViewModel : ViewModelBase
         ReanalyzeCommand = new AsyncRelayCommand(async (_, cancellationToken) => await QueueAnalysisAsync());
         RegenerateNoteCommand = new AsyncRelayCommand(async (_, cancellationToken) => await QueueAnalysisAsync());
         RunSessionBatchCommand = new AsyncRelayCommand(async (_, cancellationToken) => await RunSessionBatchAsync(cancellationToken));
+        SaveSelectedCommand = new AsyncRelayCommand(async (_, cancellationToken) => await SaveSelectedAsync(cancellationToken));
+        SaveResultCommand = new AsyncRelayCommand(async (_, cancellationToken) => await SaveResultAsync(cancellationToken));
+        ShowEntriesCommand = new RelayCommand(_ => ActiveTab = ReviewWorkspaceTab.Entries);
+        ShowPreviewCommand = new RelayCommand(_ => { RefreshMarkdown(); ActiveTab = ReviewWorkspaceTab.MarkdownPreview; });
+        ShowResultCommand = new RelayCommand(_ => ActiveTab = ReviewWorkspaceTab.Result);
         CancelAnalysisCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.CancelAsync(job.Id); await LoadAsync(); } });
         RetryAnalysisCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.RetryAsync(job.Id); await _analysisJobs.RunManualAsync(); await LoadAsync(); } });
         ExcludeCommand = new AsyncRelayCommand(async (_, cancellationToken) => await RunAsync(_library.Exclude));
@@ -445,11 +529,33 @@ public sealed class CapturesViewModel : ViewModelBase
     public ScreenshotStatus? StatusFilter { get => _statusFilter; set { _statusFilter = value; OnPropertyChanged(); Refresh(); } }
     public CaptureImportance? ImportanceFilter { get => _importanceFilter; set { _importanceFilter = value; OnPropertyChanged(); Refresh(); } }
     public ReviewFilter ReviewFilter { get => _reviewFilter; set { _reviewFilter = value; OnPropertyChanged(); Refresh(); } }
+    public bool ShowTrash { get => _showTrash; set { _showTrash = value; OnPropertyChanged(); Refresh(); } }
+    public string PreviewMarkdown { get => _previewMarkdown; private set { _previewMarkdown = value; OnPropertyChanged(); } }
+    public string ResultMarkdown { get => _resultMarkdown; set { _resultMarkdown = value; OnPropertyChanged(); } }
+    public ReviewWorkspaceTab ActiveTab
+    {
+        get => _activeTab;
+        set { _activeTab = value; OnPropertyChanged(); OnPropertyChanged(nameof(ActiveTabIndex)); }
+    }
+    public int ActiveTabIndex
+    {
+        get => (int)ActiveTab;
+        set { if (Enum.IsDefined(typeof(ReviewWorkspaceTab), value)) ActiveTab = (ReviewWorkspaceTab)value; }
+    }
+    public string SaveStatus { get => _saveStatus; private set { _saveStatus = value; OnPropertyChanged(); } }
+    public string BatchStatus { get => _batchStatus; private set { _batchStatus = value; OnPropertyChanged(); } }
+    public string ResultStatus { get => _resultStatus; private set { _resultStatus = value; OnPropertyChanged(); } }
+    public int IncludedCount => _library.Captures.Count(x => x.Status != EntityStatus.Deleted && x.IncludeInDocument);
     public ICommand ApplyChipCommand { get; }
     public ICommand CloseQuickContextCommand { get; }
     public ICommand ReanalyzeCommand { get; }
     public ICommand RegenerateNoteCommand { get; }
     public ICommand RunSessionBatchCommand { get; }
+    public ICommand SaveSelectedCommand { get; }
+    public ICommand SaveResultCommand { get; }
+    public ICommand ShowEntriesCommand { get; }
+    public ICommand ShowPreviewCommand { get; }
+    public ICommand ShowResultCommand { get; }
     public ICommand CancelAnalysisCommand { get; }
     public ICommand RetryAnalysisCommand { get; }
     public ICommand ExcludeCommand { get; }
@@ -482,6 +588,8 @@ public sealed class CapturesViewModel : ViewModelBase
         OnPropertyChanged(nameof(Sections));
         Refresh();
         ReplaceSelection(Captures.Where(x => selectedIds.Contains(x.Id)));
+        if (_settings is not null)
+            ResultMarkdown = await _settings.GetAsync<string>(ResultKey(session.Id)) ?? ResultMarkdown;
     }
 
     private IReadOnlyCollection<Guid> SelectedIds() => Selected().Select(capture => capture.Id).ToArray();
@@ -514,8 +622,10 @@ public sealed class CapturesViewModel : ViewModelBase
     private async Task RunSessionBatchAsync(CancellationToken cancellationToken)
     {
         if (_analysisJobs is null || _activeSession?.Invoke() is not { } session || _workspace is null) return;
+        BatchStatus = "Preparando elementos…";
         var captures = (await _workspace.LoadAsync(session.Id, cancellationToken))
             .Where(capture => capture.Status != EntityStatus.Deleted &&
+                capture.IncludeInDocument &&
                 capture.Image is not null &&
                 capture.ProcessingStatus is not (ScreenshotStatus.Analyzing or ScreenshotStatus.Queued))
             .ToArray();
@@ -530,8 +640,30 @@ public sealed class CapturesViewModel : ViewModelBase
             }, cancellationToken);
         }
         await _workspace.SaveAsync(captures, cancellationToken);
+        BatchStatus = $"Procesando {captures.Length} capturas…";
         await _analysisJobs.RunBatchAsync(session.Id, cancellationToken);
         await LoadAsync();
+        var document = await _workspace.ComposeAsync(session, cancellationToken);
+        ResultMarkdown = MarkdownComposition.ComposeDocument(document);
+        await SaveResultAsync(cancellationToken);
+        BatchStatus = "Evaluación final completada";
+        ActiveTab = ReviewWorkspaceTab.Result;
+    }
+    private async Task SaveSelectedAsync(CancellationToken cancellationToken)
+    {
+        if (_workspace is null || SelectedCapture is null) return;
+        SaveStatus = "Guardando…";
+        await _workspace.SaveAsync([SelectedCapture], cancellationToken);
+        RefreshMarkdown();
+        SaveStatus = $"Guardado {DateTime.Now:HH:mm:ss}";
+    }
+    private async Task SaveResultAsync(CancellationToken cancellationToken)
+    {
+        if (_settings is null || _activeSession?.Invoke() is not { } session) return;
+        ResultStatus = "Guardando…";
+        await _settings.SetAsync(ResultKey(session.Id), ResultMarkdown, cancellationToken: cancellationToken);
+        if (_unitOfWork is not null) await _unitOfWork.SaveChangesAsync(cancellationToken);
+        ResultStatus = $"Guardado {DateTime.Now:HH:mm:ss}";
     }
     private async Task PersistAndRefreshAsync(IReadOnlyCollection<Screenshot> changed)
     {
@@ -542,9 +674,18 @@ public sealed class CapturesViewModel : ViewModelBase
     {
         var selectedIds = SelectedCaptures.Select(capture => capture.Id).ToHashSet();
         Captures.Clear();
-        foreach (var capture in _library.Query(new(SectionFilter, TagFilter, StatusFilter, ImportanceFilter, ReviewFilter))) Captures.Add(capture);
+        foreach (var capture in _library.Query(new(SectionFilter, TagFilter, StatusFilter, ImportanceFilter, ReviewFilter, ShowTrash))) Captures.Add(capture);
         ReplaceSelection(Captures.Where(capture => selectedIds.Contains(capture.Id)));
+        RefreshMarkdown();
+        OnPropertyChanged(nameof(IncludedCount));
     }
+
+    private void RefreshMarkdown()
+    {
+        if (_activeSession?.Invoke() is { } session)
+            PreviewMarkdown = MarkdownComposition.ComposeReview(session, _library.Captures);
+    }
+    private static string ResultKey(Guid sessionId) => $"review.result-markdown:{sessionId:N}";
 }
 public sealed class InstructionsViewModel : ViewModelBase;
 public sealed class DocumentViewModel : ViewModelBase

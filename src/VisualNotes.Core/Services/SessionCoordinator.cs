@@ -95,6 +95,7 @@ public sealed class SessionCoordinator(ISessionRepository sessions, IScreenshotR
         {
             ScreenshotId = capture.Id,
             RevisionNumber = capture.Revisions.Count + 1,
+            DisplayTitle = capture.DisplayTitle,
             UserContext = capture.UserContext,
             CaptureInstruction = capture.CaptureInstruction,
             Tags = capture.Tags,
@@ -124,7 +125,8 @@ public sealed class SessionCoordinator(ISessionRepository sessions, IScreenshotR
 
     private static void CopyConfiguration(NoteSession source, NoteSession target)
     {
-        target.CourseId = source.CourseId; target.Name = source.Name + " (copia)"; target.Module = source.Module;
+        target.CourseId = source.CourseId; target.CourseModuleId = source.CourseModuleId;
+        target.Name = source.Name + " (copia)"; target.Module = source.Module;
         target.Topic = source.Topic; target.Professor = source.Professor; target.Language = source.Language;
         target.WorkingFolder = source.WorkingFolder; target.PlannedDocumentName = source.PlannedDocumentName;
         target.InstructionTemplate = source.InstructionTemplate;

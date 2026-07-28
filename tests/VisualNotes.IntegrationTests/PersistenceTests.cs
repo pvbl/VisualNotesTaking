@@ -61,4 +61,29 @@ public sealed class PersistenceTests : IAsyncLifetime
 
         restored.ShouldNotBeNull().UserContext.ShouldBe("explicación parcial antes del reinicio");
     }
+
+    [Fact]
+    public async Task Course_module_session_hierarchy_and_capture_title_round_trip()
+    {
+        var course = new Course { Name = "Matemáticas" };
+        var module = new CourseModule { Course = course, CourseId = course.Id, Name = "Álgebra", Order = 0 };
+        course.Modules.Add(module);
+        var session = TestData.Session();
+        session.Course = course;
+        session.CourseId = course.Id;
+        session.CourseModule = module;
+        session.CourseModuleId = module.Id;
+        var capture = TestData.Capture(session.Id);
+        capture.DisplayTitle = "Transformaciones lineales";
+        session.Screenshots.Add(capture);
+
+        await new SessionRepository(_db).AddAsync(session);
+        await new UnitOfWork(_db).SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        var loaded = (await new SessionRepository(_db).GetAsync(session.Id)).ShouldNotBeNull();
+        loaded.Course.ShouldNotBeNull().Name.ShouldBe("Matemáticas");
+        loaded.CourseModule.ShouldNotBeNull().Name.ShouldBe("Álgebra");
+        loaded.Screenshots.Single().DisplayTitle.ShouldBe("Transformaciones lineales");
+    }
 }

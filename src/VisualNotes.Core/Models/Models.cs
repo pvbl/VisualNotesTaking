@@ -20,6 +20,16 @@ public sealed class Course : Entity
 {
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
+    public ICollection<CourseModule> Modules { get; set; } = [];
+    public ICollection<NoteSession> Sessions { get; set; } = [];
+}
+
+public sealed class CourseModule : Entity
+{
+    public Guid CourseId { get; set; }
+    public Course? Course { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int Order { get; set; }
     public ICollection<NoteSession> Sessions { get; set; } = [];
 }
 
@@ -27,6 +37,8 @@ public sealed class NoteSession : Entity
 {
     public Guid? CourseId { get; set; }
     public Course? Course { get; set; }
+    public Guid? CourseModuleId { get; set; }
+    public CourseModule? CourseModule { get; set; }
     public string Name { get; set; } = "Nueva sesión";
     public string Module { get; set; } = string.Empty;
     public string Topic { get; set; } = string.Empty;
@@ -77,6 +89,7 @@ public sealed class Screenshot : Entity
     public string? PerceptualHash { get; set; }
     public ScreenshotImage? Image { get; set; }
     public ScreenshotContext? Context { get; set; }
+    public string DisplayTitle { get; set; } = string.Empty;
     public string UserContext { get; set; } = string.Empty;
     public string CaptureInstruction { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty;
@@ -92,6 +105,7 @@ public sealed class CaptureRevision : Entity
     public Guid ScreenshotId { get; set; }
     public Screenshot? Screenshot { get; set; }
     public int RevisionNumber { get; set; }
+    public string DisplayTitle { get; set; } = string.Empty;
     public string UserContext { get; set; } = string.Empty;
     public string CaptureInstruction { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty;

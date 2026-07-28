@@ -59,6 +59,29 @@ public sealed class CapturePanelUiTests
         source.ShouldContain("_placement = CapturePanelPlacement.Derecha;");
     }
 
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Capture_uses_the_complete_next_item_draft_and_clears_it_after_success()
+    {
+        var panel = new CapturePanelViewModel(CreateMain())
+        {
+            CaptureTitle = "Teorema de Bayes",
+            CaptureTags = "examen, probabilidad",
+            ContextMarkdown = "Comparar con probabilidad condicionada."
+        };
+        CaptureDraft? requested = null;
+        panel.CaptureRequested += (_, draft) => requested = draft;
+
+        panel.CaptureCommand.Execute(null);
+
+        requested.ShouldBe(new CaptureDraft("Teorema de Bayes", "examen, probabilidad",
+            "Comparar con probabilidad condicionada."));
+        panel.CaptureCompleted(clearContext: true);
+        panel.HasDraft.ShouldBeFalse();
+        panel.CaptureTitle.ShouldBeEmpty();
+        panel.CaptureTags.ShouldBeEmpty();
+        panel.ContextMarkdown.ShouldBeEmpty();
+    }
+
     [Theory, Trait("Category", "UI"), Trait("Category", "Windows")]
     [InlineData(-1920, 0, 1920, 1080, 1.0)]
     [InlineData(0, -1440, 2560, 1440, 1.25)]
@@ -72,6 +95,7 @@ public sealed class CapturePanelUiTests
     }
 
     [Theory, Trait("Category", "UI"), Trait("Category", "Windows")]
+    [InlineData(CapturePanelPlacement.Izquierda)]
     [InlineData(CapturePanelPlacement.Derecha)]
     [InlineData(CapturePanelPlacement.Arriba)]
     [InlineData(CapturePanelPlacement.Abajo)]
@@ -80,6 +104,7 @@ public sealed class CapturePanelUiTests
         var workArea = new Rect(-1920, 0, 1920, 1080);
         var result = CapturePanelViewModel.GetPlacementBounds(placement, workArea, new Rect(-1500, 200, 430, 190));
 
+        if (placement == CapturePanelPlacement.Izquierda) result.Left.ShouldBe(workArea.Left);
         if (placement == CapturePanelPlacement.Derecha) result.Right.ShouldBe(workArea.Right);
         if (placement == CapturePanelPlacement.Arriba) result.Top.ShouldBe(workArea.Top);
         if (placement == CapturePanelPlacement.Abajo) result.Bottom.ShouldBe(workArea.Bottom);
@@ -130,20 +155,21 @@ public sealed class CapturePanelUiTests
         xaml.ShouldContain("AutomationProperties.AutomationId=\"UndoButton\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"MarkImportantButton\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"AddContextButton\"");
-        xaml.ShouldContain("AutomationProperties.AutomationId=\"CapturePanelPlacementSelector\"");
-        xaml.ShouldContain("ItemsSource=\"{Binding Placements}\"");
+        xaml.ShouldContain("Command=\"{Binding SelectPlacementCommand}\"");
+        xaml.ShouldContain("CommandParameter=\"Izquierda\"");
+        xaml.ShouldContain("CommandParameter=\"Flotante\"");
         xaml.ShouldContain("Key=\"Z\" Modifiers=\"Control\" Command=\"{Binding UndoCommand}\"");
         xaml.ShouldContain("FocusManager.FocusedElement=\"{Binding ElementName=CaptureNowButton, Mode=OneWay}\"");
-        xaml.ShouldContain("{Binding SessionStatus, Mode=OneWay}");
-        xaml.ShouldContain("{Binding CaptureCount, Mode=OneWay}");
+        xaml.ShouldContain("Text=\"{Binding SessionStatus}\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"OpenSessionReviewButton\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelCourseSelector\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelModuleSelector\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelSessionSelector\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"CaptureTitleInput\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"CaptureTagsInput\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"CaptureContextMarkdownInput\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"AddTextNoteButton\"");
-        xaml.ShouldContain("AutomationProperties.AutomationId=\"RunSessionBatchButton\"");
         xaml.ShouldContain("Text=\"{Binding ContextMarkdown, UpdateSourceTrigger=PropertyChanged}\"");
-        xaml.ShouldContain("AutomationProperties.AutomationId=\"ContextPlacementSelector\"");
-        xaml.ShouldContain("ItemsSource=\"{Binding ContextPlacements}\"");
-        xaml.ShouldContain("AutomationProperties.AutomationId=\"ToggleRegionLockButton\"");
-        xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelSectionSelector\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelAddSectionButton\"");
     }
 

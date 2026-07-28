@@ -9,7 +9,8 @@ public sealed record CaptureFilter(
     string? Tag = null,
     ScreenshotStatus? Status = null,
     CaptureImportance? Importance = null,
-    ReviewFilter Review = ReviewFilter.All);
+    ReviewFilter Review = ReviewFilter.All,
+    bool IncludeDeleted = false);
 
 /// <summary>
 /// Pure, UI-independent capture list operations. A single snapshot is recorded for
@@ -34,6 +35,7 @@ public sealed class CaptureLibrary
     }
 
     public IReadOnlyList<Screenshot> Query(CaptureFilter filter) => _captures
+        .Where(capture => filter.IncludeDeleted || capture.Status != EntityStatus.Deleted)
         .Where(capture => filter.SectionId is null || capture.SectionId == filter.SectionId)
         .Where(capture => filter.Status is null || capture.ProcessingStatus == filter.Status)
         .Where(capture => filter.Importance is null || capture.Importance == filter.Importance)
@@ -107,6 +109,7 @@ public sealed class CaptureLibrary
             capture.Status = state.Status;
             capture.ProcessingStatus = state.ProcessingStatus;
             capture.IncludeInDocument = state.IncludeInDocument;
+            capture.DisplayTitle = state.DisplayTitle;
             capture.Tags = state.Tags;
             capture.UserContext = state.UserContext;
         }
@@ -124,7 +127,8 @@ public sealed class CaptureLibrary
     {
         if (ids.Count == 0) return;
         _undo.Push(_captures.Select((capture, index) => new CaptureState(capture.Id, index, capture.SectionId,
-            capture.Status, capture.ProcessingStatus, capture.IncludeInDocument, capture.Tags, capture.UserContext)).ToArray());
+            capture.Status, capture.ProcessingStatus, capture.IncludeInDocument, capture.DisplayTitle,
+            capture.Tags, capture.UserContext)).ToArray());
     }
 
     private static int Index(IReadOnlyList<CaptureState> states, Guid id) => states.Single(state => state.Id == id).Index;
@@ -134,5 +138,5 @@ public sealed class CaptureLibrary
             .Concat(right.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Distinct(StringComparer.OrdinalIgnoreCase));
     private sealed record CaptureState(Guid Id, int Index, Guid? SectionId, EntityStatus Status, ScreenshotStatus ProcessingStatus,
-        bool IncludeInDocument, string Tags, string UserContext);
+        bool IncludeInDocument, string DisplayTitle, string Tags, string UserContext);
 }

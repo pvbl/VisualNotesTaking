@@ -17,10 +17,33 @@ internal sealed class CaptureWorkspace(VisualNotesDbContext database, IScreensho
         {
             var persisted = database.Screenshots.Local.FirstOrDefault(x => x.Id == capture.Id) ??
                 await database.Screenshots.SingleAsync(x => x.Id == capture.Id, cancellationToken).ConfigureAwait(false);
+            var metadataChanged = persisted.DisplayTitle != capture.DisplayTitle ||
+                persisted.Tags != capture.Tags || persisted.UserContext != capture.UserContext ||
+                persisted.CaptureInstruction != capture.CaptureInstruction ||
+                persisted.Importance != capture.Importance ||
+                persisted.IncludeInDocument != capture.IncludeInDocument;
+            if (metadataChanged)
+            {
+                var revision = (await database.CaptureRevisions
+                    .Where(x => x.ScreenshotId == capture.Id)
+                    .MaxAsync(x => (int?)x.RevisionNumber, cancellationToken).ConfigureAwait(false) ?? 0) + 1;
+                database.CaptureRevisions.Add(new CaptureRevision
+                {
+                    ScreenshotId = capture.Id,
+                    RevisionNumber = revision,
+                    DisplayTitle = capture.DisplayTitle,
+                    Tags = capture.Tags,
+                    UserContext = capture.UserContext,
+                    CaptureInstruction = capture.CaptureInstruction,
+                    Importance = capture.Importance,
+                    IncludeInDocument = capture.IncludeInDocument
+                });
+            }
             persisted.SectionId = capture.SectionId;
             persisted.Status = capture.Status;
             persisted.ProcessingStatus = capture.ProcessingStatus;
             persisted.IncludeInDocument = capture.IncludeInDocument;
+            persisted.DisplayTitle = capture.DisplayTitle;
             persisted.Tags = capture.Tags;
             persisted.UserContext = capture.UserContext;
             persisted.CaptureInstruction = capture.CaptureInstruction;
