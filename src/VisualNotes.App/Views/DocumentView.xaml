@@ -13,10 +13,10 @@
    <Button Content="Excluir" Command="{Binding ExcludeCommand}" Margin="8,0,0,0"/>
    <Button Content="Subir" Command="{Binding MoveUpCommand}" Margin="8,0,0,0"/>
    <Button Content="Bajar" Command="{Binding MoveDownCommand}" Margin="8,0,0,0"/>
-   <Button Content="Exportar" Command="{Binding ExportCommand}" Margin="20,0,0,0" Padding="16,5"/>
+   <Button AutomationProperties.AutomationId="ExportButton" Content="Exportar" Command="{Binding ExportCommand}" Margin="20,0,0,0" Padding="16,5"/>
   </StackPanel>
   </StackPanel>
-  <ListView ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="White">
+  <ListView AutomationProperties.AutomationId="DocumentReviewList" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" Background="White">
    <ListView.View><GridView>
     <GridViewColumn Header="Incluir" DisplayMemberBinding="{Binding IsIncluded}" Width="65"/>
     <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding Node.Type}" Width="100"/>

@@ -7,6 +7,7 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" /><PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" /><PackageReference Include="NSubstitute" />
     <PackageReference Include="Shouldly" /><PackageReference Include="Verify.Xunit" /><PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <PackageReference Include="FlaUI.Core" /><PackageReference Include="FlaUI.UIA3" />
     <ProjectReference Include="..\..\src\VisualNotes.App\VisualNotes.App.csproj" />
     <Compile Include="..\Shared\Fixtures\*.cs" Link="Fixtures\%(Filename)%(Extension)" />
     <Compile Include="..\Shared\Utilities\*.cs" Link="Utilities\%(Filename)%(Extension)" />

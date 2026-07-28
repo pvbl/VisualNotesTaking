@@ -13,13 +13,13 @@
    <Grid Visibility="{Binding ExpandedVisibility}" Margin="0,8,0,0">
     <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
     <StackPanel Orientation="Horizontal">
-     <ComboBox Width="115" ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}" AutomationProperties.Name="Modo de captura"/>
-     <Button Content="Capturar" Command="{Binding CaptureCommand}" Margin="6,0" AutomationProperties.Name="Capturar ahora"/>
+     <ComboBox Width="115" ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}" AutomationProperties.AutomationId="CaptureModeSelector" AutomationProperties.Name="Modo de captura"/>
+     <Button Content="Capturar" Command="{Binding CaptureCommand}" Margin="6,0" AutomationProperties.AutomationId="CaptureNowButton" AutomationProperties.Name="Capturar ahora"/>
      <Button Content="Pausar / reanudar" Command="{Binding TogglePauseCommand}" AutomationProperties.Name="Pausar o reanudar sesión"/>
     </StackPanel>
     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,6">
      <Button Content="◀ Sección" Command="{Binding PreviousSectionCommand}" AutomationProperties.Name="Sección anterior"/><Button Content="Sección ▶" Command="{Binding NextSectionCommand}" Margin="4,0" AutomationProperties.Name="Sección siguiente"/>
-     <Button Content="Deshacer" Command="{Binding UndoCommand}" AutomationProperties.Name="Deshacer última acción"/><Button Content="Importante" Command="{Binding MarkImportantCommand}" Margin="4,0" AutomationProperties.Name="Marcar captura como importante"/><Button Content="Contexto" Command="{Binding AddContextCommand}" AutomationProperties.Name="Añadir contexto"/>
+     <Button Content="Deshacer" Command="{Binding UndoCommand}" AutomationProperties.Name="Deshacer última acción"/><Button Content="Importante" Command="{Binding MarkImportantCommand}" Margin="4,0" AutomationProperties.Name="Marcar captura como importante"/><Button Content="Contexto" Command="{Binding AddContextCommand}" AutomationProperties.AutomationId="AddContextButton" AutomationProperties.Name="Añadir contexto"/>
     </StackPanel>
     <DockPanel Grid.Row="2"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><TextBlock Text="Opacidad" VerticalAlignment="Center" Margin="6,0"/><Slider Width="70" Minimum="0.55" Maximum="1" Value="{Binding PanelOpacity}" AutomationProperties.Name="Opacidad del panel"/></StackPanel><TextBlock VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"><Run Text="Estado: "/><Run Text="{Binding SessionStatus}"/><Run Text=" · Cola: "/><Run Text="{Binding QueuedCaptures}"/><Run Text=" · Capturas: "/><Run Text="{Binding CaptureCount}"/></TextBlock></DockPanel>
    </Grid>

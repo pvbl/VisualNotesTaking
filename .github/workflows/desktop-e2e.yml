@@ -1,0 +1,62 @@
+name: Interactive desktop E2E
+
+on:
+  release:
+    types: [published]
+  schedule:
+    - cron: "30 2 * * 2-6"
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Suite to run
+        type: choice
+        options: [smoke, full]
+        default: full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-e2e-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'smoke' || github.event_name == 'release' && github.event.release.prerelease
+    runs-on: [self-hosted, Windows, X64, interactive-desktop]
+    timeout-minutes: 15
+    env:
+      VISUALNOTES_INTERACTIVE_UI: "1"
+      VISUALNOTES_E2E_ARTIFACTS: ${{ github.workspace }}\TestResults\E2E
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet test tests/VisualNotes.UiTests --configuration Release --filter "Category=Smoke" --logger "trx;LogFileName=smoke.trx" --results-directory TestResults
+      - name: Publish UI diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-ui-diagnostics
+          path: TestResults
+          if-no-files-found: warn
+
+  full:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' && inputs.suite == 'full'
+    runs-on: [self-hosted, Windows, X64, interactive-desktop]
+    timeout-minutes: 45
+    env:
+      VISUALNOTES_INTERACTIVE_UI: "1"
+      VISUALNOTES_E2E_ARTIFACTS: ${{ github.workspace }}\TestResults\E2E
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: 8.0.x }
+      - run: dotnet test tests/VisualNotes.UiTests --configuration Release --filter "Category=E2E|Category=Smoke" --logger "trx;LogFileName=e2e.trx" --results-directory TestResults
+      - name: Publish UI diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-ui-diagnostics
+          path: TestResults
+          if-no-files-found: warn
