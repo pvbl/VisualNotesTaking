@@ -41,6 +41,18 @@ de composición justificado en `coverage.runsettings`; nunca se excluye lógica 
 No añada pruebas vacías, caminos ejecutados sin comprobar ni aserciones irrelevantes
 para mover la métrica: cada test debe verificar comportamiento observable o invariantes.
 
+## Mutaciones de Core
+
+Ejecute `dotnet tool restore` y `dotnet stryker` desde la raíz para mutar las áreas
+críticas de `VisualNotes.Core`. El score objetivo inicial es 70 % y el umbral de rotura
+es 60 %; los módulos críticos subirán progresivamente a 80–85 % cuando las pruebas sean
+estables. Revise el informe HTML de `StrykerOutput` y convierta los mutantes
+supervivientes en pruebas de comportamiento relevantes. No ignore mutaciones ni amplíe
+las exclusiones de código generado, migraciones y XAML sin una justificación documentada.
+
+CI ejecuta esta comprobación semanalmente, bajo demanda y en pull requests que afectan
+áreas críticas, y publica `StrykerOutput` como el artefacto `stryker-report`.
+
 ## Windows y UI
 
 Se requiere Windows 10/11 o Windows Server con .NET 8 SDK y una sesión de escritorio disponible. No ejecute UI en un agente sin escritorio. Ejecute `dotnet test tests/VisualNotes.UiTests --filter 'Category=UI'`. Los recursos compartidos de captura/ventana deben limpiarse al finalizar.
@@ -58,7 +70,7 @@ Se requiere Windows 10/11 o Windows Server con .NET 8 SDK y una sesión de escri
 
 ## Jobs independientes
 
-En pull requests, `core-tests` ejecuta unitarias, arquitectura e integración. `ui-tests`, `mutations` y `benchmarks` son jobs separados para aislar requisitos, duración y resultados. Para benchmarks locales: `dotnet run -c Release --project tests/VisualNotes.Benchmarks`.
+En pull requests, `core-tests` ejecuta unitarias, arquitectura e integración. `ui-tests` y `benchmarks` son jobs separados; el workflow de mutaciones se activa solo al cambiar áreas críticas. Para benchmarks locales: `dotnet run -c Release --project tests/VisualNotes.Benchmarks`.
 
 ## Matriz manual de captura y DPI
 
