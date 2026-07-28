@@ -1,8 +1,10 @@
 <UserControl x:Class="VisualNotes.App.Views.DocumentView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <UserControl.Resources><BooleanToVisibilityConverter x:Key="BoolToVisibility"/></UserControl.Resources>
  <DockPanel>
   <StackPanel DockPanel.Dock="Top">
   <TextBlock Text="Documento" FontSize="32" FontWeight="SemiBold" Foreground="#172033"/>
+  <ProgressBar Height="3" IsIndeterminate="True" Visibility="{Binding ExportCommand.IsRunning, Converter={StaticResource BoolToVisibility}}"/>
   <TextBlock Text="Previsualiza el modelo semántico, revisa avisos y decide qué exportar." FontSize="16" Foreground="#64748B" Margin="0,8,0,18"/>
   <Border Background="#FFF7ED" CornerRadius="6" Padding="10" Margin="0,0,0,12" Visibility="{Binding HasWarnings, Converter={StaticResource BooleanToVisibilityConverter}}">
    <TextBlock Text="Hay contenido sin revisar o archivos ausentes." Foreground="#9A3412"/>

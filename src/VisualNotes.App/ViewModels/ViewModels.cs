@@ -22,6 +22,86 @@ public sealed class RelayCommand(Action<object?> execute, Predicate<object?>? ca
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }
 
+public interface INotificationService
+{
+    void ShowError(string message);
+}
+
+public sealed class AsyncRelayCommand : ViewModelBase, ICommand
+{
+    public static INotificationService? DefaultNotificationService { get; set; }
+    private readonly Func<object?, CancellationToken, Task> _execute;
+    private readonly Predicate<object?>? _canExecute;
+    private readonly INotificationService? _notifications;
+    private readonly bool _allowConcurrentExecutions;
+    private CancellationTokenSource? _cancellation;
+    private bool _isRunning;
+
+    public AsyncRelayCommand(Func<object?, CancellationToken, Task> execute,
+        Predicate<object?>? canExecute = null, INotificationService? notifications = null,
+        bool allowConcurrentExecutions = false)
+    {
+        _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+        _canExecute = canExecute;
+        _notifications = notifications ?? DefaultNotificationService;
+        _allowConcurrentExecutions = allowConcurrentExecutions;
+    }
+
+    public event EventHandler? CanExecuteChanged;
+    public bool IsRunning { get => _isRunning; private set { if (_isRunning == value) return; _isRunning = value; OnPropertyChanged(); RaiseCanExecuteChanged(); } }
+    public bool CanExecute(object? parameter) => (_allowConcurrentExecutions || !IsRunning) && (_canExecute?.Invoke(parameter) ?? true);
+    public async void Execute(object? parameter) => await ExecuteAsync(parameter);
+
+    public async Task ExecuteAsync(object? parameter = null, CancellationToken cancellationToken = default)
+    {
+        if (!CanExecute(parameter)) return;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, AsyncCommandOperations.ShutdownToken);
+        _cancellation = cancellation;
+        IsRunning = true;
+        var operation = ExecuteCoreAsync(parameter, cancellation.Token);
+        AsyncCommandOperations.Track(operation);
+        try { await operation; }
+        finally
+        {
+            if (ReferenceEquals(_cancellation, cancellation)) _cancellation = null;
+            IsRunning = false;
+        }
+    }
+
+    private async Task ExecuteCoreAsync(object? parameter, CancellationToken cancellationToken)
+    {
+        try { await _execute(parameter, cancellationToken); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception exception) { _notifications?.ShowError(exception.Message); }
+    }
+
+    public void Cancel() => _cancellation?.Cancel();
+    public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+}
+
+public static class AsyncCommandOperations
+{
+    private static readonly object Gate = new();
+    private static readonly HashSet<Task> Active = [];
+    private static readonly CancellationTokenSource Shutdown = new();
+    internal static CancellationToken ShutdownToken => Shutdown.Token;
+
+    internal static void Track(Task task)
+    {
+        lock (Gate) Active.Add(task);
+        _ = task.ContinueWith(completed => { lock (Gate) Active.Remove(completed); },
+            CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+    }
+
+    public static async Task CancelAndWaitAsync()
+    {
+        Shutdown.Cancel();
+        Task[] tasks;
+        lock (Gate) tasks = Active.ToArray();
+        await Task.WhenAll(tasks);
+    }
+}
+
 public interface ICaptureActionContract
 {
     bool CanUndo { get; }
@@ -63,7 +143,7 @@ public sealed class MainViewModel : ViewModelBase
         Document = new DocumentViewModel();
         Document.ExportRequested += ExportDocument;
         _currentViewModel = Sessions;
-        NavigateCommand = new RelayCommand(async page =>
+        NavigateCommand = new AsyncRelayCommand(async (page, cancellationToken) =>
         {
             if (page as string == "Captures") await Captures.LoadAsync();
             if (page as string == "Document" && ActiveSession is not null && _captureWorkspace is not null)
@@ -74,18 +154,18 @@ public sealed class MainViewModel : ViewModelBase
                 "Document" => Document, "Settings" => _settings ?? Settings, _ => Sessions
             };
         });
-        TogglePauseCommand = new RelayCommand(async _ =>
+        TogglePauseCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
         {
             if (ActiveSession is null) return;
             await _coordinator.SetPausedAsync(ActiveSession, !ActiveSession.IsPaused);
             RefreshHeader();
             _captureActions?.SessionStateChanged();
         });
-        CaptureRegionCommand = new RelayCommand(_ => CaptureRegionRequested?.Invoke());
-        RedefineRegionCommand = new RelayCommand(_ => RedefineRegionRequested?.Invoke());
-        UndoCommand = new RelayCommand(async _ => await (_captureActions?.UndoAsync() ?? Task.CompletedTask), _ => _captureActions?.CanUndo == true);
-        MarkImportantCommand = new RelayCommand(async _ => await (_captureActions?.MarkImportantAsync() ?? Task.CompletedTask), _ => _captureActions?.CanMarkImportant == true);
-        AddContextCommand = new RelayCommand(async _ => await (_captureActions?.AddContextAsync() ?? Task.CompletedTask), _ => _captureActions?.CanAddContext == true);
+        CaptureRegionCommand = new AsyncRelayCommand(async (_, _) => await (CaptureRegionRequested?.Invoke() ?? Task.CompletedTask));
+        RedefineRegionCommand = new AsyncRelayCommand(async (_, _) => await (RedefineRegionRequested?.Invoke() ?? Task.CompletedTask));
+        UndoCommand = new AsyncRelayCommand(async (_, cancellationToken) => await (_captureActions?.UndoAsync() ?? Task.CompletedTask), _ => _captureActions?.CanUndo == true);
+        MarkImportantCommand = new AsyncRelayCommand(async (_, cancellationToken) => await (_captureActions?.MarkImportantAsync() ?? Task.CompletedTask), _ => _captureActions?.CanMarkImportant == true);
+        AddContextCommand = new AsyncRelayCommand(async (_, cancellationToken) => await (_captureActions?.AddContextAsync() ?? Task.CompletedTask), _ => _captureActions?.CanAddContext == true);
         if (_captureActions is not null) _captureActions.CanExecuteChanged += (_, _) => RefreshCaptureActions();
     }
 
@@ -106,8 +186,8 @@ public sealed class MainViewModel : ViewModelBase
     public RelayCommand UndoCommand { get; }
     public RelayCommand MarkImportantCommand { get; }
     public RelayCommand AddContextCommand { get; }
-    public event Action? CaptureRegionRequested;
-    public event Action? RedefineRegionRequested;
+    public event Func<Task>? CaptureRegionRequested;
+    public event Func<Task>? RedefineRegionRequested;
 
     public async Task InitializeAsync()
     {
@@ -117,7 +197,7 @@ public sealed class MainViewModel : ViewModelBase
         if (restored is not null) Activate(restored);
     }
 
-    public async void CaptureAdded(Screenshot capture)
+    public async Task CaptureAddedAsync(Screenshot capture)
     {
         if (ActiveSession is not null && ActiveSession.Screenshots.All(item => item.Id != capture.Id))
             ActiveSession.Screenshots.Add(capture);
@@ -132,7 +212,7 @@ public sealed class MainViewModel : ViewModelBase
         _captureActions?.SessionStateChanged();
         await Captures.LoadAsync();
     }
-    private async void ExportDocument(SemanticDocument document, ExportScope _)
+    private async Task ExportDocument(SemanticDocument document, ExportScope _)
     {
         if (_documentExporter is null || _exportInteraction is null) return;
         var path = _exportInteraction.SelectDocxPath(ActiveSession?.PlannedDocumentName);
@@ -160,15 +240,15 @@ public sealed class SessionViewModel : ViewModelBase
     public SessionViewModel(SessionCoordinator coordinator, ISessionRepository repository, Action<NoteSession> activate)
     {
         _coordinator = coordinator; _repository = repository; _activate = activate;
-        CreateCommand = new RelayCommand(async _ => { var session = await _coordinator.CreateAsync(Draft); RecentSessions.Insert(0, session); SelectedSession = session; Draft = NewDraft(); });
-        DuplicateCommand = new RelayCommand(async _ => { if (SelectedSession is null) return; var copy = await _coordinator.CreateAsync(NewDraft(), SelectedSession.Id); RecentSessions.Insert(0, copy); SelectedSession = copy; });
-        ContinueCommand = new RelayCommand(async _ => { if (SelectedSession is null) return; await _coordinator.ContinueAsync(SelectedSession); _activate(SelectedSession); });
-        SaveCommand = new RelayCommand(async _ => { if (SelectedSession is not null) await _coordinator.SetPausedAsync(SelectedSession, SelectedSession.IsPaused); });
-        AddSectionCommand = new RelayCommand(async _ => { if (SelectedSession is null) return; SelectedSection = await _coordinator.AddSectionAsync(SelectedSession, "Nueva sección", parentId: SelectedSection?.Id); _activate(SelectedSession); });
-        ActivateSectionCommand = new RelayCommand(async value => { if (SelectedSession is null || value is not NoteSection section) return; await _coordinator.ActivateSectionAsync(SelectedSession, section.Id); SelectedSection = section; _activate(SelectedSession); });
-        RenameSectionCommand = new RelayCommand(async _ => { if (SelectedSection is not null) await _coordinator.RenameSectionAsync(SelectedSection, SelectedSection.Title); });
-        MoveUpCommand = new RelayCommand(async _ => { if (SelectedSession is null || SelectedSection is null) return; await _coordinator.ReorderSectionAsync(SelectedSession, SelectedSection.Id, SelectedSection.Order - 1); OnPropertyChanged(nameof(OrderedSections)); });
-        MoveDownCommand = new RelayCommand(async _ => { if (SelectedSession is null || SelectedSection is null) return; await _coordinator.ReorderSectionAsync(SelectedSession, SelectedSection.Id, SelectedSection.Order + 1); OnPropertyChanged(nameof(OrderedSections)); });
+        CreateCommand = new AsyncRelayCommand(async (_, cancellationToken) => { var session = await _coordinator.CreateAsync(Draft); RecentSessions.Insert(0, session); SelectedSession = session; Draft = NewDraft(); });
+        DuplicateCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; var copy = await _coordinator.CreateAsync(NewDraft(), SelectedSession.Id); RecentSessions.Insert(0, copy); SelectedSession = copy; });
+        ContinueCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; await _coordinator.ContinueAsync(SelectedSession); _activate(SelectedSession); });
+        SaveCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is not null) await _coordinator.SetPausedAsync(SelectedSession, SelectedSession.IsPaused); });
+        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; SelectedSection = await _coordinator.AddSectionAsync(SelectedSession, "Nueva sección", parentId: SelectedSection?.Id); _activate(SelectedSession); });
+        ActivateSectionCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (SelectedSession is null || value is not NoteSection section) return; await _coordinator.ActivateSectionAsync(SelectedSession, section.Id); SelectedSection = section; _activate(SelectedSession); });
+        RenameSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSection is not null) await _coordinator.RenameSectionAsync(SelectedSection, SelectedSection.Title); });
+        MoveUpCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null || SelectedSection is null) return; await _coordinator.ReorderSectionAsync(SelectedSession, SelectedSection.Id, SelectedSection.Order - 1); OnPropertyChanged(nameof(OrderedSections)); });
+        MoveDownCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null || SelectedSection is null) return; await _coordinator.ReorderSectionAsync(SelectedSession, SelectedSection.Id, SelectedSection.Order + 1); OnPropertyChanged(nameof(OrderedSections)); });
     }
 
     public ObservableCollection<NoteSession> RecentSessions { get; } = [];
@@ -207,18 +287,18 @@ public sealed class CapturesViewModel : ViewModelBase
         _library = new CaptureLibrary(captures ?? []);
         Sections = _library.Captures.Where(capture => capture.Section is not null).Select(capture => capture.Section!).DistinctBy(section => section.Id).OrderBy(section => section.Order).ToArray();
         SelectedCaptures.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectionCount));
-        ApplyChipCommand = new RelayCommand(async value => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); await PersistAndRefreshAsync([SelectedCapture]); });
+        ApplyChipCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); await PersistAndRefreshAsync([SelectedCapture]); });
         CloseQuickContextCommand = new RelayCommand(_ => IsQuickContextOpen = false);
-        ReanalyzeCommand = new RelayCommand(async _ => await QueueAnalysisAsync());
-        RegenerateNoteCommand = new RelayCommand(async _ => await QueueAnalysisAsync());
-        CancelAnalysisCommand = new RelayCommand(async value => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.CancelAsync(job.Id); await LoadAsync(); } });
-        RetryAnalysisCommand = new RelayCommand(async value => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.RetryAsync(job.Id); await _analysisJobs.RunManualAsync(); await LoadAsync(); } });
-        ExcludeCommand = new RelayCommand(async _ => await RunAsync(_library.Exclude));
-        DeleteCommand = new RelayCommand(async _ => await RunAsync(_library.Delete));
-        RestoreCommand = new RelayCommand(async _ => await RunAsync(_library.Restore));
-        UndoCommand = new RelayCommand(async _ => { if (_library.Undo()) await PersistAndRefreshAsync(_library.Captures); });
-        MoveToSectionCommand = new RelayCommand(async value => { if (value is Guid id) await RunAsync(ids => _library.MoveToSection(ids, id)); });
-        ReorderCommand = new RelayCommand(async value => { if (value is int index) await RunAsync(ids => _library.Reorder(ids, index)); });
+        ReanalyzeCommand = new AsyncRelayCommand(async (_, cancellationToken) => await QueueAnalysisAsync());
+        RegenerateNoteCommand = new AsyncRelayCommand(async (_, cancellationToken) => await QueueAnalysisAsync());
+        CancelAnalysisCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.CancelAsync(job.Id); await LoadAsync(); } });
+        RetryAnalysisCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.RetryAsync(job.Id); await _analysisJobs.RunManualAsync(); await LoadAsync(); } });
+        ExcludeCommand = new AsyncRelayCommand(async (_, cancellationToken) => await RunAsync(_library.Exclude));
+        DeleteCommand = new AsyncRelayCommand(async (_, cancellationToken) => await RunAsync(_library.Delete));
+        RestoreCommand = new AsyncRelayCommand(async (_, cancellationToken) => await RunAsync(_library.Restore));
+        UndoCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (_library.Undo()) await PersistAndRefreshAsync(_library.Captures); });
+        MoveToSectionCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (value is Guid id) await RunAsync(ids => _library.MoveToSection(ids, id)); });
+        ReorderCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (value is int index) await RunAsync(ids => _library.Reorder(ids, index)); });
         ClearFiltersCommand = new RelayCommand(_ => { SectionFilter = null; TagFilter = string.Empty; StatusFilter = null; ImportanceFilter = null; ReviewFilter = VisualNotes.Core.Services.ReviewFilter.All; });
         Refresh();
     }
@@ -331,7 +411,7 @@ public sealed class DocumentViewModel : ViewModelBase
         ExcludeCommand = new RelayCommand(value => SetIncluded(value, false));
         MoveUpCommand = new RelayCommand(value => Move(value, -1));
         MoveDownCommand = new RelayCommand(value => Move(value, 1));
-        ExportCommand = new RelayCommand(_ => ExportRequested?.Invoke(CreateExportDocument(), Scope));
+        ExportCommand = new AsyncRelayCommand(async (_, _) => await (ExportRequested?.Invoke(CreateExportDocument(), Scope) ?? Task.CompletedTask));
     }
 
     public ObservableCollection<PreviewItem> Items { get; }
@@ -344,7 +424,7 @@ public sealed class DocumentViewModel : ViewModelBase
     public ICommand MoveUpCommand { get; }
     public ICommand MoveDownCommand { get; }
     public ICommand ExportCommand { get; }
-    public event Action<SemanticDocument, ExportScope>? ExportRequested;
+    public event Func<SemanticDocument, ExportScope, Task>? ExportRequested;
 
     public SemanticDocument CreateExportDocument() => _preview.CreateDocument(Scope,
         SelectedItem?.Node.Type == SemanticNodeType.Section ? SelectedItem.StableKey : SelectedItem?.SectionKey);
@@ -418,9 +498,9 @@ public sealed class SettingsViewModel : ViewModelBase
         _unitOfWork = unitOfWork;
         Bindings = new(DefaultBindings().Select(binding => new HotkeyBindingEditorViewModel(binding)));
         SaveCommand = new RelayCommand(_ => Save());
-        SaveCredentialCommand = new RelayCommand(async value => await SaveCredentialAsync(value));
-        VerifyCredentialCommand = new RelayCommand(async value => await VerifyCredentialAsync(value));
-        DeleteCredentialCommand = new RelayCommand(async value => await DeleteCredentialAsync(value));
+        SaveCredentialCommand = new AsyncRelayCommand(async (value, cancellationToken) => await SaveCredentialAsync(value));
+        VerifyCredentialCommand = new AsyncRelayCommand(async (value, cancellationToken) => await VerifyCredentialAsync(value));
+        DeleteCredentialCommand = new AsyncRelayCommand(async (value, cancellationToken) => await DeleteCredentialAsync(value));
         InitializeHierarchicalSettings();
     }
 
