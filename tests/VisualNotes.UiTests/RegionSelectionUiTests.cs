@@ -8,6 +8,17 @@ namespace VisualNotes.UiTests;
 public sealed class RegionSelectionUiTests
 {
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Selection_drag_starts_on_the_canvas_without_intercepting_control_buttons()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+            "src", "VisualNotes.App", "Services", "RegionSelectionOverlay.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        source.ShouldContain("_canvas.MouseLeftButtonDown += OnMouseDown;");
+        source.ShouldNotContain("PreviewMouseLeftButtonDown += OnMouseDown;");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
     public void Selection_can_be_confirmed_and_reset()
     {
         var selection = new RegionSelectionController();

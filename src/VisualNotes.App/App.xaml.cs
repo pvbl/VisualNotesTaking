@@ -170,7 +170,8 @@ public partial class App : System.Windows.Application
         };
         CreateTrayIcon();
         _window.Show();
-        _capturePanel.Owner = _window;
+        // Keep capture controls independent so minimizing or hiding the main window
+        // does not remove them from the screen during a capture session.
         _capturePanel.Show();
         if (_activeRegion is not null) _regionBorder.Show(_activeRegion);
     }

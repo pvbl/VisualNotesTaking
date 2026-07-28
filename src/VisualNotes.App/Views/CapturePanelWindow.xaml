@@ -1,28 +1,47 @@
 <Window x:Class="VisualNotes.App.Views.CapturePanelWindow"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
- Title="Controles de captura de VisualNotes" Width="430" Height="190" MinWidth="280" MinHeight="56"
+ Title="Controles de captura de VisualNotes" Width="430" Height="190" MinWidth="220" MinHeight="56"
  WindowStyle="ToolWindow" ResizeMode="CanResizeWithGrip" Topmost="True" ShowInTaskbar="False" Opacity="{Binding PanelOpacity}"
  AutomationProperties.AutomationId="CapturePanelWindow" AutomationProperties.Name="Panel de controles de captura" AutomationProperties.HelpText="Controla la sesión y las capturas sin abrir la ventana principal"
  KeyboardNavigation.TabNavigation="Cycle" FocusManager.FocusedElement="{Binding ElementName=CaptureNowButton, Mode=OneWay}">
  <Window.InputBindings><KeyBinding Key="C" Modifiers="Control" Command="{Binding CaptureCommand}"/><KeyBinding Key="Space" Command="{Binding TogglePauseCommand}"/><KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoCommand}"/><KeyBinding Key="M" Modifiers="Control" Command="{Binding ToggleMinimalCommand}"/></Window.InputBindings>
+ <Window.Resources>
+  <Style x:Key="LayoutAwarePanel" TargetType="StackPanel">
+   <Setter Property="Orientation" Value="Horizontal"/>
+   <Style.Triggers>
+    <DataTrigger Binding="{Binding IsVerticalLayout}" Value="True">
+     <Setter Property="Orientation" Value="Vertical"/>
+    </DataTrigger>
+   </Style.Triggers>
+  </Style>
+ </Window.Resources>
  <Border Background="#F8FAFC" BorderBrush="#334155" BorderThickness="1" Padding="10">
   <StackPanel>
    <DockPanel>
-    <Button DockPanel.Dock="Right" Content="Modo mínimo" Command="{Binding ToggleMinimalCommand}" AutomationProperties.AutomationId="ToggleMinimalButton" AutomationProperties.Name="Alternar modo mínimo" AutomationProperties.HelpText="Muestra u oculta los controles secundarios"/>
+    <StackPanel DockPanel.Dock="Right" Style="{StaticResource LayoutAwarePanel}">
+     <StackPanel Orientation="Horizontal" Margin="8,0">
+      <TextBlock Text="Posición" VerticalAlignment="Center" Margin="0,0,4,0"/>
+      <ComboBox Width="92" ItemsSource="{Binding Placements}" SelectedItem="{Binding Placement}" AutomationProperties.AutomationId="CapturePanelPlacementSelector" AutomationProperties.Name="Posición de los controles de captura"/>
+     </StackPanel>
+     <Button Content="Modo mínimo" Command="{Binding ToggleMinimalCommand}" AutomationProperties.AutomationId="ToggleMinimalButton" AutomationProperties.Name="Alternar modo mínimo" AutomationProperties.HelpText="Muestra u oculta los controles secundarios"/>
+    </StackPanel>
     <StackPanel><TextBlock Text="{Binding SessionName, StringFormat=Sesión: {0}}" FontWeight="Bold" AutomationProperties.LiveSetting="Polite"/><TextBlock Text="{Binding SectionName, StringFormat=Sección: {0}}" AutomationProperties.LiveSetting="Polite"/></StackPanel>
    </DockPanel>
    <Grid Visibility="{Binding ExpandedVisibility}" Margin="0,8,0,0">
     <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
-    <StackPanel Orientation="Horizontal">
+    <StackPanel Style="{StaticResource LayoutAwarePanel}">
      <ComboBox Width="115" ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}" AutomationProperties.AutomationId="CaptureModeSelector" AutomationProperties.Name="Modo de captura"/>
      <Button x:Name="CaptureNowButton" Content="Capturar" Command="{Binding CaptureCommand}" Margin="6,0" AutomationProperties.AutomationId="CaptureNowButton" AutomationProperties.Name="Capturar ahora" AutomationProperties.HelpText="Realiza una captura con el modo seleccionado; atajo Control+C"/>
      <Button Content="Pausar / reanudar" Command="{Binding TogglePauseCommand}" AutomationProperties.AutomationId="TogglePauseButton" AutomationProperties.Name="Pausar o reanudar sesión" AutomationProperties.HelpText="Alterna el estado de la sesión; atajo Espacio"/>
     </StackPanel>
-    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,6">
+    <StackPanel Grid.Row="1" Style="{StaticResource LayoutAwarePanel}" Margin="0,6">
      <Button Content="◀ Sección" Command="{Binding PreviousSectionCommand}" AutomationProperties.Name="Sección anterior"/><Button Content="Sección ▶" Command="{Binding NextSectionCommand}" Margin="4,0" AutomationProperties.Name="Sección siguiente"/>
      <Button Content="Deshacer" Command="{Binding UndoCommand}" AutomationProperties.AutomationId="UndoButton" AutomationProperties.Name="Deshacer última acción" ToolTip="No disponible sin una captura reciente o durante una pausa"/><Button Content="Importante" Command="{Binding MarkImportantCommand}" Margin="4,0" AutomationProperties.AutomationId="MarkImportantButton" AutomationProperties.Name="Marcar captura como importante" ToolTip="No disponible sin una captura reciente o durante una pausa"/><Button Content="Contexto" Command="{Binding AddContextCommand}" AutomationProperties.AutomationId="AddContextButton" AutomationProperties.Name="Añadir contexto" ToolTip="No disponible sin una captura reciente o durante una pausa"/>
     </StackPanel>
-    <DockPanel Grid.Row="2"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><TextBlock Text="Opacidad" VerticalAlignment="Center" Margin="6,0"/><Slider Width="70" Minimum="0.55" Maximum="1" Value="{Binding PanelOpacity}" AutomationProperties.Name="Opacidad del panel"/></StackPanel><TextBlock VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"><Run Text="Estado: "/><Run Text="{Binding SessionStatus, Mode=OneWay}"/><Run Text=" · Cola: "/><Run Text="{Binding QueuedCaptures, Mode=OneWay}"/><Run Text=" · Capturas: "/><Run Text="{Binding CaptureCount, Mode=OneWay}"/></TextBlock></DockPanel>
+    <StackPanel Grid.Row="2" Style="{StaticResource LayoutAwarePanel}">
+     <TextBlock VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"><Run Text="Estado: "/><Run Text="{Binding SessionStatus, Mode=OneWay}"/><Run Text=" · Cola: "/><Run Text="{Binding QueuedCaptures, Mode=OneWay}"/><Run Text=" · Capturas: "/><Run Text="{Binding CaptureCount, Mode=OneWay}"/></TextBlock>
+     <StackPanel Orientation="Horizontal"><TextBlock Text="Opacidad" VerticalAlignment="Center" Margin="10,0,6,0"/><Slider Width="70" Minimum="0.55" Maximum="1" Value="{Binding PanelOpacity}" AutomationProperties.Name="Opacidad del panel"/></StackPanel>
+    </StackPanel>
    </Grid>
   </StackPanel>
  </Border>

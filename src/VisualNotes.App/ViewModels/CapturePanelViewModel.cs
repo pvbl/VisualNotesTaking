@@ -4,6 +4,7 @@ using System.Windows.Input;
 namespace VisualNotes.App.ViewModels;
 
 public enum CapturePanelMode { Region, Monitor, Desktop, Window }
+public enum CapturePanelPlacement { Flotante, Derecha, Arriba, Abajo }
 
 /// <summary>State and commands exposed by the always-on-top capture controller.</summary>
 public sealed class CapturePanelViewModel : ViewModelBase
@@ -14,6 +15,7 @@ public sealed class CapturePanelViewModel : ViewModelBase
     private int _captureCount;
     private bool _isMinimal;
     private double _panelOpacity = 0.94;
+    private CapturePanelPlacement _placement;
 
     public CapturePanelViewModel(MainViewModel main)
     {
@@ -38,6 +40,19 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public string SessionStatus => _main.SessionStatus;
     public CapturePanelMode Mode { get => _mode; set { _mode = value; OnPropertyChanged(); } }
     public IReadOnlyList<CapturePanelMode> Modes { get; } = Enum.GetValues<CapturePanelMode>();
+    public CapturePanelPlacement Placement
+    {
+        get => _placement;
+        set
+        {
+            if (_placement == value) return;
+            _placement = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsVerticalLayout));
+        }
+    }
+    public IReadOnlyList<CapturePanelPlacement> Placements { get; } = Enum.GetValues<CapturePanelPlacement>();
+    public bool IsVerticalLayout => Placement == CapturePanelPlacement.Derecha;
     public int QueuedCaptures { get => _queuedCaptures; set { _queuedCaptures = Math.Max(0, value); OnPropertyChanged(); } }
     public int CaptureCount { get => _captureCount; private set { _captureCount = value; OnPropertyChanged(); } }
     public bool IsMinimal { get => _isMinimal; set { _isMinimal = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandedVisibility)); } }
@@ -57,10 +72,31 @@ public sealed class CapturePanelViewModel : ViewModelBase
 
     public static Rect ConstrainToWorkArea(Rect requested, Rect workArea)
     {
-        var width = Math.Clamp(requested.Width, 280, workArea.Width);
+        var minimumWidth = Math.Min(220, workArea.Width);
+        var width = Math.Clamp(requested.Width, minimumWidth, workArea.Width);
         var height = Math.Clamp(requested.Height, 56, workArea.Height);
         return new(Math.Clamp(requested.X, workArea.Left, workArea.Right - width),
             Math.Clamp(requested.Y, workArea.Top, workArea.Bottom - height), width, height);
+    }
+
+    public static Rect GetPlacementBounds(CapturePanelPlacement placement, Rect workArea, Rect floatingBounds)
+    {
+        if (placement == CapturePanelPlacement.Flotante)
+            return ConstrainToWorkArea(floatingBounds, workArea);
+
+        if (placement == CapturePanelPlacement.Derecha)
+        {
+            var width = Math.Min(workArea.Width, Math.Clamp(Math.Round(workArea.Width / 6), 220, 480));
+            return new(workArea.Right - width, workArea.Top, width, workArea.Height);
+        }
+
+        var horizontalWidth = Math.Min(1040, workArea.Width);
+        var horizontalHeight = Math.Min(190, workArea.Height);
+        var left = workArea.Left + ((workArea.Width - horizontalWidth) / 2);
+        var top = placement == CapturePanelPlacement.Arriba
+            ? workArea.Top
+            : workArea.Bottom - horizontalHeight;
+        return new(left, top, horizontalWidth, horizontalHeight);
     }
 
     private void ChangeSection(int offset)

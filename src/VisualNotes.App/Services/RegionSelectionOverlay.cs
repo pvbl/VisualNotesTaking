@@ -80,7 +80,11 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             Left = screen.Bounds.Left / scaleX; Top = screen.Bounds.Top / scaleY;
             Width = screen.Bounds.Width / scaleX; Height = screen.Bounds.Height / scaleY;
             Content = BuildContent();
-            PreviewMouseLeftButtonDown += OnMouseDown;
+            // Start a selection only from the drawing surface. Listening at window
+            // preview level also receives clicks intended for the command buttons;
+            // capturing the mouse there prevents Confirm, Cancel, Reset, etc. from
+            // completing their Click event and replaces the selection with 0x0.
+            _canvas.MouseLeftButtonDown += OnMouseDown;
             PreviewMouseMove += OnMouseMove;
             PreviewMouseLeftButtonUp += (_, _) => ReleaseMouseCapture();
             PreviewKeyDown += OnKeyDown;

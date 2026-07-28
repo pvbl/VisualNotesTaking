@@ -20,6 +20,39 @@ public sealed class CapturePanelUiTests
         workArea.Contains(result.BottomRight).ShouldBeTrue();
     }
 
+    [Theory, Trait("Category", "UI"), Trait("Category", "Windows")]
+    [InlineData(CapturePanelPlacement.Derecha)]
+    [InlineData(CapturePanelPlacement.Arriba)]
+    [InlineData(CapturePanelPlacement.Abajo)]
+    public void Docked_panel_touches_the_selected_work_area_edge(CapturePanelPlacement placement)
+    {
+        var workArea = new Rect(-1920, 0, 1920, 1080);
+        var result = CapturePanelViewModel.GetPlacementBounds(placement, workArea, new Rect(-1500, 200, 430, 190));
+
+        if (placement == CapturePanelPlacement.Derecha) result.Right.ShouldBe(workArea.Right);
+        if (placement == CapturePanelPlacement.Arriba) result.Top.ShouldBe(workArea.Top);
+        if (placement == CapturePanelPlacement.Abajo) result.Bottom.ShouldBe(workArea.Bottom);
+        workArea.Contains(result.TopLeft).ShouldBeTrue();
+        workArea.Contains(result.BottomRight).ShouldBeTrue();
+    }
+
+    [Theory, Trait("Category", "UI"), Trait("Category", "Windows")]
+    [InlineData(1366, 228)]
+    [InlineData(1920, 320)]
+    [InlineData(2560, 427)]
+    [InlineData(3840, 480)]
+    public void Right_panel_uses_about_one_sixth_of_the_screen_without_becoming_unusable(
+        double screenWidth, double expectedWidth)
+    {
+        var workArea = new Rect(0, 0, screenWidth, 1080);
+        var result = CapturePanelViewModel.GetPlacementBounds(
+            CapturePanelPlacement.Derecha, workArea, new Rect(100, 100, 430, 190));
+
+        result.Width.ShouldBe(expectedWidth, 0.001);
+        result.Height.ShouldBe(workArea.Height);
+        result.Top.ShouldBe(workArea.Top);
+    }
+
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
     public void Panel_xaml_provides_keyboard_shortcuts_and_screen_reader_names()
     {
@@ -31,6 +64,8 @@ public sealed class CapturePanelUiTests
         xaml.ShouldContain("AutomationProperties.AutomationId=\"UndoButton\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"MarkImportantButton\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"AddContextButton\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"CapturePanelPlacementSelector\"");
+        xaml.ShouldContain("ItemsSource=\"{Binding Placements}\"");
         xaml.ShouldContain("Key=\"Z\" Modifiers=\"Control\" Command=\"{Binding UndoCommand}\"");
         xaml.ShouldContain("FocusManager.FocusedElement=\"{Binding ElementName=CaptureNowButton, Mode=OneWay}\"");
         xaml.ShouldContain("{Binding SessionStatus, Mode=OneWay}");
@@ -38,18 +73,17 @@ public sealed class CapturePanelUiTests
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
-    public void Panel_owner_is_assigned_after_the_main_window_is_shown()
+    public void Panel_is_not_owned_by_the_main_window_so_it_remains_visible_when_main_is_minimized()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");
         var source = File.ReadAllText(Path.GetFullPath(path));
 
         var showMain = source.IndexOf("_window.Show();", StringComparison.Ordinal);
-        var assignOwner = source.IndexOf("_capturePanel.Owner = _window;", StringComparison.Ordinal);
         var showPanel = source.IndexOf("_capturePanel.Show();", StringComparison.Ordinal);
 
         showMain.ShouldBeGreaterThanOrEqualTo(0);
-        assignOwner.ShouldBeGreaterThan(showMain);
-        showPanel.ShouldBeGreaterThan(assignOwner);
+        showPanel.ShouldBeGreaterThan(showMain);
+        source.ShouldNotContain("_capturePanel.Owner = _window;");
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
