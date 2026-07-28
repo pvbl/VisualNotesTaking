@@ -49,6 +49,8 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
         var existing = await db.AnalysisJobs.AsNoTracking().SingleOrDefaultAsync(x => x.IdempotencyKey == job.IdempotencyKey, cancellationToken);
         if (existing is not null) return existing;
         db.AnalysisJobs.Add(job);
+        var screenshot = await db.Screenshots.SingleOrDefaultAsync(x => x.Id == job.ScreenshotId, cancellationToken);
+        if (screenshot is not null) screenshot.ProcessingStatus = ScreenshotStatus.Queued;
         try { await db.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateException)
         {
@@ -82,10 +84,18 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
         await using var db = await _contexts.CreateDbContextAsync(cancellationToken);
         var job = await db.AnalysisJobs.SingleAsync(x => x.Id == jobId, cancellationToken);
         job.Cancel(DateTimeOffset.UtcNow);
+        (await db.Screenshots.SingleAsync(x => x.Id == job.ScreenshotId, cancellationToken)).ProcessingStatus = ScreenshotStatus.Captured;
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RetryAsync(Guid jobId, CancellationToken cancellationToken = default) => await MutateAsync(jobId, x => x.Retry(DateTimeOffset.UtcNow), cancellationToken);
+    public async Task RetryAsync(Guid jobId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _contexts.CreateDbContextAsync(cancellationToken);
+        var job = await db.AnalysisJobs.SingleAsync(x => x.Id == jobId, cancellationToken);
+        job.Retry(DateTimeOffset.UtcNow);
+        (await db.Screenshots.SingleAsync(x => x.Id == job.ScreenshotId, cancellationToken)).ProcessingStatus = ScreenshotStatus.Queued;
+        await db.SaveChangesAsync(cancellationToken);
+    }
     public async Task ChangeProviderAsync(Guid jobId, Guid providerId, CancellationToken cancellationToken = default) => await MutateAsync(jobId, x => x.ChangeProvider(providerId), cancellationToken);
 
     private async Task MutateAsync(Guid id, Action<AnalysisJob> action, CancellationToken token)
@@ -112,6 +122,8 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
             job.StartedAt ??= now;
             job.LeaseOwner = _workerId;
             job.LeaseExpiresAt = now + _options.EffectiveLeaseDuration;
+            var screenshot = await db.Screenshots.SingleAsync(x => x.Id == job.ScreenshotId, token);
+            screenshot.ProcessingStatus = ScreenshotStatus.Analyzing;
         }
         await db.SaveChangesAsync(token);
         await transaction.CommitAsync(token);
@@ -161,6 +173,7 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
         job.JobStatus = AnalysisJobStatus.Completed;
         job.CompletedAt = DateTimeOffset.UtcNow;
         job.ClearLease();
+        (await db.Screenshots.SingleAsync(x => x.Id == job.ScreenshotId, token)).ProcessingStatus = ScreenshotStatus.Ready;
         var attempt = await db.AnalysisJobAttempts.SingleAsync(x => x.AnalysisJobId == id && x.AttemptNumber == job.Attempts, token);
         attempt.FinishedAt = job.CompletedAt;
         await db.SaveChangesAsync(token);
@@ -172,15 +185,27 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
         var job = await db.AnalysisJobs.SingleAsync(x => x.Id == id);
         if (job.JobStatus != AnalysisJobStatus.Running || job.LeaseOwner != _workerId) return;
         var now = DateTimeOffset.UtcNow;
-        job.Error = error.Message;
+        job.Error = $"{Classify(error)}: {error.Message}";
         job.JobStatus = job.Attempts < job.MaximumAttempts ? AnalysisJobStatus.Pending : AnalysisJobStatus.Failed;
         job.NextAttemptAt = job.JobStatus == AnalysisJobStatus.Pending ? now + TimeSpan.FromTicks(_options.EffectiveRetryBaseDelay.Ticks * (1L << Math.Min(job.Attempts - 1, 10))) : null;
         job.CompletedAt = job.JobStatus == AnalysisJobStatus.Failed ? now : null;
         job.ClearLease();
+        (await db.Screenshots.SingleAsync(x => x.Id == job.ScreenshotId)).ProcessingStatus =
+            job.JobStatus == AnalysisJobStatus.Pending ? ScreenshotStatus.Queued : ScreenshotStatus.Failed;
         var attempt = await db.AnalysisJobAttempts.SingleAsync(x => x.AnalysisJobId == id && x.AttemptNumber == job.Attempts);
         attempt.FinishedAt = now; attempt.Error = error.ToString(); attempt.RetryAt = job.NextAttemptAt;
         await db.SaveChangesAsync();
     }
+
+    private static string Classify(Exception error) => error switch
+    {
+        LanguageModelException { Kind: LanguageModelErrorKind.Authentication } => "authentication",
+        LanguageModelException { Kind: LanguageModelErrorKind.RateLimited or LanguageModelErrorKind.BudgetExhausted } => "limit",
+        LanguageModelException { Kind: LanguageModelErrorKind.Timeout or LanguageModelErrorKind.ServiceUnavailable } or HttpRequestException => "network",
+        LanguageModelException { Kind: LanguageModelErrorKind.InvalidResponse } or AnalysisResponseValidationException => "invalid-response",
+        LanguageModelException { Kind: LanguageModelErrorKind.InvalidRequest } => "configuration",
+        _ => "unknown"
+    };
 
     private async Task ReleaseAfterStopAsync(Guid id)
     {

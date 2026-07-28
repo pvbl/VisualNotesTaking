@@ -30,7 +30,8 @@ public sealed class VisualExtractionPipeline(
     IVisualSourceNormalizer normalizer,
     IVisionLanguageModelProvider visionModel,
     IExtractionArtifactStore artifacts,
-    BoundingBoxNormalizationOptions? boundingBoxOptions = null)
+    BoundingBoxNormalizationOptions? boundingBoxOptions = null,
+    string? extractionPrompt = null)
 {
     public async Task<ExtractionPipelineResult> ExtractAsync(
         VisualSource source, LanguageModelOptions options, CancellationToken cancellationToken = default)
@@ -40,7 +41,7 @@ public sealed class VisualExtractionPipeline(
         ValidatePixels(normalized);
 
         var request = new VisionLanguageModelRequest(
-            ExtractionPrompt, normalized.RgbaPixels, normalized.MediaType, options, ImageDetail.High);
+            extractionPrompt ?? ExtractionPrompt, normalized.RgbaPixels, normalized.MediaType, options, ImageDetail.High);
         var modelResponse = await visionModel.GenerateAsync(request, cancellationToken).ConfigureAwait(false);
         if (modelResponse.IsPartial)
             throw new AnalysisResponseValidationException("The provider returned a partial extraction.");
