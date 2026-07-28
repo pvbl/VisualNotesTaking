@@ -7,7 +7,7 @@
 | `VisualNotes.UnitTests` | `Unit` | Lógica pura; se mantiene paralela. |
 | `VisualNotes.IntegrationTests` | `Integration`, opcionalmente `External`/`Slow` | SQLite, sistema de archivos y adaptadores. Cada prueba obtiene una base y carpeta exclusivas. |
 | `VisualNotes.ArchitectureTests` | `Architecture` | Límites entre capas. |
-| `VisualNotes.UiTests` | `UI`, `Windows`, opcionalmente `Slow` | Automatización de escritorio en un job Windows dedicado. |
+| `VisualNotes.UiTests` | `UI`, `Windows`, `Smoke` o `E2E` | Automatización UIA de escritorio; `Smoke` es la ruta crítica corta y `E2E` la matriz completa. |
 | `VisualNotes.Benchmarks` | no aplica | Medición con BenchmarkDotNet, nunca como puerta del job principal. |
 
 Use `[Trait("Category", "...")]` con los valores `Unit`, `Integration`, `Windows`, `UI`, `External` y `Slow`. Solo las clases que usan un recurso global de Windows pertenecen a `WindowsResourceCollection`; esa colección desactiva la paralelización. No desactive globalmente el paralelismo.
@@ -55,7 +55,9 @@ CI ejecuta esta comprobación semanalmente, bajo demanda y en pull requests que 
 
 ## Windows y UI
 
-Se requiere Windows 10/11 o Windows Server con .NET 8 SDK y una sesión de escritorio disponible. No ejecute UI en un agente sin escritorio. Ejecute `dotnet test tests/VisualNotes.UiTests --filter 'Category=UI'`. Los recursos compartidos de captura/ventana deben limpiarse al finalizar.
+Se requiere Windows 10/11 o Windows Server con .NET 8 SDK y una sesión de escritorio **interactiva, desbloqueada y con resolución estable**. El runner autoalojado debe tener las etiquetas `Windows`, `X64` e `interactive-desktop`; no se admite ejecutar UIA como servicio en sesión 0. Defina `VISUALNOTES_INTERACTIVE_UI=1` únicamente después de validar esa sesión. Ejecute la ruta corta con `dotnet test tests/VisualNotes.UiTests --filter 'Category=Smoke'` y la completa con `dotnet test tests/VisualNotes.UiTests --filter 'Category=E2E|Category=Smoke'`.
+
+Los journeys E2E localizan controles exclusivamente por `AutomationId`, salvo la prueba marcada `Capture`, que puede inspeccionar límites físicos de monitores. Usan un VLM falso, sin red y determinista. Ante una excepción, el harness guarda `desktop.png`, `uia-tree.txt`, el error y los logs JSON en `VISUALNOTES_E2E_ARTIFACTS`; CI publica el directorio solo en fallos. El workflow `desktop-e2e.yml` ejecuta smoke en cada GitHub Release marcada como pre-release (release candidate), y la suite completa de martes a sábado y bajo demanda. Los recursos compartidos de captura/ventana se limpian al finalizar.
 
 ## Fixtures, SQLite y fugas
 

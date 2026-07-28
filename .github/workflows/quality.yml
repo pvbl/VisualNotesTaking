@@ -40,15 +40,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with: { name: coverage, path: TestResults/CoverageReport }
 
-  ui-tests:
-    runs-on: windows-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: 8.0.x }
-      - run: dotnet test tests/VisualNotes.UiTests --configuration Release --filter "Category=UI"
-
   benchmarks:
     runs-on: windows-latest
     timeout-minutes: 20

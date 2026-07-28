@@ -1,7 +1,7 @@
 <Window x:Class="VisualNotes.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="VisualNotes" Width="1100" Height="700" MinWidth="800" MinHeight="500"
+        Title="VisualNotes" AutomationProperties.AutomationId="MainWindow" Width="1100" Height="700" MinWidth="800" MinHeight="500"
         Background="#F4F6FA">
   <Window.InputBindings>
     <KeyBinding Key="C" Modifiers="Control+Shift" Command="{Binding CaptureRegionCommand}"/>
@@ -22,18 +22,18 @@
         <StackPanel><TextBlock Text="SESIÓN ACTIVA" Foreground="#94A3B8" FontSize="10" FontWeight="Bold"/>
          <TextBlock Text="{Binding ActiveSessionName}" Foreground="White" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,4,0,0"/>
          <TextBlock Text="{Binding ActiveSectionName, StringFormat=§ {0}}" Foreground="#7DD3FC" TextTrimming="CharacterEllipsis" Margin="0,3,0,8"/>
-         <Button Content="{Binding SessionStatus}" Command="{Binding TogglePauseCommand}" Padding="6"/>
+         <Button AutomationProperties.AutomationId="SessionStatusButton" Content="{Binding SessionStatus}" Command="{Binding TogglePauseCommand}" Padding="6"/>
         </StackPanel>
        </Border>
       <StackPanel>
         <TextBlock Text="VisualNotes" Foreground="White" FontSize="26" FontWeight="Bold" Margin="4,10,4,30"/>
-        <Button Content="Sesión" Command="{Binding NavigateCommand}" CommandParameter="Session" Style="{StaticResource NavButton}"/>
-        <Button Content="Capturas" Command="{Binding NavigateCommand}" CommandParameter="Captures" Style="{StaticResource NavButton}"/>
-        <Button Content="Instrucciones" Command="{Binding NavigateCommand}" CommandParameter="Instructions" Style="{StaticResource NavButton}"/>
-        <Button Content="Documento" Command="{Binding NavigateCommand}" CommandParameter="Document" Style="{StaticResource NavButton}"/>
-        <Button Content="Configuración" Command="{Binding NavigateCommand}" CommandParameter="Settings" Style="{StaticResource NavButton}"/>
+        <Button AutomationProperties.AutomationId="NavSession" Content="Sesión" Command="{Binding NavigateCommand}" CommandParameter="Session" Style="{StaticResource NavButton}"/>
+        <Button AutomationProperties.AutomationId="NavCaptures" Content="Capturas" Command="{Binding NavigateCommand}" CommandParameter="Captures" Style="{StaticResource NavButton}"/>
+        <Button AutomationProperties.AutomationId="NavInstructions" Content="Instrucciones" Command="{Binding NavigateCommand}" CommandParameter="Instructions" Style="{StaticResource NavButton}"/>
+        <Button AutomationProperties.AutomationId="NavDocument" Content="Documento" Command="{Binding NavigateCommand}" CommandParameter="Document" Style="{StaticResource NavButton}"/>
+        <Button AutomationProperties.AutomationId="NavSettings" Content="Configuración" Command="{Binding NavigateCommand}" CommandParameter="Settings" Style="{StaticResource NavButton}"/>
       </StackPanel></DockPanel>
     </Border>
-    <ContentControl Grid.Column="1" Content="{Binding CurrentViewModel}" Margin="36"/>
+    <ContentControl AutomationProperties.AutomationId="PageContent" Grid.Column="1" Content="{Binding CurrentViewModel}" Margin="36"/>
   </Grid>
 </Window>

@@ -4,7 +4,7 @@
   <StackPanel><TextBlock Text="Capturas" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="Revisa, organiza y procesa muchas capturas a la vez." Foreground="#64748B" Margin="0,8,0,14"/></StackPanel>
   <WrapPanel Grid.Row="1" Margin="0,0,0,14">
    <ComboBox Width="145" ItemsSource="{Binding Sections}" DisplayMemberPath="Title" SelectedValuePath="Id" SelectedValue="{Binding SectionFilter}" IsEditable="True" AutomationProperties.Name="Filtrar por sección"/>
-   <TextBox Width="145" Margin="8,0,0,0" Text="{Binding TagFilter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="Filtrar por etiqueta" ToolTip="Etiqueta"/>
+   <TextBox Width="145" Margin="8,0,0,0" Text="{Binding TagFilter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="CaptureTagFilter" AutomationProperties.Name="Filtrar por etiqueta" ToolTip="Etiqueta"/>
    <ComboBox Width="145" Margin="8,0" ItemsSource="{Binding Statuses}" SelectedItem="{Binding StatusFilter}" IsEditable="True" AutomationProperties.Name="Filtrar por estado"/>
    <ComboBox Width="145" ItemsSource="{Binding Importances}" SelectedItem="{Binding ImportanceFilter}" IsEditable="True" AutomationProperties.Name="Filtrar por importancia"/>
    <ComboBox Width="130" Margin="8,0" ItemsSource="{Binding ReviewOptions}" SelectedItem="{Binding ReviewFilter}" AutomationProperties.Name="Filtrar por revisión"/>
@@ -13,7 +13,7 @@
   <Grid Grid.Row="2"><Grid.ColumnDefinitions><ColumnDefinition MinWidth="430" Width="3*"/><ColumnDefinition MinWidth="290" Width="2*"/></Grid.ColumnDefinitions>
    <DockPanel>
     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8"><TextBlock Text="{Binding SelectionCount, StringFormat={}{0} seleccionadas}" VerticalAlignment="Center" Margin="0,0,12,0"/><Button Content="Excluir" Command="{Binding ExcludeCommand}"/><Button Content="Eliminar" Command="{Binding DeleteCommand}" Margin="6,0"/><Button Content="Restaurar" Command="{Binding RestoreCommand}"/><Button Content="Reprocesar" Command="{Binding ReanalyzeCommand}" Margin="6,0"/><Button Content="Deshacer" Command="{Binding UndoCommand}"/><ComboBox Width="140" Margin="8,0,0,0" ItemsSource="{Binding Sections}" DisplayMemberPath="Title" SelectedValuePath="Id" SelectedValue="{Binding TargetSectionId}" ToolTip="Sección destino"/><Button Content="Mover" Command="{Binding MoveToSectionCommand}" CommandParameter="{Binding TargetSectionId}"/></WrapPanel>
-    <ListBox x:Name="CaptureList" ItemsSource="{Binding Captures}" SelectionMode="Extended" SelectionChanged="SelectionChanged" AllowDrop="True" Drop="CaptureDrop" PreviewMouseMove="CaptureMouseMove" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.IsDeferredScrollingEnabled="True" AutomationProperties.Name="Lista de capturas">
+    <ListBox x:Name="CaptureList" AutomationProperties.AutomationId="CaptureList" ItemsSource="{Binding Captures}" SelectionMode="Extended" SelectionChanged="SelectionChanged" AllowDrop="True" Drop="CaptureDrop" PreviewMouseMove="CaptureMouseMove" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.IsDeferredScrollingEnabled="True" AutomationProperties.Name="Lista de capturas">
      <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>
      <ListBox.ItemTemplate><DataTemplate><Border BorderBrush="#CBD5E1" BorderThickness="0,0,0,1" Padding="6"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="112"/><ColumnDefinition/></Grid.ColumnDefinitions>
       <Image Source="{Binding Image.RelativePath, IsAsync=True}" Width="104" Height="68" Stretch="UniformToFill" AutomationProperties.Name="Miniatura cargada bajo demanda"/>
@@ -22,11 +22,11 @@
     </ListBox>
    </DockPanel>
    <ScrollViewer Grid.Column="1" Margin="18,0,0,0" VerticalScrollBarVisibility="Auto"><StackPanel>
-    <TextBlock Text="Detalle" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="Contexto personal" FontWeight="SemiBold" Margin="0,12,0,0"/><TextBox Text="{Binding SelectedCapture.UserContext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="72"/>
+    <TextBlock Text="Detalle" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="Contexto personal" FontWeight="SemiBold" Margin="0,12,0,0"/><TextBox AutomationProperties.AutomationId="CaptureContextInput" Text="{Binding SelectedCapture.UserContext, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="72"/>
     <TextBlock Text="Instrucción de procesamiento" FontWeight="SemiBold" Margin="0,12,0,0"/><TextBox Text="{Binding SelectedCapture.CaptureInstruction, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="72"/>
     <TextBlock Text="Etiquetas rápidas" FontWeight="SemiBold" Margin="0,12,0,6"/><ItemsControl ItemsSource="{Binding QuickChips}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Button Content="{Binding}" Command="{Binding DataContext.ApplyChipCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" Margin="0,0,7,7" Padding="9,5"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
     <TextBlock Text="Etiquetas" FontWeight="SemiBold"/><TextBox Text="{Binding SelectedCapture.Tags, UpdateSourceTrigger=PropertyChanged}"/>
-    <WrapPanel Margin="0,12"><Button Content="Volver a analizar" Command="{Binding ReanalyzeCommand}"/><Button Content="Regenerar nota" Command="{Binding RegenerateNoteCommand}" Margin="8,0"/></WrapPanel>
+    <WrapPanel Margin="0,12"><Button AutomationProperties.AutomationId="ReanalyzeButton" Content="Volver a analizar" Command="{Binding ReanalyzeCommand}"/><Button AutomationProperties.AutomationId="RegenerateNoteButton" Content="Regenerar nota" Command="{Binding RegenerateNoteCommand}" Margin="8,0"/></WrapPanel>
    </StackPanel></ScrollViewer>
   </Grid>
  </Grid>

@@ -34,7 +34,8 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualNotes");
+        var dataDirectory = Environment.GetEnvironmentVariable("VISUALNOTES_DATA_DIRECTORY")
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualNotes");
         (_loggerFactory, _serilog) = LoggingFactory.Create(Path.Combine(dataDirectory, "diagnostics", "visualnotes-.json"));
         _telemetry = new VisualNotesTelemetry(enableLocalConsoleExporter: false);
         _exceptions = new GlobalExceptionHandler(_loggerFactory.CreateLogger<GlobalExceptionHandler>(), ShowError, code => Shutdown(code));
