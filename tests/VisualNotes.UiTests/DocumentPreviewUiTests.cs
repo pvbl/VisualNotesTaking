@@ -22,7 +22,7 @@ public sealed class DocumentPreviewUiTests
         viewModel.Scope = ExportScope.Selection;
         viewModel.Items.Single(item => item.StableKey == "ready").IsSelected = true;
         SemanticDocument? requested = null;
-        viewModel.ExportRequested += (export, _) => requested = export;
+        viewModel.ExportRequested += (export, _) => { requested = export; return Task.CompletedTask; };
 
         viewModel.ExportCommand.Execute(null);
 

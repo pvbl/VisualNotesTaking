@@ -1,7 +1,8 @@
 <UserControl x:Class="VisualNotes.App.Views.CapturesView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <UserControl.Resources><BooleanToVisibilityConverter x:Key="BoolToVisibility"/></UserControl.Resources>
  <UserControl.InputBindings><KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoCommand}"/><KeyBinding Key="Delete" Command="{Binding DeleteCommand}"/></UserControl.InputBindings>
  <Grid KeyboardNavigation.TabNavigation="Cycle"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition/></Grid.RowDefinitions>
-  <StackPanel><TextBlock Text="Capturas" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="Revisa, organiza y procesa muchas capturas a la vez." Foreground="#64748B" Margin="0,8,0,14"/></StackPanel>
+  <StackPanel><TextBlock Text="Capturas" FontSize="32" FontWeight="SemiBold"/><TextBlock Text="Revisa, organiza y procesa muchas capturas a la vez." Foreground="#64748B" Margin="0,8,0,14"/><ProgressBar Height="3" IsIndeterminate="True" Visibility="{Binding ReanalyzeCommand.IsRunning, Converter={StaticResource BoolToVisibility}}"/></StackPanel>
   <WrapPanel Grid.Row="1" Margin="0,0,0,14">
    <ComboBox Width="145" ItemsSource="{Binding Sections}" DisplayMemberPath="Title" SelectedValuePath="Id" SelectedValue="{Binding SectionFilter}" IsEditable="True" AutomationProperties.Name="Filtrar por sección"/>
    <TextBox Width="145" Margin="8,0,0,0" Text="{Binding TagFilter, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.AutomationId="CaptureTagFilter" AutomationProperties.Name="Filtrar por etiqueta" ToolTip="Etiqueta"/>

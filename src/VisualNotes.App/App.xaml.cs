@@ -13,6 +13,10 @@ namespace VisualNotes.App;
 
 public partial class App : System.Windows.Application
 {
+    private sealed class MessageBoxNotificationService : INotificationService
+    {
+        public void ShowError(string message) => MessageBox.Show(message, "Operación no completada", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
     private Forms.NotifyIcon? _trayIcon;
     private MainWindow? _window;
     private Views.CapturePanelWindow? _capturePanel;
@@ -31,9 +35,12 @@ public partial class App : System.Windows.Application
     private GlobalExceptionHandler? _exceptions;
     private VisualNotesTelemetry? _telemetry;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override async void OnStartup(StartupEventArgs e) => await StartAsync(e);
+
+    private async Task StartAsync(StartupEventArgs e)
     {
         base.OnStartup(e);
+        AsyncRelayCommand.DefaultNotificationService = new MessageBoxNotificationService();
         if (e.Args is ["--smoke-test", var markerPath])
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(markerPath))!);
@@ -99,8 +106,8 @@ public partial class App : System.Windows.Application
         _regions = new PersistentRegionService(_regionSettings);
         _capture = new WindowsScreenCaptureService(new RegionSelectionOverlay());
         _regionBorder = new PersistentRegionBorder();
-        _viewModel.CaptureRegionRequested += CapturePersistentRegion;
-        _viewModel.RedefineRegionRequested += RedefinePersistentRegion;
+        _viewModel.CaptureRegionRequested += CapturePersistentRegionAsync;
+        _viewModel.RedefineRegionRequested += RedefinePersistentRegionAsync;
         var restored = await _regions.RestoreAsync(WindowsScreenCaptureService.GetMonitors(),
             _viewModel.ActiveSession?.Id ?? Guid.Empty);
         _activeRegion = restored.Region;
@@ -120,7 +127,8 @@ public partial class App : System.Windows.Application
         if (_activeRegion is not null) _regionBorder.Show(_activeRegion);
     }
 
-    private async void RedefinePersistentRegion()
+    private async void RedefinePersistentRegion() => await RedefinePersistentRegionAsync();
+    private async Task RedefinePersistentRegionAsync()
     {
         if (_capture is null || _regions is null || _viewModel is null) return;
         var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion));
@@ -133,7 +141,8 @@ public partial class App : System.Windows.Application
         _regionBorder?.Show(_activeRegion);
     }
 
-    private async void CapturePersistentRegion()
+    private async void CapturePersistentRegion() => await CapturePersistentRegionAsync();
+    private async Task CapturePersistentRegionAsync()
     {
         if (_capture is null || _activeRegion is null || _activeRegion.IsHidden) return;
         var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
@@ -142,10 +151,11 @@ public partial class App : System.Windows.Application
         _regionBorder?.Show(_activeRegion);
     }
 
-    private async void CaptureFromPanel(CapturePanelMode mode)
+    private async void CaptureFromPanel(CapturePanelMode mode) => await CaptureFromPanelAsync(mode);
+    private async Task CaptureFromPanelAsync(CapturePanelMode mode)
     {
         if (_capture is null) return;
-        if (mode == CapturePanelMode.Region && _activeRegion is not null) { CapturePersistentRegion(); return; }
+        if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(); return; }
         var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
         var frame = await _capture.CaptureAsync(new(captureMode));
         if (frame is not null) await PersistCapturedFrameAsync(frame);
@@ -183,7 +193,8 @@ public partial class App : System.Windows.Application
         _window.Activate();
     }
 
-    private async void ExitApplication()
+    private async void ExitApplication() => await ExitApplicationAsync();
+    private async Task ExitApplicationAsync()
     {
         _isExiting = true;
         _trayIcon?.Dispose();
@@ -191,6 +202,7 @@ public partial class App : System.Windows.Application
         _capturePanel?.Close();
         _hotkeys?.Dispose();
         _window?.Close();
+        await AsyncCommandOperations.CancelAndWaitAsync();
         if (_runtime is not null) await _runtime.DisposeAsync();
         _telemetry?.Dispose();
         _loggerFactory?.Dispose();
@@ -257,7 +269,7 @@ public partial class App : System.Windows.Application
                 }
             };
             await _runtime.Coordinator.AddCaptureAsync(session, capture);
-            _viewModel.CaptureAdded(capture);
+            await _viewModel.CaptureAddedAsync(capture);
             _capturePanelViewModel?.CaptureCompleted();
         }
         catch (Exception exception)
@@ -268,12 +280,13 @@ public partial class App : System.Windows.Application
         }
     }
 
-    private async void OnHotkeyInvoked(object? sender, HotkeyAction action)
+    private async void OnHotkeyInvoked(object? sender, HotkeyAction action) => await HandleHotkeyAsync(action);
+    private async Task HandleHotkeyAsync(HotkeyAction action)
     {
         if (_viewModel is null || _capture is null) return;
         switch (action)
         {
-            case HotkeyAction.CaptureRegion: CapturePersistentRegion(); break;
+            case HotkeyAction.CaptureRegion: await CapturePersistentRegionAsync(); break;
             case HotkeyAction.CaptureFullDesktop: await CaptureAndPersistAsync(ScreenCaptureMode.FullVirtualDesktop); break;
             case HotkeyAction.CaptureCurrentMonitor: await CaptureAndPersistAsync(ScreenCaptureMode.CurrentMonitor); break;
             case HotkeyAction.CaptureActiveWindow: await CaptureAndPersistAsync(ScreenCaptureMode.ActiveWindow); break;
