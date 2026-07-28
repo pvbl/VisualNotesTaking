@@ -22,6 +22,19 @@ public sealed class RelayCommand(Action<object?> execute, Predicate<object?>? ca
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }
 
+public interface ICaptureActionContract
+{
+    bool CanUndo { get; }
+    bool CanMarkImportant { get; }
+    bool CanAddContext { get; }
+    Task UndoAsync();
+    Task MarkImportantAsync();
+    Task AddContextAsync();
+    void CaptureCompleted(Screenshot capture);
+    void SessionStateChanged();
+    event EventHandler? CanExecuteChanged;
+}
+
 public sealed class MainViewModel : ViewModelBase
 {
     private readonly SessionCoordinator _coordinator;
@@ -33,15 +46,17 @@ public sealed class MainViewModel : ViewModelBase
     private readonly ICaptureWorkspace? _captureWorkspace;
     private readonly IDocumentExporter? _documentExporter;
     private readonly IExportInteraction? _exportInteraction;
+    private readonly ICaptureActionContract? _captureActions;
 
     public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository, IGlobalHotkeyService? hotkeys = null,
         IApiCredentialStore? credentials = null, ICaptureWorkspace? captureWorkspace = null,
         IDocumentExporter? documentExporter = null, IExportInteraction? exportInteraction = null,
         ISettingsRepository? settingsRepository = null, IUnitOfWork? unitOfWork = null,
-        DurableAnalysisJobProcessor? analysisJobs = null)
+        DurableAnalysisJobProcessor? analysisJobs = null, ICaptureActionContract? captureActions = null)
     {
         _coordinator = coordinator; _repository = repository;
         _captureWorkspace = captureWorkspace; _documentExporter = documentExporter; _exportInteraction = exportInteraction;
+        _captureActions = captureActions;
         _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys, credentials, settingsRepository, unitOfWork);
         Sessions = new SessionViewModel(coordinator, repository, Activate);
         Captures = new CapturesViewModel(workspace: captureWorkspace, activeSession: () => ActiveSession, analysisJobs: analysisJobs);
@@ -64,9 +79,14 @@ public sealed class MainViewModel : ViewModelBase
             if (ActiveSession is null) return;
             await _coordinator.SetPausedAsync(ActiveSession, !ActiveSession.IsPaused);
             RefreshHeader();
+            _captureActions?.SessionStateChanged();
         });
         CaptureRegionCommand = new RelayCommand(_ => CaptureRegionRequested?.Invoke());
         RedefineRegionCommand = new RelayCommand(_ => RedefineRegionRequested?.Invoke());
+        UndoCommand = new RelayCommand(async _ => await (_captureActions?.UndoAsync() ?? Task.CompletedTask), _ => _captureActions?.CanUndo == true);
+        MarkImportantCommand = new RelayCommand(async _ => await (_captureActions?.MarkImportantAsync() ?? Task.CompletedTask), _ => _captureActions?.CanMarkImportant == true);
+        AddContextCommand = new RelayCommand(async _ => await (_captureActions?.AddContextAsync() ?? Task.CompletedTask), _ => _captureActions?.CanAddContext == true);
+        if (_captureActions is not null) _captureActions.CanExecuteChanged += (_, _) => RefreshCaptureActions();
     }
 
     public SessionViewModel Sessions { get; }
@@ -83,11 +103,11 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand TogglePauseCommand { get; }
     public ICommand CaptureRegionCommand { get; }
     public ICommand RedefineRegionCommand { get; }
+    public RelayCommand UndoCommand { get; }
+    public RelayCommand MarkImportantCommand { get; }
+    public RelayCommand AddContextCommand { get; }
     public event Action? CaptureRegionRequested;
     public event Action? RedefineRegionRequested;
-    public Action? UndoRequested { get; set; }
-    public Action? MarkImportantRequested { get; set; }
-    public Action? AddContextRequested { get; set; }
 
     public async Task InitializeAsync()
     {
@@ -102,12 +122,14 @@ public sealed class MainViewModel : ViewModelBase
         if (ActiveSession is not null && ActiveSession.Screenshots.All(item => item.Id != capture.Id))
             ActiveSession.Screenshots.Add(capture);
         Captures.AddCapture(capture);
+        _captureActions?.CaptureCompleted(capture);
         if (_captureWorkspace is not null) await Captures.LoadAsync();
     }
 
     private async void Activate(NoteSession session)
     {
         ActiveSession = session;
+        _captureActions?.SessionStateChanged();
         await Captures.LoadAsync();
     }
     private async void ExportDocument(SemanticDocument document, ExportScope _)
@@ -123,6 +145,7 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception exception) { _exportInteraction.ShowExportFailed(exception.Message); }
     }
     public void RefreshHeader() { OnPropertyChanged(nameof(ActiveSessionName)); OnPropertyChanged(nameof(ActiveSectionName)); OnPropertyChanged(nameof(SessionStatus)); }
+    private void RefreshCaptureActions() { UndoCommand.RaiseCanExecuteChanged(); MarkImportantCommand.RaiseCanExecuteChanged(); AddContextCommand.RaiseCanExecuteChanged(); }
 }
 
 public sealed class SessionViewModel : ViewModelBase
@@ -246,7 +269,7 @@ public sealed class CapturesViewModel : ViewModelBase
     public async Task LoadAsync()
     {
         if (_workspace is null || _activeSession?.Invoke() is not { } session) return;
-        var selectedIds = SelectedCaptures.Select(x => x.Id).ToHashSet();
+        var selectedIds = SelectedCaptures.Select(x => x.Id).Append(SelectedCapture?.Id ?? Guid.Empty).ToHashSet();
         _library = new(await _workspace.LoadAsync(session.Id));
         Sections = session.Sections.OrderBy(x => x.Order).ToArray();
         OnPropertyChanged(nameof(Sections));
