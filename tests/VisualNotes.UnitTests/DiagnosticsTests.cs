@@ -17,6 +17,15 @@ public sealed class DiagnosticsTests
     public static IEnumerable<object[]> Boundaries() => Enum.GetValues<OperationBoundary>().Select(x => new object[] { x });
 
     [Theory]
+    [InlineData("Debug", LogEventLevel.Debug)]
+    [InlineData("warning", LogEventLevel.Warning)]
+    [InlineData("Error", LogEventLevel.Error)]
+    [InlineData(null, LogEventLevel.Information)]
+    [InlineData("not-a-level", LogEventLevel.Information)]
+    public void Log_level_is_configurable_with_a_safe_default(string? value, LogEventLevel expected) =>
+        LoggingFactory.ParseMinimumLevel(value).ShouldBe(expected);
+
+    [Theory]
     [MemberData(nameof(Boundaries))]
     public async Task Every_boundary_records_and_rethrows_controlled_failures(OperationBoundary boundary)
     {
