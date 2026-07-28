@@ -1,0 +1,28 @@
+<Window x:Class="VisualNotes.App.Views.CapturePanelWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Controles de captura de VisualNotes" Width="430" Height="190" MinWidth="280" MinHeight="56"
+ WindowStyle="ToolWindow" ResizeMode="CanResizeWithGrip" Topmost="True" ShowInTaskbar="False" Opacity="{Binding PanelOpacity}"
+ AutomationProperties.Name="Panel de controles de captura" AutomationProperties.HelpText="Controla la sesión y las capturas sin abrir la ventana principal">
+ <Window.InputBindings><KeyBinding Key="C" Modifiers="Control" Command="{Binding CaptureCommand}"/><KeyBinding Key="Space" Command="{Binding TogglePauseCommand}"/><KeyBinding Key="Z" Modifiers="Control" Command="{Binding UndoCommand}"/><KeyBinding Key="M" Modifiers="Control" Command="{Binding ToggleMinimalCommand}"/></Window.InputBindings>
+ <Border Background="#F8FAFC" BorderBrush="#334155" BorderThickness="1" Padding="10">
+  <StackPanel>
+   <DockPanel>
+    <Button DockPanel.Dock="Right" Content="Modo mínimo" Command="{Binding ToggleMinimalCommand}" AutomationProperties.Name="Alternar modo mínimo"/>
+    <StackPanel><TextBlock Text="{Binding SessionName, StringFormat=Sesión: {0}}" FontWeight="Bold" AutomationProperties.LiveSetting="Polite"/><TextBlock Text="{Binding SectionName, StringFormat=Sección: {0}}" AutomationProperties.LiveSetting="Polite"/></StackPanel>
+   </DockPanel>
+   <Grid Visibility="{Binding ExpandedVisibility}" Margin="0,8,0,0">
+    <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+    <StackPanel Orientation="Horizontal">
+     <ComboBox Width="115" ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}" AutomationProperties.Name="Modo de captura"/>
+     <Button Content="Capturar" Command="{Binding CaptureCommand}" Margin="6,0" AutomationProperties.Name="Capturar ahora"/>
+     <Button Content="Pausar / reanudar" Command="{Binding TogglePauseCommand}" AutomationProperties.Name="Pausar o reanudar sesión"/>
+    </StackPanel>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,6">
+     <Button Content="◀ Sección" Command="{Binding PreviousSectionCommand}" AutomationProperties.Name="Sección anterior"/><Button Content="Sección ▶" Command="{Binding NextSectionCommand}" Margin="4,0" AutomationProperties.Name="Sección siguiente"/>
+     <Button Content="Deshacer" Command="{Binding UndoCommand}" AutomationProperties.Name="Deshacer última acción"/><Button Content="Importante" Command="{Binding MarkImportantCommand}" Margin="4,0" AutomationProperties.Name="Marcar captura como importante"/><Button Content="Contexto" Command="{Binding AddContextCommand}" AutomationProperties.Name="Añadir contexto"/>
+    </StackPanel>
+    <DockPanel Grid.Row="2"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><TextBlock Text="Opacidad" VerticalAlignment="Center" Margin="6,0"/><Slider Width="70" Minimum="0.55" Maximum="1" Value="{Binding PanelOpacity}" AutomationProperties.Name="Opacidad del panel"/></StackPanel><TextBlock VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"><Run Text="Estado: "/><Run Text="{Binding SessionStatus}"/><Run Text=" · Cola: "/><Run Text="{Binding QueuedCaptures}"/><Run Text=" · Capturas: "/><Run Text="{Binding CaptureCount}"/></TextBlock></DockPanel>
+   </Grid>
+  </StackPanel>
+ </Border>
+</Window>

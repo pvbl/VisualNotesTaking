@@ -15,6 +15,8 @@ public partial class App : System.Windows.Application
 {
     private Forms.NotifyIcon? _trayIcon;
     private MainWindow? _window;
+    private Views.CapturePanelWindow? _capturePanel;
+    private CapturePanelViewModel? _capturePanelViewModel;
     private MainViewModel? _viewModel;
     private bool _isExiting;
     private VisualNotesRuntime? _runtime;
@@ -68,6 +70,9 @@ public partial class App : System.Windows.Application
             _viewModel.ActiveSession?.Id ?? Guid.Empty);
         _activeRegion = restored.Region;
         _window = new MainWindow { DataContext = _viewModel };
+        _capturePanelViewModel = new CapturePanelViewModel(_viewModel);
+        _capturePanelViewModel.CaptureRequested += CaptureFromPanel;
+        _capturePanel = new Views.CapturePanelWindow { DataContext = _capturePanelViewModel, Owner = _window };
         _window.Closing += (_, args) =>
         {
             if (_isExiting) return;
@@ -76,6 +81,7 @@ public partial class App : System.Windows.Application
         };
         CreateTrayIcon();
         _window.Show();
+        _capturePanel.Show();
         if (_activeRegion is not null) _regionBorder.Show(_activeRegion);
     }
 
@@ -95,9 +101,19 @@ public partial class App : System.Windows.Application
     private async void CapturePersistentRegion()
     {
         if (_capture is null || _activeRegion is null || _activeRegion.IsHidden) return;
-        await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
+        var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
             MonitorDeviceName: _activeRegion.MonitorDeviceName));
+        if (frame is not null) _capturePanelViewModel?.CaptureCompleted();
         _regionBorder?.Show(_activeRegion);
+    }
+
+    private async void CaptureFromPanel(CapturePanelMode mode)
+    {
+        if (_capture is null) return;
+        if (mode == CapturePanelMode.Region && _activeRegion is not null) { CapturePersistentRegion(); return; }
+        var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
+        var frame = await _capture.CaptureAsync(new(captureMode));
+        if (frame is not null) _capturePanelViewModel?.CaptureCompleted();
     }
 
     private void CreateTrayIcon()
@@ -137,6 +153,7 @@ public partial class App : System.Windows.Application
         _isExiting = true;
         _trayIcon?.Dispose();
         _regionBorder?.Dispose();
+        _capturePanel?.Close();
         _hotkeys?.Dispose();
         _window?.Close();
         if (_runtime is not null) await _runtime.DisposeAsync();
