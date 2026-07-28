@@ -138,6 +138,11 @@ de fallback, de modo que una rama no puede reutilizar una caché con un grafo di
 Cuando cambie una referencia, regenere los locks deliberadamente con `dotnet restore
 VisualNotes.sln --force-evaluate` y revise el diff antes de integrarlo.
 
+La política de aceptación, inventario de licencias y controles de release están en
+`docs/dependencies.md`. El workflow `release.yml` es la única ruta admitida para publicar:
+produce binarios e instalador Authenticode, SBOM SPDX, hashes SHA-256 verificados y una
+atestación de procedencia vinculada al workflow y commit.
+
 El check agregado **Quality / Required quality gate** debe configurarse como requerido
 en el ruleset de `main`, junto con al menos una aprobación y la invalidación de
 aprobaciones cuando aparezcan commits nuevos. Active también la exigencia de que la

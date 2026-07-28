@@ -1,0 +1,153 @@
+name: Signed release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: SemVer to package (without v)
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-sign-attest:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+      DOTNET_NOLOGO: true
+      NUGET_PACKAGES: ${{ github.workspace }}\.nuget\packages
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - name: Resolve release version
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { $env:INPUT_VERSION }
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') { throw "Invalid SemVer: $version" }
+          "VERSION=$version" >> $env:GITHUB_ENV
+      - name: Restore immutable dependency graph
+        run: dotnet restore VisualNotes.sln --locked-mode
+      - name: Audit vulnerable NuGet dependencies
+        run: dotnet list VisualNotes.sln package --vulnerable --include-transitive --no-restore
+      - name: Build and publish application
+        run: >-
+          dotnet publish src/VisualNotes.App/VisualNotes.App.csproj
+          --configuration Release --no-restore
+          -p:Version=${{ env.VERSION }} -p:PublishSingleFile=false
+          --output artifacts/publish
+      - name: Import ephemeral Authenticode certificate
+        id: certificate
+        shell: pwsh
+        env:
+          SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGNING_CERTIFICATE) -or [string]::IsNullOrWhiteSpace($env:SIGNING_PASSWORD)) {
+            throw 'Release signing secrets are required; unsigned releases are forbidden.'
+          }
+          $path = Join-Path $env:RUNNER_TEMP 'visualnotes-signing.pfx'
+          [IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($env:SIGNING_CERTIFICATE))
+          $secure = ConvertTo-SecureString $env:SIGNING_PASSWORD -AsPlainText -Force
+          $certificate = Import-PfxCertificate -FilePath $path -CertStoreLocation Cert:\CurrentUser\My -Password $secure
+          Remove-Item $path -Force
+          "thumbprint=$($certificate.Thumbprint)" >> $env:GITHUB_OUTPUT
+      - name: Sign and verify first-party binaries
+        shell: pwsh
+        env:
+          THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
+        run: |
+          $signtool = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse |
+            Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          if (-not $signtool) { throw 'signtool.exe was not found.' }
+          $files = Get-ChildItem artifacts/publish -File | Where-Object { $_.Name -match '^VisualNotes\..*\.(exe|dll)$' }
+          if (-not $files) { throw 'No first-party binaries found to sign.' }
+          foreach ($file in $files) {
+            & $signtool sign /sha1 $env:THUMBPRINT /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $file.FullName
+            if ($LASTEXITCODE) { throw "Signing failed: $($file.Name)" }
+            & $signtool verify /pa /all $file.FullName
+            if ($LASTEXITCODE) { throw "Signature verification failed: $($file.Name)" }
+          }
+          "SIGNTOOL=$signtool" >> $env:GITHUB_ENV
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: artifacts/publish
+          format: spdx-json
+          output-file: artifacts/VisualNotes-${{ env.VERSION }}.spdx.json
+          upload-artifact: false
+      - name: Package portable application and installer
+        shell: pwsh
+        env:
+          VISUALNOTES_VERSION: ${{ env.VERSION }}
+          VISUALNOTES_PUBLISH_DIR: ${{ github.workspace }}\artifacts\publish
+          VISUALNOTES_OUTPUT_DIR: ${{ github.workspace }}\artifacts\release
+        run: |
+          New-Item artifacts/release -ItemType Directory -Force | Out-Null
+          Compress-Archive artifacts/publish/* "artifacts/release/VisualNotes-$env:VERSION-win-x64.zip"
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup 6 was not found on the release runner.' }
+          & $iscc eng/VisualNotes.iss
+          if ($LASTEXITCODE) { throw 'Installer compilation failed.' }
+          Move-Item "artifacts/VisualNotes-$env:VERSION.spdx.json" artifacts/release/
+      - name: Sign and verify installer
+        shell: pwsh
+        env:
+          THUMBPRINT: ${{ steps.certificate.outputs.thumbprint }}
+        run: |
+          $installer = Get-Item "artifacts/release/VisualNotes-$env:VERSION-win-x64-setup.exe"
+          & $env:SIGNTOOL sign /sha1 $env:THUMBPRINT /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $installer.FullName
+          if ($LASTEXITCODE) { throw 'Installer signing failed.' }
+          & $env:SIGNTOOL verify /pa /all $installer.FullName
+          if ($LASTEXITCODE) { throw 'Installer signature verification failed.' }
+      - name: Create and independently verify SHA-256 manifest
+        shell: pwsh
+        run: |
+          $assets = Get-ChildItem artifacts/release -File | Sort-Object Name
+          $lines = $assets | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
+          $lines | Set-Content artifacts/release/SHA256SUMS -Encoding ascii
+          foreach ($line in Get-Content artifacts/release/SHA256SUMS) {
+            $hash, $name = $line -split '  ', 2
+            $actual = (Get-FileHash (Join-Path artifacts/release $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $hash) { throw "Checksum mismatch: $name" }
+          }
+      - name: Attest release artifact provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/release/*
+      - name: Publish immutable workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VisualNotes-${{ env.VERSION }}
+          path: artifacts/release/*
+          if-no-files-found: error
+      - name: Publish GitHub release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$env:VERSION"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE) { gh release create $tag --verify-tag --generate-notes --title "VisualNotes $env:VERSION" }
+          gh release upload $tag artifacts/release/* --clobber
+      - name: Remove certificate from runner
+        if: always() && steps.certificate.outputs.thumbprint != ''
+        shell: pwsh
+        run: Remove-Item "Cert:\CurrentUser\My\${{ steps.certificate.outputs.thumbprint }}" -Force

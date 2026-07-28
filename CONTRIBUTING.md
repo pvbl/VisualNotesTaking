@@ -38,6 +38,10 @@ de Core, compruebe mutation testing según `docs/quality.md`.
   debe incluir justificación y el alcance mínimo.
 - Nunca acepte automáticamente archivos Verify `.received.*`; revise el diff y
   actualice solo el `.verified.*` intencional.
+- Toda dependencia nueva o actualizada debe cumplir la revisión de necesidad, licencia,
+  mantenimiento, transitivas y plan de retirada de `docs/dependencies.md`. Actualice
+  `Directory.Packages.props` y regenere los locks con `dotnet restore VisualNotes.sln
+  --force-evaluate`; no introduzca versiones en un `.csproj`.
 
 ## Definición de terminado
 
@@ -46,3 +50,5 @@ de Core, compruebe mutation testing según `docs/quality.md`.
 - No se introducen secretos ni datos personales.
 - La documentación pública refleja cambios de uso, arquitectura u operación.
 - El pull request incluye evidencia reproducible, no solo afirmaciones de calidad.
+- Los cambios de dependencias incluyen la evidencia de suministro exigida y el diff de
+  todos los `packages.lock.json` afectados.

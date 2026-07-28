@@ -39,6 +39,8 @@ jobs:
       - uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: moderate
+          deny-licenses: AGPL-1.0, AGPL-3.0, SSPL-1.0
+          comment-summary-in-pr: always
 
   build-and-test:
     name: Build, test and coverage
@@ -78,6 +80,15 @@ jobs:
         run: ./eng/coverage-gate.ps1 -Report TestResults/CoverageReport/Cobertura.xml -BaseRef $env:COVERAGE_BASE_REF
       - name: Audit vulnerable NuGet dependencies
         run: dotnet list VisualNotes.sln package --vulnerable --include-transitive --no-restore
+      - name: Reject package versions outside central management
+        shell: pwsh
+        run: |
+          $violations = Get-ChildItem -Recurse -Filter *.csproj |
+            Select-String -Pattern '<PackageReference\s+[^>]*Version\s*='
+          if ($violations) {
+            $violations | ForEach-Object { Write-Error $_.Line }
+            throw 'Package versions must be declared in Directory.Packages.props.'
+          }
       - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
