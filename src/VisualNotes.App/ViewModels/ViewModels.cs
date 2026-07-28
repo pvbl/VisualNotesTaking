@@ -183,9 +183,9 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand TogglePauseCommand { get; }
     public ICommand CaptureRegionCommand { get; }
     public ICommand RedefineRegionCommand { get; }
-    public RelayCommand UndoCommand { get; }
-    public RelayCommand MarkImportantCommand { get; }
-    public RelayCommand AddContextCommand { get; }
+    public AsyncRelayCommand UndoCommand { get; }
+    public AsyncRelayCommand MarkImportantCommand { get; }
+    public AsyncRelayCommand AddContextCommand { get; }
     public event Func<Task>? CaptureRegionRequested;
     public event Func<Task>? RedefineRegionRequested;
 
