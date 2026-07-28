@@ -1,79 +1,329 @@
 # VisualNotes
 
-Aplicación de escritorio para Windows que convierte capturas de pantalla en apuntes
-estructurados. VisualNotes organiza el trabajo por sesiones y secciones, permite
-capturar regiones persistentes o pantallas completas, enriquecer las capturas con un
-modelo de lenguaje visual y revisar el documento antes de exportarlo.
+VisualNotes es una aplicación de escritorio para Windows que convierte capturas de
+pantalla en apuntes estructurados. Organiza el trabajo por sesiones y secciones,
+permite capturar una región, una ventana, un monitor o todo el escritorio, y ofrece
+una vista previa antes de exportar el resultado a Word (`.docx`).
 
-> **Estado:** proyecto en desarrollo. No se publican todavía binarios firmados ni una
-> versión estable. Las credenciales de proveedores externos deben configurarse en la
-> aplicación y nunca almacenarse en el repositorio.
+> [!IMPORTANT]
+> El proyecto sigue en desarrollo: todavía no hay una versión estable ni binarios
+> firmados para uso general. No utilices capturas o credenciales sensibles en un
+> entorno que no controles.
 
-## Funcionalidades
+## Qué incluye
 
 - Captura del escritorio virtual, monitor actual, ventana activa o región persistente.
 - Sesiones con secciones jerárquicas, pausa, reanudación y recuperación local.
 - Clasificación, edición, deduplicación y reprocesado de capturas.
-- Integración con OpenAI y Gemini mediante adaptadores HTTP resilientes.
-- Vista previa semántica y exportación a Open XML (`.docx`).
+- Adaptadores para análisis visual con OpenAI y Google Gemini.
+- Vista previa semántica y exportación Open XML (`.docx`).
 - Persistencia local con SQLite, copias de seguridad y diagnósticos estructurados.
-- Atajos globales, icono en la bandeja y soporte para varios monitores/DPI.
+- Atajos globales, icono en la bandeja y soporte para varios monitores y DPI.
 
 ## Requisitos
 
-| Requisito | Motivo |
-|---|---|
-| Windows 10 versión 2004 (build 19041) o posterior, Windows 11, x64 | Es la plataforma mínima y la única arquitectura del instalador firmado. |
-| .NET 8 SDK | Compilación, pruebas y herramientas locales. |
-| Visual Studio 2022 (opcional) | Desarrollo y depuración de escritorio. |
-| Clave de OpenAI o Gemini (opcional) | Solo para análisis real con un proveedor externo. |
+| Requisito | Obligatorio | Notas |
+|---|---:|---|
+| Windows 10 2004 (build 19041) o posterior | Sí | Windows 11 también es compatible. La aplicación usa WPF y APIs de escritorio de Windows. |
+| Equipo x64 | Sí | Es la arquitectura de publicación e instalador configurada actualmente. |
+| [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) | Sí, al compilar | Comprueba la instalación con `dotnet --version`; debe devolver `8.x`. No basta con instalar solo el runtime. |
+| Git | Sí, al clonar | También puedes descargar el código fuente como ZIP. |
+| Visual Studio 2022 | No | Si lo usas, instala la carga **Desarrollo de escritorio de .NET**. |
+| Clave de OpenAI o Gemini | No | Las capturas y la gestión local funcionan sin clave; se necesita para llamadas reales al proveedor. |
 
-## Inicio rápido
+> [!NOTE]
+> La compilación y ejecución de la interfaz requieren Windows. Aunque .NET permita
+> restaurar parte de la solución en otros sistemas, la aplicación no es
+> multiplataforma.
+
+## Instalación desde el código fuente
+
+### 1. Clonar y entrar en el repositorio
+
+Sustituye la URL por la de tu fork o la ubicación desde la que obtuviste el proyecto:
 
 ```powershell
-git clone <url-del-repositorio>
+git clone <URL-DEL-REPOSITORIO>
 cd VisualNotesTaking
-dotnet tool restore
-dotnet restore VisualNotes.sln
-dotnet build VisualNotes.sln --configuration Release
-dotnet run --project src/VisualNotes.App
 ```
 
-Los datos se guardan bajo `%LOCALAPPDATA%\VisualNotes`, incluida la base SQLite y
-los diagnósticos. Las claves se protegen mediante DPAPI. Para experimentar sin llamar
-a servicios externos se pueden ejecutar todas las pruebas unitarias, que emplean
-dobles o servidores HTTP simulados.
+### 2. Restaurar y compilar
 
-En el primer inicio se eligen la carpeta de almacenamiento, el proveedor, el
-consentimiento de privacidad y los atajos, y se puede ejecutar una captura de prueba.
-El instalador conserva deliberadamente sesiones, credenciales y configuración tanto
-en actualizaciones/reparaciones como al desinstalar.
+Ejecuta estos comandos desde la raíz del repositorio:
 
-## Verificación local
+```powershell
+dotnet restore VisualNotes.sln
+dotnet build VisualNotes.sln --configuration Release --no-restore
+```
+
+Si solo quieres arrancar la aplicación durante el desarrollo, también puedes
+compilar en `Debug`. Las herramientas locales para cobertura y mutation testing no
+son necesarias para ejecutar VisualNotes; los contribuidores pueden instalarlas con
+`dotnet tool restore`.
+
+### 3. Iniciar VisualNotes
+
+```powershell
+dotnet run --project src/VisualNotes.App/VisualNotes.App.csproj --configuration Release --no-build
+```
+
+Si no ejecutaste antes el `build`, elimina `--no-build` del comando. También puedes
+abrir `VisualNotes.sln` en Visual Studio, seleccionar `VisualNotes.App` como proyecto
+de inicio y pulsar **F5**.
+
+### 4. Completar el primer inicio
+
+El asistente inicial solicita:
+
+1. **Carpeta de almacenamiento.** Ahí se guardan la base SQLite, capturas y
+   diagnósticos. La ubicación predeterminada es `%LOCALAPPDATA%\VisualNotes`.
+2. **Proveedor de análisis.** Selecciona **Ninguno**, **OpenAI** o **Gemini**.
+3. **Consentimiento de privacidad.** Actívalo solo si autorizas el envío de capturas
+   al proveedor elegido.
+4. **Atajos globales.** Se pueden dejar habilitados o configurar después.
+5. **Captura de prueba.** Comprueba que Windows permite capturar la pantalla.
+
+Para una ejecución aislada (por ejemplo, durante desarrollo) puedes indicar otra
+carpeta antes de abrir la aplicación:
+
+```powershell
+$env:VISUALNOTES_DATA_DIRECTORY = "$env:TEMP\VisualNotes-dev"
+dotnet run --project src/VisualNotes.App/VisualNotes.App.csproj
+```
+
+La variable solo cambia la carpeta de datos para ese proceso o terminal. No pongas
+claves API en esta variable ni en archivos del repositorio.
+
+## Configurar una API
+
+### Obtener una clave
+
+Utiliza el panel oficial del proveedor y revisa sus condiciones, disponibilidad y
+facturación antes de crearla:
+
+- **OpenAI:** [crear y administrar claves de API](https://platform.openai.com/api-keys).
+- **Google Gemini:** [obtener una clave en Google AI Studio](https://aistudio.google.com/app/apikey).
+
+Una suscripción a una aplicación de chat no implica necesariamente crédito para su
+API. La cuenta del proveedor debe tener acceso al modelo configurado y, cuando
+corresponda, facturación activa. Nunca pegues una clave en `README.md`, archivos
+`.json`, capturas, incidencias o commits.
+
+### Guardar la clave en VisualNotes
+
+1. Abre VisualNotes y entra en **Configuración**.
+2. En **Configuración por niveles**, selecciona el proveedor y modelo deseados. El
+   valor predeterminado visible actualmente es OpenAI con `gpt-4.1-mini`.
+3. En **Credenciales de API**, pega la clave en **Nueva credencial**.
+4. Pulsa **Guardar**. La interfaz vacía el campo y muestra la credencial enmascarada.
+5. Configura los dos perfiles según el flujo que vayas a utilizar:
+   - **Extracción:** análisis de la imagen y obtención de contenido estructurado.
+   - **Composición:** generación o reorganización del documento final.
+   Puedes usar la misma clave en ambos perfiles si la cuenta tiene los permisos
+   necesarios, o claves distintas para separar acceso y consumo.
+6. Pulsa **Eliminar** cuando quieras revocar la copia local y revoca también la clave
+   desde el panel del proveedor si pudo quedar expuesta.
+
+> [!WARNING]
+> **Verificar** comprueba que el texto introducido coincide con la copia guardada;
+> actualmente no realiza una petición al proveedor ni valida saldo, permisos o el
+> nombre del modelo. Además, los adaptadores OpenAI/Gemini y la pantalla de
+> credenciales están implementados, pero el flujo principal todavía no conecta esas
+> credenciales con un análisis remoto completo. Esta limitación es propia del estado
+> de desarrollo actual, no un error de tu clave.
+
+### Cómo se protegen las credenciales
+
+- Se cifran mediante Windows DPAPI para el usuario actual.
+- Se almacenan fuera de la carpeta de sesiones, en
+  `%LOCALAPPDATA%\VisualNotesCredentials`.
+- No se incluyen en las exportaciones portables ni en las copias de seguridad.
+- No se pueden trasladar copiando el archivo cifrado a otro usuario o equipo.
+- La aplicación nunca vuelve a mostrar el valor: solo indica que existe mediante una
+  máscara.
+
+Para rotar una clave, crea una nueva en el proveedor, guárdala en el perfil
+correspondiente, comprueba tu flujo y después revoca la anterior. No edites a mano
+los archivos `.credential`.
+
+## Cómo utilizar VisualNotes
+
+### Flujo básico
+
+1. **Crea o recupera una sesión.** En **Sesión**, rellena al menos un nombre que te
+   permita identificarla y pulsa **Crear desde cero**. Para retomar trabajo anterior,
+   selecciónalo en **Sesiones recientes** y pulsa **Continuar**.
+2. **Organiza el contenido.** Selecciona una sección, edita su título y descripción y
+   usa **Crear subsección** cuando necesites otro bloque. Pulsa **Cambiar a esta
+   sección** para convertirla en el destino activo.
+3. **Elige qué capturar.** Utiliza el panel flotante, que permanece por encima de
+   otras ventanas, selecciona un modo y pulsa **Capturar**.
+4. **Pausa cuando sea necesario.** El botón **Pausar / reanudar** detiene o recupera
+   el estado de la sesión. El nombre, sección y estado actuales aparecen tanto en el
+   panel como en la barra lateral.
+5. **Revisa el resultado.** Abre **Capturas** para filtrar y seleccionar elementos,
+   añadir contexto, instrucciones o etiquetas, moverlos de sección, excluirlos,
+   eliminarlos o solicitar su reprocesado.
+6. **Prepara la salida.** En **Documento**, selecciona qué elementos incluir,
+   reordénalos, elige el alcance y pulsa **Exportar**.
+
+Los cambios de sesión se guardan en la base de datos local. Cerrar la ventana
+principal no termina necesariamente el proceso: VisualNotes continúa en la bandeja
+para que puedas seguir capturando. Utiliza el menú del icono para volver a abrirla o
+salir.
+
+### Modos de captura
+
+| Modo del panel | Qué captura | Comportamiento |
+|---|---|---|
+| **Region** | Una parte rectangular de la pantalla | Si ya hay una región persistente, la reutiliza; de lo contrario permite seleccionar una región puntual. |
+| **Monitor** | El monitor actual | Captura la pantalla en la que se encuentra el punto de referencia activo. |
+| **Desktop** | Todo el escritorio virtual | Incluye el área combinada de todos los monitores. |
+| **Window** | La ventana activa | Captura la ventana que estaba activa antes de iniciar la acción. |
+
+Para definir o cambiar la región persistente usa **Ctrl+Mayús+R**. Durante la
+selección:
+
+- arrastra para marcar el rectángulo;
+- pulsa **Intro** para confirmar o **Esc** para cancelar;
+- usa las flechas para moverlo y **Mayús + flecha** para cambiar su tamaño;
+- pulsa **R** para reiniciar, **L** para bloquear, **H** para ocultar o **Supr** para
+  eliminar la selección.
+
+Una vez definida, **Ctrl+Mayús+C** captura esa región. También puedes hacerlo desde
+el menú del icono de la bandeja.
+
+### Panel flotante y atajos
+
+El panel flotante permite trabajar sin regresar a la ventana principal:
+
+- **Ctrl+C:** capturar con el modo seleccionado cuando el panel tiene el foco.
+- **Espacio:** pausar o reanudar la sesión cuando el panel tiene el foco.
+- **Ctrl+M:** alternar el modo mínimo del panel.
+- **Ctrl+Z:** deshacer la última acción compatible.
+- **Sección anterior/siguiente:** cambia la sección activa sin detener la sesión.
+- **Importante** y **Contexto:** actúan sobre la captura correspondiente cuando el
+  flujo de capturas está conectado.
+
+En **Configuración → Atajos globales** puedes activar o modificar los atajos que
+funcionan aunque VisualNotes no tenga el foco. Los valores de tecla se muestran como
+códigos de tecla virtual de Windows. Si una combinación ya está registrada por otra
+aplicación, VisualNotes muestra el conflicto al guardar; elige otra combinación.
+
+### Revisar capturas y preparar el documento
+
+En **Capturas** puedes usar varios filtros a la vez: sección, etiqueta, estado,
+importancia y revisión. La selección múltiple permite excluir, eliminar, restaurar,
+reprocesar o mover varios elementos de una sola vez. En el panel de detalle puedes:
+
+- añadir información que ayude a interpretar la imagen;
+- escribir una instrucción específica de procesamiento;
+- aplicar etiquetas rápidas o escribir etiquetas propias;
+- volver a analizar la captura o regenerar su nota.
+
+En **Documento**, revisa cualquier aviso de contenido pendiente o archivos ausentes.
+Selecciona una fila para incluirla, excluirla o cambiar su posición. El alcance de
+exportación determina si se prepara todo el documento o solo una parte.
+
+> [!WARNING]
+> En la versión de desarrollo actual, el selector de pantalla y el contador del panel
+> funcionan, pero la captura todavía no se incorpora al repositorio de la sesión. Por
+> ello, **Capturas** puede aparecer vacío y **Documento → Exportar** todavía no escribe
+> un archivo desde el flujo principal. Los botones **Importante**, **Contexto** y las
+> acciones de análisis dependen igualmente de esa conexión pendiente. Estas pantallas
+> describen el flujo previsto y sirven para desarrollar y validar la interfaz.
+
+## Datos locales y reinicio de la configuración
+
+| Contenido | Ubicación predeterminada |
+|---|---|
+| Configuración del primer inicio | `%LOCALAPPDATA%\VisualNotes\bootstrap.json` |
+| Base de datos de sesiones | `%LOCALAPPDATA%\VisualNotes\visualnotes.db` |
+| Diagnósticos | `%LOCALAPPDATA%\VisualNotes\diagnostics` |
+| Credenciales cifradas | `%LOCALAPPDATA%\VisualNotesCredentials` |
+
+La carpeta de datos puede ser distinta si la elegiste en el asistente o definiste
+`VISUALNOTES_DATA_DIRECTORY`. Actualizar, reparar o desinstalar la aplicación conserva
+deliberadamente sesiones, configuración y credenciales.
+
+Antes de borrar datos, cierra VisualNotes y guarda una copia si la necesitas. Para
+repetir únicamente el asistente inicial, elimina `bootstrap.json`; esto no elimina la
+base de datos ni las credenciales. Para retirar una clave, utiliza preferentemente el
+botón **Eliminar** y revócala también en el proveedor.
+
+## Solución de problemas
+
+### `dotnet` no se reconoce o aparece una versión incorrecta
+
+Instala el **SDK de .NET 8**, abre una terminal nueva y ejecuta:
+
+```powershell
+dotnet --info
+```
+
+### La restauración de paquetes falla
+
+Comprueba la conexión y el acceso a NuGet, y vuelve a restaurar desde la raíz:
+
+```powershell
+dotnet nuget locals all --clear
+dotnet restore VisualNotes.sln
+```
+
+Si el problema continúa, revisa que ningún proxy o cortafuegos esté bloqueando
+`https://api.nuget.org` y conserva el mensaje completo para diagnosticarlo.
+
+### No aparece la ventana al volver a abrir
+
+VisualNotes puede seguir ejecutándose en la bandeja del sistema. Usa el icono de
+VisualNotes y selecciona **Abrir VisualNotes** antes de iniciar otra instancia.
+
+### La captura no funciona
+
+- Ejecuta la captura de prueba del asistente.
+- Comprueba que la sesión de Windows esté desbloqueada.
+- Prueba primero con una pantalla local; Escritorio remoto, máquinas virtuales y
+  software de protección pueden limitar la captura.
+- Revisa los archivos JSON de `diagnostics`, eliminando información sensible antes
+  de compartirlos.
+
+### La clave está guardada pero el análisis no funciona
+
+Confirma el proveedor y modelo configurados, el consentimiento de privacidad, el
+acceso del proyecto del proveedor y su facturación. Ten en cuenta también la
+limitación de integración remota descrita en [Configurar una API](#configurar-una-api):
+el botón **Verificar** no prueba una llamada real.
+
+## Verificación para desarrollo
 
 ```powershell
 # Formato y analizadores
 dotnet format VisualNotes.sln --verify-no-changes --severity error
 dotnet build VisualNotes.sln --configuration Release /warnaserror
 
-# Suite automatizada que no depende de UI ni servicios externos
+# Suite que no depende de UI ni de proveedores externos
 dotnet test VisualNotes.sln --configuration Release `
   --filter "Category=Unit|Category=Architecture|Category=Integration"
 ```
 
-Las pruebas UI requieren una sesión de escritorio de Windows. Consulte la
-[estrategia de pruebas](tests/README.md) para filtros, snapshots, fixtures y la matriz
-manual de captura.
+Las pruebas de UI requieren Windows con una sesión de escritorio interactiva y
+desbloqueada. Consulta la [guía detallada de pruebas](tests/README.md) para conocer
+los filtros, snapshots, fixtures y la matriz manual de captura.
 
-## Calidad y métricas
+## Estructura del repositorio
 
-El repositorio aplica analizadores de .NET, Meziantou y Sonar, warnings como errores
-en `Release`/CI, reglas de arquitectura, cobertura Cobertura, mutation testing y
-benchmarks. Los resultados se generan en CI como artefactos; **no se inventan ni se
-mantienen porcentajes manuales en este README**, porque quedarían obsoletos.
-
-La [guía de calidad](docs/quality.md) explica cómo obtener cobertura, mutation score,
-resultados de tests y medidas de rendimiento, además de qué puertas son obligatorias.
+```text
+src/
+  VisualNotes.App/              WPF, vistas, view models y adaptadores Windows
+  VisualNotes.Core/             dominio y casos de uso sin dependencias de UI
+  VisualNotes.Infrastructure/   SQLite, archivos, proveedores, exportación y diagnóstico
+tests/
+  VisualNotes.UnitTests/        lógica y contratos aislados
+  VisualNotes.IntegrationTests/ persistencia, archivos y exportación
+  VisualNotes.ArchitectureTests/ límites entre capas
+  VisualNotes.UiTests/          automatización de escritorio Windows
+  VisualNotes.Benchmarks/       escenarios BenchmarkDotNet
+```
 
 ## Documentación
 
@@ -83,28 +333,13 @@ resultados de tests y medidas de rendimiento, además de qué puertas son obliga
 - [Guía detallada de pruebas](tests/README.md)
 - [Cómo contribuir](CONTRIBUTING.md)
 
-## Estructura
-
-```text
-src/
-  VisualNotes.App/             WPF, vistas, view models y adaptadores Windows
-  VisualNotes.Core/            dominio y casos de uso sin dependencias de UI
-  VisualNotes.Infrastructure/  SQLite, archivos, proveedores, exportación y diagnóstico
-tests/
-  VisualNotes.UnitTests/       lógica y contratos aislados
-  VisualNotes.IntegrationTests persistencia, archivos y exportación
-  VisualNotes.ArchitectureTests límites entre capas
-  VisualNotes.UiTests/         automatización de escritorio Windows
-  VisualNotes.Benchmarks/      escenarios BenchmarkDotNet
-```
-
 ## Seguridad y privacidad
 
-- No incluya claves, capturas reales ni datos personales en commits o fixtures.
-- Revise los paquetes de diagnóstico antes de compartirlos.
+- No incluyas claves, capturas reales ni datos personales en commits o fixtures.
+- Revisa los paquetes de diagnóstico antes de compartirlos.
 - Las llamadas a modelos pueden enviar imágenes y texto al proveedor configurado;
-  use únicamente contenido cuya transferencia esté autorizada.
-- Informe vulnerabilidades por un canal privado al equipo mantenedor, no mediante una
+  usa únicamente contenido cuya transferencia esté autorizada.
+- Informa vulnerabilidades por un canal privado al equipo mantenedor, no mediante una
   incidencia pública.
 
 ## Licencia
