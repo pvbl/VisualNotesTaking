@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[VisualNotes.*]*</Include>
+          <Exclude>[*.Tests]*,[VisualNotes.Benchmarks]*</Exclude>
+          <ExcludeByAttribute>CompilerGeneratedAttribute,GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <!-- EF migrations are generated snapshots. The remaining files are WPF
+               code-behind and composition-root glue with no domain decisions. -->
+          <ExcludeByFile>**/Migrations/*.cs,**/*.g.cs,**/*.g.i.cs,**/App.xaml.cs,**/MainWindow.xaml.cs,**/Views/*.xaml.cs,**/VisualNotesRuntime.cs,**/LanguageModelServiceCollectionExtensions.cs</ExcludeByFile>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SingleHit>false</SingleHit>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

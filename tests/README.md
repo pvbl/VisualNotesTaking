@@ -28,11 +28,18 @@ Las pruebas de integración aplican límites explícitos de 10–20 segundos a o
 ## Cobertura e informe
 
 ```bash
-dotnet test VisualNotes.sln --filter 'Category!=UI' --collect:'XPlat Code Coverage' --results-directory TestResults
-reportgenerator '-reports:TestResults/**/coverage.cobertura.xml' '-targetdir:TestResults/CoverageReport' '-reporttypes:Html;Cobertura'
+dotnet test VisualNotes.sln --filter 'Category!=UI' --settings coverage.runsettings --collect:'XPlat Code Coverage' --results-directory TestResults
+reportgenerator '-reports:TestResults/**/coverage.cobertura.xml' '-targetdir:TestResults/CoverageReport' '-reporttypes:Html;Cobertura;TextSummary'
+pwsh ./eng/coverage-gate.ps1 -Report TestResults/CoverageReport/Cobertura.xml -BaseRef origin/main
 ```
 
-El primer formato genera un sitio HTML y el segundo `Cobertura.xml` para CI.
+El informe contiene el sitio HTML, `Cobertura.xml` combinado y `Summary.txt`. El gate
+exige 75/65 global, 90/85 en Core, 98/95 en áreas críticas y 90/85 sobre líneas nuevas
+(líneas/ramas). CI publica el directorio completo como artefacto incluso si el gate
+falla. Las exclusiones se limitan a código generado, migraciones EF y glue code XAML o
+de composición justificado en `coverage.runsettings`; nunca se excluye lógica difícil.
+No añada pruebas vacías, caminos ejecutados sin comprobar ni aserciones irrelevantes
+para mover la métrica: cada test debe verificar comportamiento observable o invariantes.
 
 ## Windows y UI
 

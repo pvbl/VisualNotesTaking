@@ -12,14 +12,17 @@ de CI son la fuente de verdad; no se deben copiar porcentajes a mano al README.
 | Compilación | analizadores .NET, Meziantou y Sonar | Cero warnings en `Release` y CI. |
 | Tests principales | xUnit: unitarios, arquitectura e integración | Todos pasan. |
 | UI | xUnit en runner Windows con escritorio | Todos pasan en su job independiente. |
-| Cobertura | coverlet + ReportGenerator | Se publica Cobertura/HTML; aún no hay umbral de bloqueo. |
+| Cobertura global | coverlet + ReportGenerator | Bloquea por debajo de 75 % de líneas o 65 % de ramas. |
+| Cobertura de Core | `eng/coverage-gate.ps1` | Objetivo reforzado: 90 % de líneas y 85 % de ramas. |
+| Código crítico | `eng/coverage-gate.ps1` | 98 % de líneas y 95 % de ramas. |
+| Código nuevo | diff contra la rama base | 90 % de líneas y 85 % de ramas modificadas. |
 | Mutaciones | Stryker.NET sobre algoritmos críticos | Bloquea por debajo de 60 %; 75 % bajo, 90 % alto. |
 | Rendimiento | BenchmarkDotNet | Se registra como tendencia; aún no hay presupuesto automático. |
 | Secretos | Gitleaks | Ningún secreto detectado. |
 
-La ausencia de umbral de cobertura o rendimiento es deliberadamente visible: primero
-se debe capturar una línea base estable y después acordar un presupuesto que no premie
-tests superficiales. El mutation score complementa, pero no sustituye, la cobertura.
+Los umbrales globales son el suelo inicial, no el destino. Core se mantiene en el
+objetivo progresivo 90/85 y el código nuevo no puede esconderse detrás de cobertura
+histórica. El mutation score complementa, pero no sustituye, la cobertura.
 
 ## Obtener métricas
 
@@ -39,16 +42,30 @@ El TRX contiene total, aprobadas, fallidas, omitidas y duración. Archive
 ```powershell
 dotnet tool restore
 dotnet test VisualNotes.sln --configuration Release --filter "Category!=UI&Category!=External" `
-  --collect:"XPlat Code Coverage" --results-directory TestResults
+  --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults
 dotnet reportgenerator `
   "-reports:TestResults/**/coverage.cobertura.xml" `
   "-targetdir:TestResults/CoverageReport" `
   "-reporttypes:Html;Cobertura;TextSummary"
 Get-Content TestResults/CoverageReport/Summary.txt
+./eng/coverage-gate.ps1 -Report TestResults/CoverageReport/Cobertura.xml -BaseRef origin/main
 ```
 
-Informe al menos cobertura de líneas y ramas. Compare contra la rama base y revise las
-líneas sin cubrir de código nuevo; un porcentaje global aislado no demuestra calidad.
+El gate calcula líneas y ramas globales, de Core, críticas y nuevas. En un pull request
+usa el ancestro común con la rama base; en un push usa el commit anterior. Si un cambio
+no contiene líneas instrumentables, el gate de código nuevo se declara no aplicable.
+
+Se consideran críticos la normalización de cajas, la resolución/modelo de
+configuración, las reglas de caché/deduplicación, las transiciones de la cola durable y
+las reglas de privacidad de respuestas, configuración portable y diagnósticos. Sus
+patrones están enumerados explícitamente en `eng/coverage-gate.ps1` para que una nueva
+área crítica requiera una decisión revisable, no una exclusión implícita.
+
+`coverage.runsettings` excluye solamente artefactos generados por compilador, las
+migraciones generadas por EF y glue code sin decisiones de dominio: code-behind XAML y
+raíces de composición/registro. Adaptadores, persistencia y lógica difícil permanecen
+instrumentados. Toda nueva exclusión debe justificar qué genera el archivo o por qué
+es exclusivamente ensamblado de dependencias.
 
 ### Mutation testing
 
@@ -72,22 +89,21 @@ de capturas 1080p/1440p/4K, filtrado de 1.000 capturas y exportación DOCX grand
 en hardware y configuración equivalentes; no trate resultados de máquinas distintas
 como una regresión concluyente.
 
-## Línea base
+## Evolución de los objetivos
 
-No hay métricas numéricas verificadas en este checkout porque deben producirse con el
-.NET 8 SDK y, para la solución completa, Windows. Para establecer la primera línea base:
-
-1. Ejecute los cuatro bloques anteriores en el mismo commit de un runner Windows.
-2. Adjunte TRX, Cobertura/HTML, Stryker y BenchmarkDotNet como artefactos.
-3. Registre fecha, SHA, versión del SDK, runner y filtros.
-4. Observe varios runs antes de fijar umbrales de cobertura o rendimiento.
-5. Cuando la señal sea estable, eleve los umbrales gradualmente y documente el motivo.
+El suelo global inicial es 75/65. Core ya expresa el siguiente objetivo, 90/85, y las
+áreas críticas se acercan al 100 % con 98/95. Los umbrales solo pueden mantenerse o
+subir cuando la señal sea estable; bajarlos exige una decisión explícita y documentada.
+El informe HTML, Cobertura combinado y resumen textual se publican juntos como el
+artefacto `coverage` incluso si falla el gate, para permitir diagnosticar el resultado.
 
 ## Interpretación responsable
 
 - **Tests:** un total alto no implica escenarios relevantes; revise categorías y
   casos límite.
 - **Cobertura:** mida línea y rama, y no excluya código difícil sin justificación.
+- **Código nuevo:** revise el diff además del total; no acepte aserciones irrelevantes,
+  tests vacíos ni ejecución sin comprobar resultados para satisfacer el porcentaje.
 - **Mutaciones:** investigue supervivientes en vez de perseguir el 100 % ciegamente.
 - **Rendimiento:** use mediana/distribución y asignaciones, no una única ejecución.
 - **Calidad estática:** cero warnings no reemplaza revisión de diseño, seguridad y UX.
