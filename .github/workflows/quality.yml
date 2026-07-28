@@ -1,11 +1,26 @@
 name: Quality
+
 on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  DOTNET_NOLOGO: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
 jobs:
   secret-scan:
+    name: Secrets / Gitleaks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -13,38 +28,116 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  core-tests:
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+
+  build-and-test:
+    name: Build, test and coverage
     runs-on: windows-latest
-    timeout-minutes: 20
-    env: { CI: true }
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: 8.0.x }
-      - run: dotnet tool restore
-      - run: dotnet restore VisualNotes.sln
-      - run: dotnet format VisualNotes.sln --verify-no-changes --no-restore --severity error
-      - run: dotnet build VisualNotes.sln --configuration Release --no-restore /warnaserror
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - name: Restore tools
+        run: dotnet tool restore
+      - name: Restore packages from lock files
+        run: dotnet restore VisualNotes.sln --locked-mode
+      - name: Check formatting
+        run: dotnet format VisualNotes.sln --verify-no-changes --no-restore
+      - name: Build Debug with warnings as errors
+        run: dotnet build VisualNotes.sln --configuration Debug --no-restore --warnaserror -bl:TestResults/logs/build-debug.binlog
+      - name: Build Release with warnings as errors
+        run: dotnet build VisualNotes.sln --configuration Release --no-restore --warnaserror -bl:TestResults/logs/build-release.binlog
       - name: Unit, architecture and integration tests
-        run: dotnet test VisualNotes.sln --configuration Release --no-build --filter "Category=Unit|Category=Architecture|Category=Integration" --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults
-      - name: HTML and Cobertura reports
+        run: >-
+          dotnet test VisualNotes.sln --configuration Release --no-build
+          --filter "Category=Unit|Category=Architecture|Category=Integration"
+          --settings coverage.runsettings --collect:"XPlat Code Coverage"
+          --logger "trx;LogFileName=quality.trx" --results-directory TestResults
+      - name: Generate HTML and Cobertura reports
+        if: always()
         run: reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/CoverageReport" "-reporttypes:Html;Cobertura;TextSummary"
-      - name: Coverage quality gates
+      - name: Enforce coverage thresholds
         shell: pwsh
         env:
           COVERAGE_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: ./eng/coverage-gate.ps1 -Report TestResults/CoverageReport/Cobertura.xml -BaseRef $env:COVERAGE_BASE_REF
-      - name: Publish coverage report
+      - name: Audit vulnerable NuGet dependencies
+        run: dotnet list VisualNotes.sln package --vulnerable --include-transitive --no-restore
+      - name: Publish test results
         if: always()
         uses: actions/upload-artifact@v4
-        with: { name: coverage, path: TestResults/CoverageReport }
+        with:
+          name: test-results
+          path: TestResults/**/*.trx
+          if-no-files-found: warn
+      - name: Publish coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            TestResults/**/coverage.cobertura.xml
+            TestResults/CoverageReport/**
+          if-no-files-found: warn
+      - name: Publish build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: TestResults/logs/**
+          if-no-files-found: warn
 
-  benchmarks:
+  ui-tests:
+    name: Windows UI tests
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: 8.0.x }
-      - run: dotnet run --configuration Release --project tests/VisualNotes.Benchmarks -- --filter "*"
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - name: Restore packages from lock files
+        run: dotnet restore tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj --locked-mode
+      - name: Run UI tests
+        run: >-
+          dotnet test tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj
+          --configuration Release --no-restore --warnaserror
+          --filter "Category=UI&Category!=E2E"
+          --logger "trx;LogFileName=ui.trx" --results-directory TestResults
+      - name: Publish UI results and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-results
+          path: TestResults/**
+          if-no-files-found: warn
+
+  quality-gate:
+    name: Required quality gate
+    if: always()
+    needs: [secret-scan, dependency-review, build-and-test, ui-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every quality job
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          [[ "$RESULTS" != *failure* && "$RESULTS" != *cancelled* ]]

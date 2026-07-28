@@ -1,0 +1,38 @@
+name: Scheduled benchmarks
+
+on:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmarks:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - run: dotnet restore tests/VisualNotes.Benchmarks/VisualNotes.Benchmarks.csproj --locked-mode
+      - name: Run benchmarks
+        run: dotnet run --configuration Release --no-restore --project tests/VisualNotes.Benchmarks -- --filter "*"
+      - name: Publish benchmark results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: BenchmarkDotNet.Artifacts/**
+          if-no-files-found: warn

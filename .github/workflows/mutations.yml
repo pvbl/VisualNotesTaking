@@ -27,15 +27,25 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mutations-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   core-mutations:
     runs-on: windows-latest
     timeout-minutes: 60
+    env:
+      CI: true
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: "**/packages.lock.json"
+      - run: dotnet restore VisualNotes.sln --locked-mode
       - run: dotnet tool restore
       - name: Mutate critical VisualNotes.Core behavior
         run: dotnet stryker
