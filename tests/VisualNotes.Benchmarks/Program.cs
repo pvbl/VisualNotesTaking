@@ -11,6 +11,7 @@ BenchmarkRunner.Run<DocumentBenchmarks>();
 BenchmarkRunner.Run<ScreenshotStorageBenchmarks>();
 BenchmarkRunner.Run<CaptureListBenchmarks>();
 BenchmarkRunner.Run<OpenXmlExportBenchmarks>();
+BenchmarkRunner.Run<LocalSearchBenchmarks>();
 
 [MemoryDiagnoser]
 public class DocumentBenchmarks
@@ -87,4 +88,28 @@ public class OpenXmlExportBenchmarks
 
     [GlobalCleanup]
     public void Cleanup() { if (File.Exists(_path)) File.Delete(_path); }
+}
+
+[MemoryDiagnoser]
+public class LocalSearchBenchmarks
+{
+    private LocalSearchIndex _index = null!;
+
+    [Params(10_000, 50_000)] public int Blocks { get; set; }
+
+    [GlobalSetup]
+    public void Setup()
+    {
+        _index = new LocalSearchIndex();
+        var sessionId = Guid.NewGuid();
+        for (var index = 0; index < Blocks; index++)
+        {
+            _index.Upsert(new(Guid.NewGuid(), sessionId, $"Tema {index}", "Contexto de la lección",
+                $"Extracción Unicode número {index}: árbol y matriz", "Código `resolver_matriz` y fórmula E=mc^2",
+                index % 2 == 0 ? ["álgebra", "código"] : ["física"]));
+        }
+    }
+
+    [Benchmark(Description = "Búsqueda local sobre decenas de miles de bloques")]
+    public IReadOnlyList<SearchResult> Search() => _index.Search("resolver_matriz formula", limit: 20);
 }
