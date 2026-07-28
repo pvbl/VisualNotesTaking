@@ -124,7 +124,7 @@ public partial class App : System.Windows.Application
         if (_capture is null || _activeRegion is null || _activeRegion.IsHidden) return;
         var frame = await _capture.CaptureAsync(new(ScreenCaptureMode.OneTimeRegion, _activeRegion.Bounds,
             MonitorDeviceName: _activeRegion.MonitorDeviceName));
-        if (frame is not null) _capturePanelViewModel?.CaptureCompleted();
+        if (frame is not null) await PersistCapturedFrameAsync(frame);
         _regionBorder?.Show(_activeRegion);
     }
 
@@ -134,7 +134,7 @@ public partial class App : System.Windows.Application
         if (mode == CapturePanelMode.Region && _activeRegion is not null) { CapturePersistentRegion(); return; }
         var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
         var frame = await _capture.CaptureAsync(new(captureMode));
-        if (frame is not null) _capturePanelViewModel?.CaptureCompleted();
+        if (frame is not null) await PersistCapturedFrameAsync(frame);
     }
 
     private void CreateTrayIcon()
@@ -186,15 +186,83 @@ public partial class App : System.Windows.Application
 
     private static void ShowError(UserFacingError error) => MessageBox.Show(error.Message, error.Title, MessageBoxButton.OK, MessageBoxImage.Error);
 
+    private async Task PersistCapturedFrameAsync(CapturedFrame frame)
+    {
+        if (_runtime is null || _viewModel?.ActiveSession is not { } session)
+        {
+            MessageBox.Show("Crea o continúa una sesión antes de capturar.", "Captura no guardada", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (session.IsPaused)
+        {
+            MessageBox.Show("Reanuda la sesión antes de capturar.", "Captura no guardada", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (session.ActiveSectionId is null || session.Sections.All(section => section.Id != session.ActiveSectionId))
+        {
+            MessageBox.Show("Selecciona o crea una sección activa antes de capturar.", "Captura no guardada", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            await using var content = new MemoryStream(frame.ImageData, writable: false);
+            var stored = await _runtime.ScreenshotStorage.StoreAsync(new ScreenshotStorageRequest(
+                session.Id, frame.Id, content,
+                frame.MediaType.Equals("image/png", StringComparison.OrdinalIgnoreCase)
+                    ? ScreenshotContentKind.CodeOrSmallText : ScreenshotContentKind.VideoOrImage));
+            var metadata = frame.Metadata;
+            var capture = new Screenshot
+            {
+                Id = frame.Id,
+                SessionId = session.Id,
+                SectionId = session.ActiveSectionId,
+                CapturedAt = metadata?.CapturedAt ?? frame.CapturedAt,
+                Width = metadata?.PixelWidth ?? frame.Region.Width,
+                Height = metadata?.PixelHeight ?? frame.Region.Height,
+                PerceptualHash = stored.Optimized.Sha256,
+                Image = new ScreenshotImage
+                {
+                    ScreenshotId = frame.Id,
+                    RelativePath = stored.Optimized.RelativePath,
+                    MediaType = stored.Optimized.Format.Equals("PNG", StringComparison.OrdinalIgnoreCase) ? "image/png" : "image/jpeg",
+                    ByteLength = stored.Optimized.Size,
+                    Sha256 = stored.Optimized.Sha256
+                },
+                Context = new ScreenshotContext
+                {
+                    ScreenshotId = frame.Id,
+                    WindowTitle = metadata?.WindowTitle,
+                    MonitorDeviceName = metadata?.MonitorDeviceName,
+                    WindowHandle = metadata?.WindowHandle is { } handle ? (long)handle : null,
+                    CaptureMode = metadata?.Mode,
+                    PhysicalX = metadata?.PhysicalBounds.X ?? frame.Region.X,
+                    PhysicalY = metadata?.PhysicalBounds.Y ?? frame.Region.Y,
+                    DpiX = metadata?.DpiX ?? 96,
+                    DpiY = metadata?.DpiY ?? 96
+                }
+            };
+            await _runtime.Coordinator.AddCaptureAsync(session, capture);
+            _viewModel.CaptureAdded(capture);
+            _capturePanelViewModel?.CaptureCompleted();
+        }
+        catch (Exception exception)
+        {
+            _loggerFactory?.CreateLogger<App>().LogError(exception, "Screenshot persistence failed");
+            MessageBox.Show("No se pudo guardar la captura. Comprueba que la carpeta de datos sea accesible y que haya espacio disponible, e inténtalo de nuevo.",
+                "Captura no guardada", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private async void OnHotkeyInvoked(object? sender, HotkeyAction action)
     {
         if (_viewModel is null || _capture is null) return;
         switch (action)
         {
             case HotkeyAction.CaptureRegion: CapturePersistentRegion(); break;
-            case HotkeyAction.CaptureFullDesktop: await _capture.CaptureAsync(new(ScreenCaptureMode.FullVirtualDesktop)); break;
-            case HotkeyAction.CaptureCurrentMonitor: await _capture.CaptureAsync(new(ScreenCaptureMode.CurrentMonitor)); break;
-            case HotkeyAction.CaptureActiveWindow: await _capture.CaptureAsync(new(ScreenCaptureMode.ActiveWindow)); break;
+            case HotkeyAction.CaptureFullDesktop: await CaptureAndPersistAsync(ScreenCaptureMode.FullVirtualDesktop); break;
+            case HotkeyAction.CaptureCurrentMonitor: await CaptureAndPersistAsync(ScreenCaptureMode.CurrentMonitor); break;
+            case HotkeyAction.CaptureActiveWindow: await CaptureAndPersistAsync(ScreenCaptureMode.ActiveWindow); break;
             case HotkeyAction.TogglePause: _viewModel.TogglePauseCommand.Execute(null); break;
             case HotkeyAction.NextSection: ChangeSection(1); break;
             case HotkeyAction.PreviousSection: ChangeSection(-1); break;
@@ -202,6 +270,13 @@ public partial class App : System.Windows.Application
             case HotkeyAction.MarkImportant: _viewModel.MarkImportantRequested?.Invoke(); break;
             case HotkeyAction.AddContext: _viewModel.AddContextRequested?.Invoke(); break;
         }
+    }
+
+    private async Task CaptureAndPersistAsync(ScreenCaptureMode mode)
+    {
+        if (_capture is null) return;
+        var frame = await _capture.CaptureAsync(new(mode));
+        if (frame is not null) await PersistCapturedFrameAsync(frame);
     }
 
     private void ChangeSection(int offset)

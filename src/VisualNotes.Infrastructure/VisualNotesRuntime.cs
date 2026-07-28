@@ -13,17 +13,33 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
     private VisualNotesRuntime(
         VisualNotesDbContext database,
         SessionCoordinator coordinator,
-        ISessionRepository sessions)
+        ISessionRepository sessions,
+        IScreenshotRepository screenshots,
+        IScreenshotStorageService screenshotStorage,
+        ImageFileStore imageFiles,
+        IUnitOfWork unitOfWork)
     {
         _database = database;
         Coordinator = coordinator;
         Sessions = sessions;
+        Screenshots = screenshots;
+        ScreenshotStorage = screenshotStorage;
+        ImageFiles = imageFiles;
+        UnitOfWork = unitOfWork;
         ApiCredentials = new WindowsDpapiCredentialStore();
     }
 
     public SessionCoordinator Coordinator { get; }
 
     public ISessionRepository Sessions { get; }
+
+    public IScreenshotRepository Screenshots { get; }
+
+    public IScreenshotStorageService ScreenshotStorage { get; }
+
+    public ImageFileStore ImageFiles { get; }
+
+    public IUnitOfWork UnitOfWork { get; }
 
     public IApiCredentialStore ApiCredentials { get; }
 
@@ -40,12 +56,12 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         {
             await new DatabaseMigrationService(database).MigrateAsync(cancellationToken);
             var sessions = new SessionRepository(database);
-            var coordinator = new SessionCoordinator(
-                sessions,
-                new ScreenshotRepository(database),
-                new SettingsRepository(database),
-                new UnitOfWork(database));
-            return new VisualNotesRuntime(database, coordinator, sessions);
+            var screenshots = new ScreenshotRepository(database);
+            var unitOfWork = new UnitOfWork(database);
+            var screenshotStorage = new ScreenshotStorageService(dataDirectory);
+            var imageFiles = new ImageFileStore(dataDirectory);
+            var coordinator = new SessionCoordinator(sessions, screenshots, new SettingsRepository(database), unitOfWork);
+            return new VisualNotesRuntime(database, coordinator, sessions, screenshots, screenshotStorage, imageFiles, unitOfWork);
         }
         catch
         {

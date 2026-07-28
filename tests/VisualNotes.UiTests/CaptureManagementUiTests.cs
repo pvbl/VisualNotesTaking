@@ -49,6 +49,17 @@ public sealed class CaptureManagementUiTests
         viewModel.Captures.Count.ShouldBe(3);
     }
 
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Newly_completed_capture_appears_in_capture_view()
+    {
+        var viewModel = new CapturesViewModel();
+        var capture = new Screenshot { CapturedAt = DateTimeOffset.UtcNow, ProcessingStatus = ScreenshotStatus.Captured };
+
+        viewModel.AddCapture(capture);
+
+        viewModel.Captures.ShouldHaveSingleItem().ShouldBeSameAs(capture);
+    }
+
     private static Screenshot[] MakeCaptures() => Enumerable.Range(0, 3).Select(i => new Screenshot
     {
         CapturedAt = DateTimeOffset.UnixEpoch.AddMinutes(i), ProcessingStatus = ScreenshotStatus.Ready
