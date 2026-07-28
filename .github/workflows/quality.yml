@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
@@ -52,10 +53,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: |
-            Directory.Packages.props
-            **/packages.lock.json
       - name: Restore tools
         run: dotnet tool restore
       - name: Restore packages from lock files
@@ -125,10 +122,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: |
-            Directory.Packages.props
-            **/packages.lock.json
       - name: Restore packages from lock files
         shell: pwsh
         run: ./eng/restore-locked.ps1 -Target tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj

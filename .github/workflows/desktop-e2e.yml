@@ -33,10 +33,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: |
-            Directory.Packages.props
-            **/packages.lock.json
       - shell: pwsh
         run: ./eng/restore-locked.ps1 -Target tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj
       - run: dotnet test tests/VisualNotes.UiTests --configuration Release --no-restore --filter "Category=Smoke" --logger "trx;LogFileName=smoke.trx" --results-directory TestResults
@@ -60,10 +56,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-          cache: true
-          cache-dependency-path: |
-            Directory.Packages.props
-            **/packages.lock.json
       - shell: pwsh
         run: ./eng/restore-locked.ps1 -Target tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj
       - run: dotnet test tests/VisualNotes.UiTests --configuration Release --no-restore --filter "Category=E2E|Category=Smoke" --logger "trx;LogFileName=e2e.trx" --results-directory TestResults
