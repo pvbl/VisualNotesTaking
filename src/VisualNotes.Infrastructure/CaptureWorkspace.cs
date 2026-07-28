@@ -23,6 +23,7 @@ internal sealed class CaptureWorkspace(VisualNotesDbContext database, IScreensho
             persisted.Tags = capture.Tags;
             persisted.UserContext = capture.UserContext;
             persisted.CaptureInstruction = capture.CaptureInstruction;
+            persisted.Importance = capture.Importance;
             persisted.ModifiedAt = DateTimeOffset.UtcNow;
         }
         await database.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

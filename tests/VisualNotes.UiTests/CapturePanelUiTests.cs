@@ -26,5 +26,19 @@ public sealed class CapturePanelUiTests
         xaml.ShouldContain("KeyBinding");
         xaml.ShouldContain("AutomationProperties.Name");
         xaml.ShouldContain("AutomationProperties.LiveSetting");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"UndoButton\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"MarkImportantButton\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"AddContextButton\"");
+        xaml.ShouldContain("Key=\"Z\" Modifiers=\"Control\" Command=\"{Binding UndoCommand}\"");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Global_capture_action_hotkeys_execute_the_same_explicit_commands_as_the_panel()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+        source.ShouldContain("HotkeyAction.Undo: ExecuteIfAvailable(_viewModel.UndoCommand)");
+        source.ShouldContain("HotkeyAction.MarkImportant: ExecuteIfAvailable(_viewModel.MarkImportantCommand)");
+        source.ShouldContain("HotkeyAction.AddContext: ExecuteIfAvailable(_viewModel.AddContextCommand)");
     }
 }

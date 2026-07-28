@@ -72,9 +72,20 @@ public partial class App : System.Windows.Application
             return;
         }
         _hotkeys = new GlobalHotkeyService(new WindowsGlobalHotkeyAdapter());
-        _viewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions, _hotkeys, _runtime.ApiCredentials,
+        MainViewModel? composedViewModel = null;
+        var captureActions = new CaptureActionCoordinator(_runtime.CaptureWorkspace,
+            () => composedViewModel?.ActiveSession,
+            capture =>
+            {
+                if (composedViewModel is null) return;
+                composedViewModel.Captures.SelectedCapture = capture;
+                composedViewModel.NavigateCommand.Execute("Captures");
+                ShowWindow();
+            },
+            message => MessageBox.Show(message, "Acción de captura", MessageBoxButton.OK, MessageBoxImage.Information));
+        _viewModel = composedViewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions, _hotkeys, _runtime.ApiCredentials,
             _runtime.CaptureWorkspace, _runtime.DocumentExporter, new WindowsExportInteraction(),
-            _runtime.Settings, _runtime.UnitOfWork, _runtime.AnalysisJobs);
+            _runtime.Settings, _runtime.UnitOfWork, _runtime.AnalysisJobs, captureActions);
         _ = _runtime.RecoverIncompleteJobsAsync();
         _hotkeys.HotkeyInvoked += OnHotkeyInvoked;
         var bindings = bootstrap?.EnableHotkeys == false
@@ -269,10 +280,15 @@ public partial class App : System.Windows.Application
             case HotkeyAction.TogglePause: _viewModel.TogglePauseCommand.Execute(null); break;
             case HotkeyAction.NextSection: ChangeSection(1); break;
             case HotkeyAction.PreviousSection: ChangeSection(-1); break;
-            case HotkeyAction.Undo: _viewModel.UndoRequested?.Invoke(); break;
-            case HotkeyAction.MarkImportant: _viewModel.MarkImportantRequested?.Invoke(); break;
-            case HotkeyAction.AddContext: _viewModel.AddContextRequested?.Invoke(); break;
+            case HotkeyAction.Undo: ExecuteIfAvailable(_viewModel.UndoCommand); break;
+            case HotkeyAction.MarkImportant: ExecuteIfAvailable(_viewModel.MarkImportantCommand); break;
+            case HotkeyAction.AddContext: ExecuteIfAvailable(_viewModel.AddContextCommand); break;
         }
+    }
+
+    private static void ExecuteIfAvailable(System.Windows.Input.ICommand command)
+    {
+        if (command.CanExecute(null)) command.Execute(null);
     }
 
     private async Task CaptureAndPersistAsync(ScreenCaptureMode mode)

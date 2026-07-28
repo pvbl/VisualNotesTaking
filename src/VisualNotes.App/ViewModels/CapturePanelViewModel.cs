@@ -22,9 +22,9 @@ public sealed class CapturePanelViewModel : ViewModelBase
         TogglePauseCommand = main.TogglePauseCommand;
         NextSectionCommand = new RelayCommand(_ => ChangeSection(1));
         PreviousSectionCommand = new RelayCommand(_ => ChangeSection(-1));
-        UndoCommand = new RelayCommand(_ => main.UndoRequested?.Invoke());
-        MarkImportantCommand = new RelayCommand(_ => main.MarkImportantRequested?.Invoke());
-        AddContextCommand = new RelayCommand(_ => main.AddContextRequested?.Invoke());
+        UndoCommand = main.UndoCommand;
+        MarkImportantCommand = main.MarkImportantCommand;
+        AddContextCommand = main.AddContextCommand;
         ToggleMinimalCommand = new RelayCommand(_ => IsMinimal = !IsMinimal);
         main.PropertyChanged += (_, args) =>
         {
