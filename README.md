@@ -23,7 +23,7 @@ modelo de lenguaje visual y revisar el documento antes de exportarlo.
 
 | Requisito | Motivo |
 |---|---|
-| Windows 10/11 | La interfaz usa WPF y la captura/credenciales usan APIs de Windows. |
+| Windows 10 versión 2004 (build 19041) o posterior, Windows 11, x64 | Es la plataforma mínima y la única arquitectura del instalador firmado. |
 | .NET 8 SDK | Compilación, pruebas y herramientas locales. |
 | Visual Studio 2022 (opcional) | Desarrollo y depuración de escritorio. |
 | Clave de OpenAI o Gemini (opcional) | Solo para análisis real con un proveedor externo. |
@@ -43,6 +43,11 @@ Los datos se guardan bajo `%LOCALAPPDATA%\VisualNotes`, incluida la base SQLite 
 los diagnósticos. Las claves se protegen mediante DPAPI. Para experimentar sin llamar
 a servicios externos se pueden ejecutar todas las pruebas unitarias, que emplean
 dobles o servidores HTTP simulados.
+
+En el primer inicio se eligen la carpeta de almacenamiento, el proveedor, el
+consentimiento de privacidad y los atajos, y se puede ejecutar una captura de prueba.
+El instalador conserva deliberadamente sesiones, credenciales y configuración tanto
+en actualizaciones/reparaciones como al desinstalar.
 
 ## Verificación local
 

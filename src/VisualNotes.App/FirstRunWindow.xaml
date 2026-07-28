@@ -1,0 +1,22 @@
+<Window x:Class="VisualNotes.App.FirstRunWindow"
+ xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+ Title="Bienvenido a VisualNotes" Width="680" Height="650" WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
+ <ScrollViewer><StackPanel Margin="34">
+  <TextBlock Text="Configura VisualNotes" FontSize="30" FontWeight="SemiBold"/>
+  <TextBlock Text="Estas opciones se guardan localmente y se pueden cambiar más tarde." Foreground="#64748B" Margin="0,6,0,24"/>
+  <TextBlock Text="1. Almacenamiento" FontSize="18" FontWeight="SemiBold"/>
+  <TextBlock Text="Las sesiones y capturas no se eliminan al actualizar o desinstalar." TextWrapping="Wrap" Margin="0,4,0,8"/>
+  <DockPanel><Button Content="Examinar…" Click="BrowseClicked" DockPanel.Dock="Right" Margin="8,0,0,0"/><TextBox x:Name="DataDirectory" AutomationProperties.AutomationId="FirstRunDataDirectory"/></DockPanel>
+  <TextBlock Text="2. Proveedor de análisis" FontSize="18" FontWeight="SemiBold" Margin="0,22,0,6"/>
+  <ComboBox x:Name="Provider" SelectedIndex="0" AutomationProperties.AutomationId="FirstRunProvider"><ComboBoxItem Content="Ninguno (trabajo local)" Tag="none"/><ComboBoxItem Content="OpenAI" Tag="openai"/><ComboBoxItem Content="Gemini" Tag="gemini"/></ComboBox>
+  <TextBlock Text="3. Privacidad" FontSize="18" FontWeight="SemiBold" Margin="0,22,0,6"/>
+  <CheckBox x:Name="AllowRemoteAnalysis" Content="Permitir enviar capturas al proveedor seleccionado"/>
+  <TextBlock Text="No se enviará ninguna captura sin esta autorización. Las credenciales se protegen con DPAPI." Foreground="#64748B" TextWrapping="Wrap" Margin="22,4,0,0"/>
+  <TextBlock Text="4. Atajos" FontSize="18" FontWeight="SemiBold" Margin="0,22,0,6"/>
+  <CheckBox x:Name="EnableHotkeys" Content="Activar atajos globales predeterminados" IsChecked="True"/>
+  <TextBlock Text="Capturar región: Ctrl+Mayús+C · Redefinir: Ctrl+Mayús+R" Foreground="#64748B" Margin="22,4,0,0"/>
+  <TextBlock Text="5. Captura de prueba" FontSize="18" FontWeight="SemiBold" Margin="0,22,0,6"/>
+  <StackPanel Orientation="Horizontal"><Button Content="Probar captura" Click="TestCaptureClicked"/><TextBlock x:Name="CaptureResult" Margin="12,5,0,0"/></StackPanel>
+  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,28,0,0"><Button Content="Finalizar" IsDefault="True" Click="FinishClicked" Padding="24,8" AutomationProperties.AutomationId="FinishFirstRun"/></StackPanel>
+ </StackPanel></ScrollViewer>
+</Window>

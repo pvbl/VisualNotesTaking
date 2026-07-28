@@ -34,8 +34,25 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        var dataDirectory = Environment.GetEnvironmentVariable("VISUALNOTES_DATA_DIRECTORY")
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualNotes");
+        if (e.Args is ["--smoke-test", var markerPath])
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(markerPath))!);
+            await File.WriteAllTextAsync(markerPath, $"VisualNotes {Environment.ProcessArchitecture} OK");
+            Shutdown();
+            return;
+        }
+        var localDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualNotes");
+        var bootstrapPath = Path.Combine(localDirectory, "bootstrap.json");
+        var environmentDirectory = Environment.GetEnvironmentVariable("VISUALNOTES_DATA_DIRECTORY");
+        var bootstrap = FirstRunWindow.Load(bootstrapPath);
+        if (bootstrap?.FirstRunCompleted != true && environmentDirectory is null)
+        {
+            var firstRun = new FirstRunWindow(localDirectory);
+            if (firstRun.ShowDialog() != true || firstRun.Settings is null) { Shutdown(); return; }
+            bootstrap = firstRun.Settings;
+            FirstRunWindow.Save(bootstrapPath, bootstrap);
+        }
+        var dataDirectory = environmentDirectory ?? bootstrap?.DataDirectory ?? localDirectory;
         (_loggerFactory, _serilog) = LoggingFactory.Create(Path.Combine(dataDirectory, "diagnostics", "visualnotes-.json"));
         _telemetry = new VisualNotesTelemetry(enableLocalConsoleExporter: false);
         _exceptions = new GlobalExceptionHandler(_loggerFactory.CreateLogger<GlobalExceptionHandler>(), ShowError, code => Shutdown(code));
@@ -57,7 +74,10 @@ public partial class App : System.Windows.Application
         _hotkeys = new GlobalHotkeyService(new WindowsGlobalHotkeyAdapter());
         _viewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions, _hotkeys, _runtime.ApiCredentials);
         _hotkeys.HotkeyInvoked += OnHotkeyInvoked;
-        var hotkeyResult = _hotkeys.Apply(SettingsViewModel.DefaultBindings());
+        var bindings = bootstrap?.EnableHotkeys == false
+            ? SettingsViewModel.DefaultBindings().Select(binding => binding with { IsEnabled = false }).ToArray()
+            : SettingsViewModel.DefaultBindings();
+        var hotkeyResult = _hotkeys.Apply(bindings);
         if (!hotkeyResult.Succeeded)
             MessageBox.Show(string.Join(Environment.NewLine, hotkeyResult.Conflicts.Select(x => x.Message)),
                 "Conflicto de atajos", MessageBoxButton.OK, MessageBoxImage.Warning);
