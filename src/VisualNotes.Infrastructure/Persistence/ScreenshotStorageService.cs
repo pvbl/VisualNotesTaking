@@ -7,7 +7,11 @@ using VisualNotes.Core.Services;
 
 namespace VisualNotes.Infrastructure.Persistence;
 
-public sealed class ScreenshotStorageService(string dataDirectory, long reservedFreeBytes = 16 * 1024 * 1024) : IScreenshotStorageService
+public sealed class ScreenshotStorageService(
+    string dataDirectory,
+    long reservedFreeBytes = 16 * 1024 * 1024,
+    long maximumInputBytes = 32 * 1024 * 1024,
+    long maximumPixels = 100_000_000) : IScreenshotStorageService
 {
     public async Task<StoredScreenshot> StoreAsync(ScreenshotStorageRequest request, CancellationToken cancellationToken = default)
     {
@@ -17,11 +21,22 @@ public sealed class ScreenshotStorageService(string dataDirectory, long reserved
         var paths = ScreenshotPaths.For(request.SessionId);
         CreateWorkspace(paths);
 
+        if (maximumInputBytes < 1) throw new ArgumentOutOfRangeException(nameof(maximumInputBytes));
+        if (maximumPixels < 1) throw new ArgumentOutOfRangeException(nameof(maximumPixels));
         using var input = new MemoryStream();
-        await request.Content.CopyToAsync(input, cancellationToken);
+        var buffer = new byte[81920];
+        int read;
+        while ((read = await request.Content.ReadAsync(buffer, cancellationToken)) != 0)
+        {
+            if (input.Length + read > maximumInputBytes)
+                throw new InvalidDataException($"Screenshot exceeds the {maximumInputBytes}-byte input limit.");
+            await input.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
         EnsureSpace(input.Length * 3 + reservedFreeBytes);
         input.Position = 0;
         using var image = await Image.LoadAsync(input, cancellationToken); // ImageSharp reports corrupt/truncated input.
+        if ((long)image.Width * image.Height > maximumPixels)
+            throw new InvalidDataException($"Screenshot exceeds the {maximumPixels}-pixel decoded image limit.");
         var originalWidth = image.Width; var originalHeight = image.Height;
         var usePng = request.ContentKind == ScreenshotContentKind.CodeOrSmallText;
         var extension = usePng ? ".png" : ".jpg";

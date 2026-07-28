@@ -7,6 +7,8 @@ namespace VisualNotes.Infrastructure.LanguageModels;
 
 public abstract class LanguageModelHttpProvider
 {
+    public const int MaximumResponseBytes = 1_048_576;
+    public const int MaximumResponseDepth = 32;
     private readonly HttpClient client;
 
     protected LanguageModelHttpProvider(HttpClient client) => this.client = client;
@@ -30,6 +32,10 @@ public abstract class LanguageModelHttpProvider
             {
                 throw new LanguageModelException(LanguageModelErrorKind.Cancelled, "The language model request was cancelled.", innerException: exception);
             }
+            catch (HttpRequestException exception)
+            {
+                throw new LanguageModelException(LanguageModelErrorKind.ServiceUnavailable, "The language model connection failed.", retryable: true, innerException: exception);
+            }
 
             using (response)
             {
@@ -41,11 +47,25 @@ public abstract class LanguageModelHttpProvider
                 try
                 {
                     var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-                    return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    using var bounded = new MemoryStream();
+                    var buffer = new byte[81920];
+                    int read;
+                    while ((read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) != 0)
+                    {
+                        if (bounded.Length + read > MaximumResponseBytes)
+                            throw new LanguageModelException(LanguageModelErrorKind.InvalidResponse, $"The provider response exceeds the {MaximumResponseBytes}-byte limit.", (int)response.StatusCode);
+                        await bounded.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    }
+                    bounded.Position = 0;
+                    return await JsonDocument.ParseAsync(bounded, new JsonDocumentOptions { MaxDepth = MaximumResponseDepth }, cancellationToken).ConfigureAwait(false);
                 }
                 catch (JsonException exception)
                 {
                     throw new LanguageModelException(LanguageModelErrorKind.InvalidResponse, "The provider returned invalid JSON.", (int)response.StatusCode, innerException: exception);
+                }
+                catch (IOException exception)
+                {
+                    throw new LanguageModelException(LanguageModelErrorKind.ServiceUnavailable, "The language model response was interrupted.", (int)response.StatusCode, retryable: true, innerException: exception);
                 }
             }
         }
