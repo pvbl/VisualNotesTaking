@@ -72,6 +72,32 @@ public sealed class OpenXmlDocumentExporterTests
         finally { if (File.Exists(path)) File.Delete(path); }
     }
 
+    [Fact]
+    public async Task Export_records_version_path_configuration_and_detects_later_changes()
+    {
+        var path = TemporaryPath();
+        try
+        {
+            var exporter = new OpenXmlDocumentExporter();
+            var first = await exporter.ExportAsync(new(Document(), path, new(Cover: false)));
+            var stored = await OpenXmlDocumentExporter.ReadRecordAsync(path);
+            stored.ShouldNotBeNull();
+            stored.Version.ShouldBe(1);
+            stored.Path.ShouldBe(Path.GetFullPath(path));
+            stored.Configuration.ShouldContain("Cover");
+            ExportChangeDetector.HasChanges(Document(), stored).ShouldBeFalse();
+
+            var second = await exporter.ExportAsync(new(Document(), path, new(Cover: false),
+                ExpectedExistingVersion: ExportFileVersion.Read(path), PreviousExport: stored));
+            second.Record.ShouldNotBeNull().Version.ShouldBe(2);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(path + ".visualnotes-export.json")) File.Delete(path + ".visualnotes-export.json");
+        }
+    }
+
     private static SemanticDocument Document() => new("Notas de prueba",
     [
         new("section:architecture", SemanticNodeType.Section, SemanticContentOrigin.Observed, "Arquitectura", [],

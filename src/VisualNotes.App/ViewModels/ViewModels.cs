@@ -193,7 +193,62 @@ public sealed class CapturesViewModel : ViewModelBase
     }
 }
 public sealed class InstructionsViewModel : ViewModelBase;
-public sealed class DocumentViewModel : ViewModelBase;
+public sealed class DocumentViewModel : ViewModelBase
+{
+    private readonly SemanticDocumentPreview _preview;
+    private ExportScope _scope;
+    private PreviewItem? _selectedItem;
+
+    public DocumentViewModel(SemanticDocument? document = null,
+        IReadOnlyDictionary<string, PreviewContentState>? states = null)
+    {
+        _preview = new(document ?? new SemanticDocument("Documento", []), states);
+        Items = new(_preview.Items);
+        IncludeCommand = new RelayCommand(value => SetIncluded(value, true));
+        ExcludeCommand = new RelayCommand(value => SetIncluded(value, false));
+        MoveUpCommand = new RelayCommand(value => Move(value, -1));
+        MoveDownCommand = new RelayCommand(value => Move(value, 1));
+        ExportCommand = new RelayCommand(_ => ExportRequested?.Invoke(CreateExportDocument(), Scope));
+    }
+
+    public ObservableCollection<PreviewItem> Items { get; }
+    public PreviewItem? SelectedItem { get => _selectedItem; set { _selectedItem = value; OnPropertyChanged(); } }
+    public ExportScope Scope { get => _scope; set { _scope = value; OnPropertyChanged(); } }
+    public IReadOnlyList<ExportScope> Scopes { get; } = Enum.GetValues<ExportScope>();
+    public bool HasWarnings => _preview.HasWarnings;
+    public ICommand IncludeCommand { get; }
+    public ICommand ExcludeCommand { get; }
+    public ICommand MoveUpCommand { get; }
+    public ICommand MoveDownCommand { get; }
+    public ICommand ExportCommand { get; }
+    public event Action<SemanticDocument, ExportScope>? ExportRequested;
+
+    public SemanticDocument CreateExportDocument() => _preview.CreateDocument(Scope,
+        SelectedItem?.Node.Type == SemanticNodeType.Section ? SelectedItem.StableKey : SelectedItem?.SectionKey);
+
+    private void SetIncluded(object? value, bool included)
+    {
+        var item = value as PreviewItem ?? SelectedItem;
+        if (item is null) return;
+        _preview.SetIncluded([item.StableKey], included);
+        Refresh();
+    }
+
+    private void Move(object? value, int offset)
+    {
+        var item = value as PreviewItem ?? SelectedItem;
+        if (item is null || item.Node.Type == SemanticNodeType.Section) return;
+        _preview.Move(item.StableKey, Math.Max(0, item.Order - 1 + offset));
+        Refresh();
+    }
+
+    private void Refresh()
+    {
+        Items.Clear();
+        foreach (var item in _preview.Items.OrderBy(item => item.SectionKey).ThenBy(item => item.Order)) Items.Add(item);
+        OnPropertyChanged(nameof(HasWarnings));
+    }
+}
 public sealed class SettingsViewModel : ViewModelBase
 {
     private readonly IGlobalHotkeyService? _hotkeys;

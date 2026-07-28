@@ -30,9 +30,19 @@ public sealed record OpenXmlExportRequest(
     SemanticDocument Document, string DestinationPath, OpenXmlExportOptions Options,
     Func<Guid, CancellationToken, ValueTask<ExportImage?>>? ImageProvider = null,
     ExportFileVersion? ExpectedExistingVersion = null,
-    Func<string, CancellationToken, ValueTask<bool>>? ConfirmOverwrite = null);
+    Func<string, CancellationToken, ValueTask<bool>>? ConfirmOverwrite = null,
+    ExportRecord? PreviousExport = null);
 
-public sealed record OpenXmlExportResult(string Path, long Bytes, IReadOnlyList<string> ValidationErrors);
+public sealed record OpenXmlExportResult(string Path, long Bytes, IReadOnlyList<string> ValidationErrors,
+    ExportRecord? Record = null);
+
+public enum ExportFailureKind { InvalidPath, FileLocked, DiskFull, AccessDenied, InputOutput }
+
+public sealed class DocumentExportException(ExportFailureKind kind, string message, Exception innerException)
+    : IOException(message, innerException)
+{
+    public ExportFailureKind Kind { get; } = kind;
+}
 
 /// <summary>Creates self-contained DOCX packages without automating or requiring Microsoft Word.</summary>
 public sealed class OpenXmlDocumentExporter
@@ -43,9 +53,17 @@ public sealed class OpenXmlDocumentExporter
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentException.ThrowIfNullOrWhiteSpace(request.DestinationPath);
-        var destination = Path.GetFullPath(request.DestinationPath);
-        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-        await EnsureDestinationCanBeReplacedAsync(request, destination, cancellationToken).ConfigureAwait(false);
+        string destination;
+        try
+        {
+            destination = Path.GetFullPath(request.DestinationPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await EnsureDestinationCanBeReplacedAsync(request, destination, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new DocumentExportException(ExportFailureKind.InvalidPath, "La ruta de exportación no es válida.", exception);
+        }
 
         var temporary = Path.Combine(Path.GetDirectoryName(destination)!, $".{Path.GetFileName(destination)}.{Guid.NewGuid():N}.tmp");
         try
@@ -58,12 +76,53 @@ public sealed class OpenXmlDocumentExporter
                 throw new InvalidDataException("El paquete Open XML no es válido: " + string.Join("; ", errors));
 
             ReplaceAtomically(temporary, destination);
-            return new(destination, new FileInfo(destination).Length, errors);
+            var file = new FileInfo(destination);
+            var record = new ExportRecord((request.PreviousExport?.Version ?? 0) + 1, destination,
+                System.Text.Json.JsonSerializer.Serialize(request.Options), ExportChangeDetector.Fingerprint(request.Document),
+                DateTimeOffset.UtcNow, file.Length, file.LastWriteTimeUtc);
+            await WriteRecordAsync(record, cancellationToken).ConfigureAwait(false);
+            return new(destination, file.Length, errors, record);
+        }
+        catch (DocumentExportException) { throw; }
+        catch (UnauthorizedAccessException exception)
+        {
+            throw new DocumentExportException(ExportFailureKind.AccessDenied, "No hay permisos para escribir en la ruta seleccionada.", exception);
+        }
+        catch (IOException exception)
+        {
+            var full = (exception.HResult & 0xFFFF) is 0x27 or 0x70;
+            var locked = File.Exists(destination) && !CanOpenExclusively(destination);
+            throw new DocumentExportException(full ? ExportFailureKind.DiskFull : locked ? ExportFailureKind.FileLocked : ExportFailureKind.InputOutput,
+                full ? "No hay espacio suficiente en el disco." : locked ? "El archivo está bloqueado por otra aplicación." : "No se pudo escribir el documento.", exception);
         }
         finally
         {
             if (File.Exists(temporary)) File.Delete(temporary);
         }
+    }
+
+    public static async Task<ExportRecord?> ReadRecordAsync(string documentPath, CancellationToken cancellationToken = default)
+    {
+        var path = RecordPath(Path.GetFullPath(documentPath));
+        if (!File.Exists(path)) return null;
+        await using var stream = File.OpenRead(path);
+        return await System.Text.Json.JsonSerializer.DeserializeAsync<ExportRecord>(stream, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task WriteRecordAsync(ExportRecord record, CancellationToken token)
+    {
+        var temporary = RecordPath(record.Path) + ".tmp";
+        await using (var stream = File.Create(temporary))
+            await System.Text.Json.JsonSerializer.SerializeAsync(stream, record, cancellationToken: token).ConfigureAwait(false);
+        File.Move(temporary, RecordPath(record.Path), true);
+    }
+
+    private static string RecordPath(string documentPath) => documentPath + ".visualnotes-export.json";
+
+    private static bool CanOpenExclusively(string path)
+    {
+        try { using var _ = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None); return true; }
+        catch (IOException) { return false; }
     }
 
     private static async Task EnsureDestinationCanBeReplacedAsync(OpenXmlExportRequest request, string destination, CancellationToken token)
