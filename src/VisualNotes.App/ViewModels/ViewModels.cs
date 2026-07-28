@@ -268,7 +268,7 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         _hotkeys = hotkeys;
         _credentials = credentials;
-        Bindings = new(DefaultBindings().Select(binding => new HotkeyBindingEditor(binding)));
+        Bindings = new(DefaultBindings().Select(binding => new HotkeyBindingEditorViewModel(binding)));
         SaveCommand = new RelayCommand(_ => Save());
         SaveCredentialCommand = new RelayCommand(async value => await SaveCredentialAsync(value));
         VerifyCredentialCommand = new RelayCommand(async value => await VerifyCredentialAsync(value));
@@ -276,17 +276,17 @@ public sealed class SettingsViewModel : ViewModelBase
         InitializeHierarchicalSettings();
     }
 
-    public ObservableCollection<HotkeyBindingEditor> Bindings { get; } = [];
+    public ObservableCollection<HotkeyBindingEditorViewModel> Bindings { get; } = [];
     public string ConflictMessage { get => _conflictMessage; private set { _conflictMessage = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasConflict)); } }
     public bool HasConflict => !string.IsNullOrEmpty(ConflictMessage);
     public ICommand SaveCommand { get; }
-    public ObservableCollection<ApiCredentialEditor> CredentialProfiles { get; } =
-        new(Enum.GetValues<ApiCredentialProfile>().Select(profile => new ApiCredentialEditor(profile)));
+    public ObservableCollection<ApiCredentialEditorViewModel> CredentialProfiles { get; } =
+        new(Enum.GetValues<ApiCredentialProfile>().Select(profile => new ApiCredentialEditorViewModel(profile)));
     public ICommand SaveCredentialCommand { get; } = new RelayCommand(_ => { });
     public ICommand VerifyCredentialCommand { get; } = new RelayCommand(_ => { });
     public ICommand DeleteCredentialCommand { get; } = new RelayCommand(_ => { });
     public IReadOnlyList<SettingsLevel> Levels { get; } = Enum.GetValues<SettingsLevel>();
-    public ObservableCollection<EffectiveSettingEditor> EffectiveValues { get; } = [];
+    public ObservableCollection<EffectiveSettingEditorViewModel> EffectiveValues { get; } = [];
     public SettingsLevel SelectedLevel
     {
         get => _selectedLevel;
@@ -319,7 +319,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private async Task SaveCredentialAsync(object? value)
     {
-        if (_credentials is null || value is not ApiCredentialEditor editor || string.IsNullOrWhiteSpace(editor.PendingValue)) return;
+        if (_credentials is null || value is not ApiCredentialEditorViewModel editor || string.IsNullOrWhiteSpace(editor.PendingValue)) return;
         await _credentials.SaveAsync(editor.Profile, editor.PendingValue);
         editor.PendingValue = string.Empty;
         editor.MaskedValue = await _credentials.GetMaskedAsync(editor.Profile);
@@ -328,14 +328,14 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private async Task VerifyCredentialAsync(object? value)
     {
-        if (_credentials is null || value is not ApiCredentialEditor editor || string.IsNullOrEmpty(editor.PendingValue)) return;
+        if (_credentials is null || value is not ApiCredentialEditorViewModel editor || string.IsNullOrEmpty(editor.PendingValue)) return;
         editor.Status = await _credentials.VerifyAsync(editor.Profile, editor.PendingValue) ? "Credencial válida" : "No coincide";
         editor.PendingValue = string.Empty;
     }
 
     private async Task DeleteCredentialAsync(object? value)
     {
-        if (_credentials is null || value is not ApiCredentialEditor editor) return;
+        if (_credentials is null || value is not ApiCredentialEditorViewModel editor) return;
         await _credentials.DeleteAsync(editor.Profile);
         editor.PendingValue = string.Empty;
         editor.MaskedValue = null;
@@ -354,12 +354,12 @@ public sealed class SettingsViewModel : ViewModelBase
         _layers[SettingsLevel.Session] = new();
         _layers[SettingsLevel.Section] = new();
         _layers[SettingsLevel.ScreenshotOverride] = new();
-        OverrideSettingCommand = new RelayCommand(value => { if (value is EffectiveSettingEditor row) Override(row); });
-        RestoreSettingCommand = new RelayCommand(value => { if (value is EffectiveSettingEditor row) Restore(row); });
+        OverrideSettingCommand = new RelayCommand(value => { if (value is EffectiveSettingEditorViewModel row) Override(row); });
+        RestoreSettingCommand = new RelayCommand(value => { if (value is EffectiveSettingEditorViewModel row) Restore(row); });
         RefreshEffectiveValues();
     }
 
-    private void Override(EffectiveSettingEditor row)
+    private void Override(EffectiveSettingEditorViewModel row)
     {
         if (SelectedLevel == SettingsLevel.ApplicationDefaults) return;
         var values = _layers[SelectedLevel];
@@ -376,7 +376,7 @@ public sealed class SettingsViewModel : ViewModelBase
         RefreshEffectiveValues();
     }
 
-    private void Restore(EffectiveSettingEditor row)
+    private void Restore(EffectiveSettingEditorViewModel row)
     {
         if (SelectedLevel == SettingsLevel.ApplicationDefaults) return;
         var values = _layers[SelectedLevel];
@@ -424,7 +424,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private static HotkeyBinding New(HotkeyAction action, uint key) => new(action, new(HotkeyModifiers.Control | HotkeyModifiers.Shift, key));
 }
 
-public sealed class ApiCredentialEditor(ApiCredentialProfile profile) : ViewModelBase
+public sealed class ApiCredentialEditorViewModel(ApiCredentialProfile profile) : ViewModelBase
 {
     private string _pendingValue = string.Empty;
     private string? _maskedValue;
@@ -436,7 +436,7 @@ public sealed class ApiCredentialEditor(ApiCredentialProfile profile) : ViewMode
     public string Status { get => _status; set { _status = value; OnPropertyChanged(); } }
 }
 
-public sealed class EffectiveSettingEditor(string key, string label, string value, string provenance) : ViewModelBase
+public sealed class EffectiveSettingEditorViewModel(string key, string label, string value, string provenance) : ViewModelBase
 {
     private string _editValue = value;
     public string Key { get; } = key;
@@ -446,7 +446,7 @@ public sealed class EffectiveSettingEditor(string key, string label, string valu
     public string EditValue { get => _editValue; set { _editValue = value; OnPropertyChanged(); } }
 }
 
-public sealed class HotkeyBindingEditor(HotkeyBinding binding) : ViewModelBase
+public sealed class HotkeyBindingEditorViewModel(HotkeyBinding binding) : ViewModelBase
 {
     private HotkeyModifiers _modifiers = binding.Gesture.Modifiers;
     private uint _virtualKey = binding.Gesture.VirtualKey;
