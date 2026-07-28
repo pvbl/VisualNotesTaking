@@ -14,7 +14,15 @@ public sealed class SessionCoordinator(ISessionRepository sessions, IScreenshotR
             var source = await sessions.GetAsync(duplicateFrom.Value, ct) ?? throw new InvalidOperationException("La sesión que se desea duplicar no existe.");
             CopyConfiguration(source, draft);
             foreach (var section in source.Sections.OrderBy(x => x.Order))
-                draft.Sections.Add(new NoteSection { Title = section.Title, Description = section.Description, Content = section.Content, Order = section.Order });
+                draft.Sections.Add(new NoteSection
+                {
+                    Title = section.Title,
+                    Description = section.Description,
+                    Content = section.Content,
+                    Order = section.Order,
+                    CourseId = section.CourseId,
+                    CourseModuleId = section.CourseModuleId
+                });
         }
         await sessions.AddAsync(draft, ct);
         await SaveAndRememberAsync(draft.Id, ct);
@@ -36,10 +44,28 @@ public sealed class SessionCoordinator(ISessionRepository sessions, IScreenshotR
         await SaveAndRememberAsync(session.Id, ct);
     }
 
-    public async Task<NoteSection> AddSectionAsync(NoteSession session, string title, string description = "", Guid? parentId = null, CancellationToken ct = default)
+    public async Task<NoteSection> AddSectionAsync(
+        NoteSession session,
+        string title,
+        string description = "",
+        Guid? parentId = null,
+        Course? course = null,
+        CourseModule? courseModule = null,
+        CancellationToken ct = default)
     {
         if (parentId is not null && session.Sections.All(x => x.Id != parentId)) throw new ArgumentException("La sección padre no pertenece a la sesión.", nameof(parentId));
-        var section = new NoteSection { SessionId = session.Id, Title = title, Description = description, ParentSectionId = parentId, Order = session.Sections.Count };
+        var section = new NoteSection
+        {
+            SessionId = session.Id,
+            Title = title,
+            Description = description,
+            ParentSectionId = parentId,
+            Order = session.Sections.Count,
+            CourseId = course?.Id,
+            Course = course,
+            CourseModuleId = courseModule?.Id,
+            CourseModule = courseModule
+        };
         session.Sections.Add(section);
         session.ActiveSectionId = section.Id;
         await SaveAndRememberAsync(session.Id, ct);

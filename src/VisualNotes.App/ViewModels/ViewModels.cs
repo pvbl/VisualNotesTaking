@@ -214,7 +214,8 @@ public sealed class MainViewModel : ViewModelBase
         {
             var section = session.Sections.OrderBy(item => item.Order).FirstOrDefault();
             if (section is null)
-                section = await _coordinator.AddSectionAsync(session, "General", ct: cancellationToken);
+                section = await _coordinator.AddSectionAsync(session, "General",
+                    course: session.Course, courseModule: session.CourseModule, ct: cancellationToken);
             else
                 await _coordinator.ActivateSectionAsync(session, section.Id, cancellationToken);
             Sessions.SelectedSection = section;
@@ -266,11 +267,17 @@ public sealed class MainViewModel : ViewModelBase
         ReviewRequested?.Invoke();
     }
 
-    public async Task<NoteSection> AddSectionAsync(string title, CancellationToken cancellationToken = default)
+    public async Task<NoteSection> AddSectionAsync(
+        string title,
+        Course? course = null,
+        CourseModule? courseModule = null,
+        CancellationToken cancellationToken = default)
     {
         var session = await EnsureActiveSessionAsync(cancellationToken);
         var section = await _coordinator.AddSectionAsync(session,
             string.IsNullOrWhiteSpace(title) ? "Nueva sección" : title.Trim(),
+            course: course,
+            courseModule: courseModule,
             ct: cancellationToken);
         Sessions.SelectedSection = section;
         RefreshHeader();
@@ -336,8 +343,26 @@ public sealed class SessionViewModel : ViewModelBase
         DuplicateCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; var copy = await _coordinator.CreateAsync(NewDraft(), SelectedSession.Id); RecentSessions.Insert(0, copy); SelectedSession = copy; });
         ContinueCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; await _coordinator.ContinueAsync(SelectedSession); _activate(SelectedSession); });
         SaveCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is not null) await _coordinator.SetPausedAsync(SelectedSession, SelectedSession.IsPaused); });
-        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { var session = await EnsureSelectedSessionAsync(cancellationToken); SelectedSection = await _coordinator.AddSectionAsync(session, "Nueva sección", ct: cancellationToken); _activate(session); });
-        AddSubsectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSection is null) return; var session = await EnsureSelectedSessionAsync(cancellationToken); SelectedSection = await _coordinator.AddSectionAsync(session, "Nueva subsección", parentId: SelectedSection.Id, ct: cancellationToken); _activate(session); });
+        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
+        {
+            var session = await EnsureSelectedSessionAsync(cancellationToken);
+            SelectedSection = await _coordinator.AddSectionAsync(session, "Nueva sección",
+                course: SelectedSection?.Course ?? session.Course,
+                courseModule: SelectedSection?.CourseModule ?? session.CourseModule,
+                ct: cancellationToken);
+            _activate(session);
+        });
+        AddSubsectionCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
+        {
+            if (SelectedSection is null) return;
+            var session = await EnsureSelectedSessionAsync(cancellationToken);
+            SelectedSection = await _coordinator.AddSectionAsync(session, "Nueva subsección",
+                parentId: SelectedSection.Id,
+                course: SelectedSection.Course ?? session.Course,
+                courseModule: SelectedSection.CourseModule ?? session.CourseModule,
+                ct: cancellationToken);
+            _activate(session);
+        });
         ActivateSectionCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (SelectedSession is null || value is not NoteSection section) return; await _coordinator.ActivateSectionAsync(SelectedSession, section.Id); SelectedSection = section; _activate(SelectedSession); });
         RenameSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSection is not null) await _coordinator.RenameSectionAsync(SelectedSection, SelectedSection.Title); });
         MoveUpCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null || SelectedSection is null) return; await _coordinator.ReorderSectionAsync(SelectedSession, SelectedSection.Id, SelectedSection.Order - 1); OnPropertyChanged(nameof(OrderedSections)); });

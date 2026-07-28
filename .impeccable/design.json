@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-28T21:40:53.2163422+02:00",
+  "title": "Design System: VisualNotes",
+  "extensions": {
+    "colorMeta": {
+      "archive-blue": {
+        "role": "primary",
+        "displayName": "Azul Archivo",
+        "canonical": "#172033",
+        "tonalRamp": [
+          "oklch(15% 0.039 264.4)",
+          "oklch(27% 0.039 264.4)",
+          "oklch(39% 0.039 264.4)",
+          "oklch(51% 0.039 264.4)",
+          "oklch(63% 0.039 264.4)",
+          "oklch(75% 0.039 264.4)",
+          "oklch(87% 0.039 264.4)",
+          "oklch(95% 0.039 264.4)"
+        ]
+      },
+      "archive-panel": {
+        "role": "primary",
+        "displayName": "Panel Archivo",
+        "canonical": "#243149",
+        "tonalRamp": [
+          "oklch(15% 0.047 262.2)",
+          "oklch(27% 0.047 262.2)",
+          "oklch(39% 0.047 262.2)",
+          "oklch(51% 0.047 262.2)",
+          "oklch(63% 0.047 262.2)",
+          "oklch(75% 0.047 262.2)",
+          "oklch(87% 0.047 262.2)",
+          "oklch(95% 0.047 262.2)"
+        ]
+      },
+      "ink-deep": {
+        "role": "neutral",
+        "displayName": "Tinta Profunda",
+        "canonical": "#334155",
+        "tonalRamp": [
+          "oklch(15% 0.039 257.3)",
+          "oklch(27% 0.039 257.3)",
+          "oklch(39% 0.039 257.3)",
+          "oklch(51% 0.039 257.3)",
+          "oklch(63% 0.039 257.3)",
+          "oklch(75% 0.039 257.3)",
+          "oklch(87% 0.039 257.3)",
+          "oklch(95% 0.039 257.3)"
+        ]
+      },
+      "ink-medium": {
+        "role": "neutral",
+        "displayName": "Tinta Media",
+        "canonical": "#475569",
+        "tonalRamp": [
+          "oklch(15% 0.037 257.3)",
+          "oklch(27% 0.037 257.3)",
+          "oklch(39% 0.037 257.3)",
+          "oklch(51% 0.037 257.3)",
+          "oklch(63% 0.037 257.3)",
+          "oklch(75% 0.037 257.3)",
+          "oklch(87% 0.037 257.3)",
+          "oklch(95% 0.037 257.3)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Texto Atenuado",
+        "canonical": "#64748B",
+        "tonalRamp": [
+          "oklch(15% 0.041 257.4)",
+          "oklch(27% 0.041 257.4)",
+          "oklch(39% 0.041 257.4)",
+          "oklch(51% 0.041 257.4)",
+          "oklch(63% 0.041 257.4)",
+          "oklch(75% 0.041 257.4)",
+          "oklch(87% 0.041 257.4)",
+          "oklch(95% 0.041 257.4)"
+        ]
+      },
+      "text-subtle": {
+        "role": "neutral",
+        "displayName": "Texto Sutil",
+        "canonical": "#94A3B8",
+        "tonalRamp": [
+          "oklch(15% 0.035 256.8)",
+          "oklch(27% 0.035 256.8)",
+          "oklch(39% 0.035 256.8)",
+          "oklch(51% 0.035 256.8)",
+          "oklch(63% 0.035 256.8)",
+          "oklch(75% 0.035 256.8)",
+          "oklch(87% 0.035 256.8)",
+          "oklch(95% 0.035 256.8)"
+        ]
+      },
+      "paper-cold": {
+        "role": "neutral",
+        "displayName": "Papel Frío",
+        "canonical": "#F4F6FA",
+        "tonalRamp": [
+          "oklch(15% 0.006 264.5)",
+          "oklch(27% 0.006 264.5)",
+          "oklch(39% 0.006 264.5)",
+          "oklch(51% 0.006 264.5)",
+          "oklch(63% 0.006 264.5)",
+          "oklch(75% 0.006 264.5)",
+          "oklch(87% 0.006 264.5)",
+          "oklch(95% 0.006 264.5)"
+        ]
+      },
+      "panel-cold": {
+        "role": "neutral",
+        "displayName": "Panel Frío",
+        "canonical": "#F1F5F9",
+        "tonalRamp": [
+          "oklch(15% 0.007 247.9)",
+          "oklch(27% 0.007 247.9)",
+          "oklch(39% 0.007 247.9)",
+          "oklch(51% 0.007 247.9)",
+          "oklch(63% 0.007 247.9)",
+          "oklch(75% 0.007 247.9)",
+          "oklch(87% 0.007 247.9)",
+          "oklch(95% 0.007 247.9)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Superficie Blanca",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "oklch(15% 0.000 89.9)",
+          "oklch(27% 0.000 89.9)",
+          "oklch(39% 0.000 89.9)",
+          "oklch(51% 0.000 89.9)",
+          "oklch(63% 0.000 89.9)",
+          "oklch(75% 0.000 89.9)",
+          "oklch(87% 0.000 89.9)",
+          "oklch(95% 0.000 89.9)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Borde Pizarra",
+        "canonical": "#CBD5E1",
+        "tonalRamp": [
+          "oklch(15% 0.020 252.9)",
+          "oklch(27% 0.020 252.9)",
+          "oklch(39% 0.020 252.9)",
+          "oklch(51% 0.020 252.9)",
+          "oklch(63% 0.020 252.9)",
+          "oklch(75% 0.020 252.9)",
+          "oklch(87% 0.020 252.9)",
+          "oklch(95% 0.020 252.9)"
+        ]
+      },
+      "surface-muted": {
+        "role": "neutral",
+        "displayName": "Superficie Atenuada",
+        "canonical": "#E2E8F0",
+        "tonalRamp": [
+          "oklch(15% 0.013 255.5)",
+          "oklch(27% 0.013 255.5)",
+          "oklch(39% 0.013 255.5)",
+          "oklch(51% 0.013 255.5)",
+          "oklch(63% 0.013 255.5)",
+          "oklch(75% 0.013 255.5)",
+          "oklch(87% 0.013 255.5)",
+          "oklch(95% 0.013 255.5)"
+        ]
+      },
+      "capture-cobalt": {
+        "role": "primary",
+        "displayName": "Cobalto de Captura",
+        "canonical": "#2563EB",
+        "tonalRamp": [
+          "oklch(15% 0.180 262.9)",
+          "oklch(27% 0.180 262.9)",
+          "oklch(39% 0.180 262.9)",
+          "oklch(51% 0.180 262.9)",
+          "oklch(63% 0.180 262.9)",
+          "oklch(75% 0.180 262.9)",
+          "oklch(87% 0.180 262.9)",
+          "oklch(95% 0.180 262.9)"
+        ]
+      },
+      "capture-cobalt-deep": {
+        "role": "primary",
+        "displayName": "Cobalto Profundo",
+        "canonical": "#1D4ED8",
+        "tonalRamp": [
+          "oklch(15% 0.180 264.4)",
+          "oklch(27% 0.180 264.4)",
+          "oklch(39% 0.180 264.4)",
+          "oklch(51% 0.180 264.4)",
+          "oklch(63% 0.180 264.4)",
+          "oklch(75% 0.180 264.4)",
+          "oklch(87% 0.180 264.4)",
+          "oklch(95% 0.180 264.4)"
+        ]
+      },
+      "capture-cobalt-soft": {
+        "role": "primary",
+        "displayName": "Cobalto Suave",
+        "canonical": "#DBEAFE",
+        "tonalRamp": [
+          "oklch(15% 0.032 255.6)",
+          "oklch(27% 0.032 255.6)",
+          "oklch(39% 0.032 255.6)",
+          "oklch(51% 0.032 255.6)",
+          "oklch(63% 0.032 255.6)",
+          "oklch(75% 0.032 255.6)",
+          "oklch(87% 0.032 255.6)",
+          "oklch(95% 0.032 255.6)"
+        ]
+      },
+      "review-teal": {
+        "role": "secondary",
+        "displayName": "Verde Revisión",
+        "canonical": "#0F766E",
+        "tonalRamp": [
+          "oklch(15% 0.086 186.4)",
+          "oklch(27% 0.086 186.4)",
+          "oklch(39% 0.086 186.4)",
+          "oklch(51% 0.086 186.4)",
+          "oklch(63% 0.086 186.4)",
+          "oklch(75% 0.086 186.4)",
+          "oklch(87% 0.086 186.4)",
+          "oklch(95% 0.086 186.4)"
+        ]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Verde Éxito",
+        "canonical": "#166534",
+        "tonalRamp": [
+          "oklch(15% 0.108 151.3)",
+          "oklch(27% 0.108 151.3)",
+          "oklch(39% 0.108 151.3)",
+          "oklch(51% 0.108 151.3)",
+          "oklch(63% 0.108 151.3)",
+          "oklch(75% 0.108 151.3)",
+          "oklch(87% 0.108 151.3)",
+          "oklch(95% 0.108 151.3)"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Rojo Conflicto",
+        "canonical": "#B91C1C",
+        "tonalRamp": [
+          "oklch(15% 0.180 27.5)",
+          "oklch(27% 0.180 27.5)",
+          "oklch(39% 0.180 27.5)",
+          "oklch(51% 0.180 27.5)",
+          "oklch(63% 0.180 27.5)",
+          "oklch(75% 0.180 27.5)",
+          "oklch(87% 0.180 27.5)",
+          "oklch(95% 0.180 27.5)"
+        ]
+      },
+      "warning-paper": {
+        "role": "tertiary",
+        "displayName": "Papel de Advertencia",
+        "canonical": "#FFF7ED",
+        "tonalRamp": [
+          "oklch(15% 0.016 73.7)",
+          "oklch(27% 0.016 73.7)",
+          "oklch(39% 0.016 73.7)",
+          "oklch(51% 0.016 73.7)",
+          "oklch(63% 0.016 73.7)",
+          "oklch(75% 0.016 73.7)",
+          "oklch(87% 0.016 73.7)",
+          "oklch(95% 0.016 73.7)"
+        ]
+      },
+      "warning-ink": {
+        "role": "tertiary",
+        "displayName": "Tinta de Advertencia",
+        "canonical": "#9A3412",
+        "tonalRamp": [
+          "oklch(15% 0.143 37.3)",
+          "oklch(27% 0.143 37.3)",
+          "oklch(39% 0.143 37.3)",
+          "oklch(51% 0.143 37.3)",
+          "oklch(63% 0.143 37.3)",
+          "oklch(75% 0.143 37.3)",
+          "oklch(87% 0.143 37.3)",
+          "oklch(95% 0.143 37.3)"
+        ]
+      },
+      "section-cyan": {
+        "role": "secondary",
+        "displayName": "Cian de Sección",
+        "canonical": "#7DD3FC",
+        "tonalRamp": [
+          "oklch(15% 0.101 230.3)",
+          "oklch(27% 0.101 230.3)",
+          "oklch(39% 0.101 230.3)",
+          "oklch(51% 0.101 230.3)",
+          "oklch(63% 0.101 230.3)",
+          "oklch(75% 0.101 230.3)",
+          "oklch(87% 0.101 230.3)",
+          "oklch(95% 0.101 230.3)"
+        ]
+      },
+      "focus-ink": {
+        "role": "neutral",
+        "displayName": "Tinta de Foco",
+        "canonical": "#111827",
+        "tonalRamp": [
+          "oklch(15% 0.032 264.7)",
+          "oklch(27% 0.032 264.7)",
+          "oklch(39% 0.032 264.7)",
+          "oklch(51% 0.032 264.7)",
+          "oklch(63% 0.032 264.7)",
+          "oklch(75% 0.032 264.7)",
+          "oklch(87% 0.032 264.7)",
+          "oklch(95% 0.032 264.7)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Título de vista",
+        "purpose": "Un único título principal de 30-32px por superficie."
+      },
+      "headline": {
+        "displayName": "División mayor",
+        "purpose": "Secciones principales dentro de una vista."
+      },
+      "title": {
+        "displayName": "Título operativo",
+        "purpose": "Tarjetas, paneles y detalles."
+      },
+      "body": {
+        "displayName": "Cuerpo",
+        "purpose": "Controles, contenido y texto operativo."
+      },
+      "label": {
+        "displayName": "Rótulo compacto",
+        "purpose": "Metadatos y cabeceras pequeñas de grupo."
+      },
+      "mono": {
+        "displayName": "Markdown",
+        "purpose": "Fuente y resultado Markdown editables o de solo lectura."
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Botón principal",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Inicia una captura o crea la entidad principal de la tarea.",
+      "html": "<button class=\"ds-btn-primary\">Capturar</button>",
+      "css": ".ds-btn-primary { background: #2563EB; color: #FFFFFF; padding: 8px 14px; min-height: 32px; border: 1px solid transparent; font: 400 14px \"Segoe UI\", sans-serif; } .ds-btn-primary:hover { background: #1D4ED8; } .ds-btn-primary:focus-visible { outline: 3px solid #111827; outline-offset: 3px; } .ds-btn-primary:active { background: #1D4ED8; }"
+    },
+    {
+      "name": "Botón de revisión",
+      "kind": "button",
+      "refersTo": "button-review",
+      "description": "Procesa una sesión o conduce al espacio de revisión.",
+      "html": "<button class=\"ds-btn-review\">Revisar sesión (12) →</button>",
+      "css": ".ds-btn-review { background: #0F766E; color: #FFFFFF; padding: 10px 16px; min-height: 32px; border: 1px solid transparent; font: 600 14px \"Segoe UI\", sans-serif; } .ds-btn-review:hover { outline: 1px solid #CBD5E1; } .ds-btn-review:focus-visible { outline: 3px solid #111827; outline-offset: 3px; } .ds-btn-review:active { opacity: 0.92; }"
+    },
+    {
+      "name": "Elemento de navegación",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Destino persistente alineado a la izquierda dentro de la carcasa Azul Archivo.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item\">Capturas</button></nav>",
+      "css": ".ds-nav { width: 220px; background: #172033; padding: 18px; } .ds-nav-item { width: 100%; background: transparent; color: #FFFFFF; padding: 12px 14px; border: 0; text-align: left; font: 400 15px \"Segoe UI\", sans-serif; } .ds-nav-item:hover { background: #243149; } .ds-nav-item:focus-visible { outline: 3px solid #7DD3FC; outline-offset: -1px; } .ds-nav-item:active { background: #243149; }"
+    },
+    {
+      "name": "Tarjeta estándar",
+      "kind": "card",
+      "refersTo": "card-standard",
+      "description": "Agrupa una tarea completa sobre el Papel Frío del área de trabajo.",
+      "html": "<section class=\"ds-card\"><h3>Configuración por niveles</h3><p>La captura prevalece sobre sección, sesión y valores predeterminados.</p></section>",
+      "css": ".ds-card { background: #FFFFFF; color: #334155; padding: 28px; border-radius: 10px; font: 400 14px \"Segoe UI\", sans-serif; } .ds-card h3 { margin: 0 0 4px; font-size: 20px; font-weight: 600; } .ds-card p { margin: 0; color: #64748B; }"
+    },
+    {
+      "name": "Campo de texto",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Entrada compacta para metadatos, etiquetas e instrucciones.",
+      "html": "<label class=\"ds-field\"><span>Título</span><input class=\"ds-input\" value=\"Introducción\" /></label>",
+      "css": ".ds-field { display: grid; gap: 4px; color: #475569; font: 600 14px \"Segoe UI\", sans-serif; } .ds-input { min-height: 32px; padding: 6px 8px; background: #FFFFFF; color: #172033; border: 1px solid #CBD5E1; font: 400 14px \"Segoe UI\", sans-serif; } .ds-input:hover { border-color: #64748B; } .ds-input:focus-visible { outline: 3px solid #111827; outline-offset: 3px; }"
+    },
+    {
+      "name": "Selector de posición",
+      "kind": "custom",
+      "refersTo": "dock-choice",
+      "description": "Control direccional compacto para acoplar el Centro de captura.",
+      "html": "<button class=\"ds-dock-choice\" aria-pressed=\"true\" aria-label=\"Acoplar arriba\">↑</button>",
+      "css": ".ds-dock-choice { width: 48px; height: 38px; background: #DBEAFE; color: #1D4ED8; border: 1px solid #2563EB; border-radius: 7px; font: 600 16px \"Segoe UI\", sans-serif; } .ds-dock-choice:hover { background: #E2E8F0; } .ds-dock-choice:focus-visible { outline: 3px solid #111827; outline-offset: 3px; } .ds-dock-choice:active { background: #DBEAFE; }"
+    },
+    {
+      "name": "Aviso operativo",
+      "kind": "custom",
+      "refersTo": "warning",
+      "description": "Expone contenido pendiente o ausente cerca de la acción afectada.",
+      "html": "<div class=\"ds-warning\" role=\"status\">Hay contenido sin revisar o archivos ausentes.</div>",
+      "css": ".ds-warning { background: #FFF7ED; color: #9A3412; padding: 10px; border-radius: 6px; font: 400 14px \"Segoe UI\", sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El cuaderno de campo digital",
+    "overview": "VisualNotes se comporta como una herramienta de trabajo que acompaña la captura, ordena la evidencia y deja el material listo para pensar. Su lenguaje visual es sereno, metódico y fiable: una estructura azul noche sostiene superficies claras, mientras los acentos funcionales indican cuándo actuar y cuándo revisar.\n\nLa interfaz es compacta y directa. La personalidad aparece en la precisión de la jerarquía, en la separación limpia de zonas de trabajo y en el uso disciplinado del color, no en decoración añadida. El resultado debe sentirse técnico sin volverse frío y denso sin convertirse en ruido.",
+    "keyCharacteristics": [
+      "Azul noche para la estructura permanente y papel frío para el área de trabajo.",
+      "Componentes compactos, directos, serenos y técnicos.",
+      "Jerarquía tipográfica sobria basada en Segoe UI y Consolas para Markdown.",
+      "Profundidad plana construida con contraste tonal, bordes y agrupación.",
+      "Estados accesibles mediante texto, foco visible y color con función estable."
+    ],
+    "rules": [
+      {
+        "name": "The Two-Accent Rule",
+        "body": "El Cobalto de Captura inicia o selecciona; el Verde Revisión confirma, procesa o conduce a la revisión. No intercambiar sus funciones.",
+        "section": "colors"
+      },
+      {
+        "name": "The Cold Paper Rule",
+        "body": "Las zonas de trabajo parten de un gris azulado claro, no de gris neutro puro; las superficies blancas deben conservar una separación perceptible.",
+        "section": "colors"
+      },
+      {
+        "name": "The Accessible State Rule",
+        "body": "Error, éxito, advertencia, pausa, selección e inclusión siempre conservan una señal textual o estructural además del color.",
+        "section": "colors"
+      },
+      {
+        "name": "The Native Clarity Rule",
+        "body": "Segoe UI es la voz de la aplicación; Consolas aparece únicamente cuando el contenido requiere lectura monoespaciada.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Display Rule",
+        "body": "Cada superficie tiene un solo título de 30-32px; las subdivisiones descienden a 22px y 18-20px sin competir con él.",
+        "section": "typography"
+      },
+      {
+        "name": "The Fixed Shell Rule",
+        "body": "La barra lateral establece orientación persistente; las tareas viven en el área flexible y no crean una segunda navegación paralela.",
+        "section": "layout"
+      },
+      {
+        "name": "The Compact Tool Rule",
+        "body": "Paneles flotantes y barras de acción reducen espacio, pero nunca el tamaño mínimo efectivo de los controles ni el recorrido de teclado.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-by-Structure Rule",
+        "body": "Una superficie gana jerarquía por contraste, borde y posición; no se añaden sombras para compensar una agrupación débil.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Nested Radius Rule",
+        "body": "El contenedor exterior usa el radio mayor; los elementos interiores emplean radios iguales o menores.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do mantener la distribución Azul Archivo → Papel Frío → Superficie Blanca para distinguir carcasa, espacio de trabajo y contenido.",
+      "Do usar Cobalto de Captura para iniciar o seleccionar y Verde Revisión para procesar, confirmar o abrir una revisión.",
+      "Do conservar títulos de vista de 30-32px, cuerpo efectivo de al menos 14px y foco visible de 3px.",
+      "Do agrupar tareas completas en tarjetas de 10px y separar filas repetidas con divisores ligeros.",
+      "Do mantener texto, icono o estructura accesible para cada estado comunicado con color."
+    ],
+    "donts": [
+      "Don't añadir sombras a tarjetas o paneles cuando el contraste tonal y la agrupación ya expresan la jerarquía.",
+      "Don't convertir controles rectangulares en píldoras ni introducir radios mayores que la tarjeta contenedora.",
+      "Don't usar Cobalto y Verde como acentos decorativos intercambiables.",
+      "Don't introducir otra familia tipográfica para decorar encabezados; Segoe UI y Consolas cubren las funciones existentes.",
+      "Don't envolver cada fila, campo o bloque de texto en una tarjeta independiente."
+    ]
+  }
+}

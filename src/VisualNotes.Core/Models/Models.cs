@@ -31,6 +31,7 @@ public sealed class CourseModule : Entity
     public string Name { get; set; } = string.Empty;
     public int Order { get; set; }
     public ICollection<NoteSession> Sessions { get; set; } = [];
+    public ICollection<NoteSection> Sections { get; set; } = [];
 }
 
 public sealed class NoteSession : Entity
@@ -65,6 +66,10 @@ public sealed class NoteSection : Entity
     public NoteSection(Guid id, string title, string content, int order) { Id = id; Title = title; Content = content; Order = order; }
     public Guid SessionId { get; set; }
     public NoteSession? Session { get; set; }
+    public Guid? CourseId { get; set; }
+    public Course? Course { get; set; }
+    public Guid? CourseModuleId { get; set; }
+    public CourseModule? CourseModule { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
@@ -74,6 +79,8 @@ public sealed class NoteSection : Entity
     public int Order { get; set; }
     public ICollection<Screenshot> Screenshots { get; set; } = [];
     public ICollection<GeneratedNote> GeneratedNotes { get; set; } = [];
+    [System.ComponentModel.DataAnnotations.Schema.NotMapped]
+    public string AcademicPath => $"{Course?.Name ?? "Sin clasificar"} › {CourseModule?.Name ?? "Sin clasificar"} › {Title}";
 }
 
 public sealed class Screenshot : Entity

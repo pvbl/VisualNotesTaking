@@ -11,11 +11,15 @@ public sealed class SessionRepository(VisualNotesDbContext db) : ISessionReposit
 {
     public Task<NoteSession?> GetAsync(Guid id, CancellationToken ct = default) => db.Sessions
         .Include(x => x.Course).Include(x => x.CourseModule)
-        .Include(x => x.Sections).Include(x => x.Screenshots).ThenInclude(x => x.Image)
+        .Include(x => x.Sections).ThenInclude(x => x.Course)
+        .Include(x => x.Sections).ThenInclude(x => x.CourseModule)
+        .Include(x => x.Screenshots).ThenInclude(x => x.Image)
         .SingleOrDefaultAsync(x => x.Id == id, ct);
     public async Task<IReadOnlyList<NoteSession>> ListAsync(CancellationToken ct = default) =>
         (await db.Sessions.Include(x => x.Course).Include(x => x.CourseModule)
-            .Include(x => x.Sections).Include(x => x.Screenshots).ToListAsync(ct))
+            .Include(x => x.Sections).ThenInclude(x => x.Course)
+            .Include(x => x.Sections).ThenInclude(x => x.CourseModule)
+            .Include(x => x.Screenshots).ToListAsync(ct))
         .OrderByDescending(x => x.ModifiedAt).ToList();
     public Task AddAsync(NoteSession session, CancellationToken ct = default) => db.Sessions.AddAsync(session, ct).AsTask();
     public void Remove(NoteSession session) => db.Sessions.Remove(session);
@@ -25,7 +29,12 @@ public sealed class ScreenshotRepository(VisualNotesDbContext db) : IScreenshotR
 {
     public Task<Screenshot?> GetAsync(Guid id, CancellationToken ct = default) => db.Screenshots.Include(x => x.Image).Include(x => x.Context).Include(x => x.Revisions).Include(x => x.AnalysisJobs).ThenInclude(x => x.Result).SingleOrDefaultAsync(x => x.Id == id, ct);
     public async Task<IReadOnlyList<Screenshot>> ListBySessionAsync(Guid sessionId, CancellationToken ct = default) =>
-        (await db.Screenshots.AsNoTracking().Include(x => x.Image).Include(x => x.AnalysisJobs).ThenInclude(x => x.Result).Where(x => x.SessionId == sessionId).ToListAsync(ct))
+        (await db.Screenshots.AsNoTracking()
+            .Include(x => x.Image)
+            .Include(x => x.Section).ThenInclude(x => x!.Course)
+            .Include(x => x.Section).ThenInclude(x => x!.CourseModule)
+            .Include(x => x.AnalysisJobs).ThenInclude(x => x.Result)
+            .Where(x => x.SessionId == sessionId).ToListAsync(ct))
         .OrderBy(x => x.CapturedAt).ToList();
     public Task AddAsync(Screenshot screenshot, CancellationToken ct = default) => db.Screenshots.AddAsync(screenshot, ct).AsTask();
 }

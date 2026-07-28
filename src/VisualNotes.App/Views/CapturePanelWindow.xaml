@@ -65,25 +65,39 @@
     <StackPanel>
      <Border Style="{StaticResource Card}">
       <StackPanel>
-       <TextBlock Text="UBICACIÓN DE TRABAJO" Style="{StaticResource Label}"/>
+       <TextBlock Text="CONTEXTO DE LOS APUNTES" Style="{StaticResource Label}"/>
+       <TextBlock Text="Sesión de trabajo" Style="{StaticResource Label}"/>
+       <ComboBox ItemsSource="{Binding AvailableSessions}" SelectedItem="{Binding SelectedSession}"
+                 DisplayMemberPath="Name" AutomationProperties.AutomationId="PanelSessionSelector"/>
+       <TextBlock Text="La sesión puede contener apuntes de varios cursos." Foreground="#64748B"
+                  TextWrapping="Wrap" Margin="0,4,0,10"/>
        <TextBlock Text="Curso" Style="{StaticResource Label}"/>
-       <ComboBox ItemsSource="{Binding Courses}" SelectedItem="{Binding SelectedCourseName}"
+       <ComboBox ItemsSource="{Binding Courses}" Text="{Binding SelectedCourseName, UpdateSourceTrigger=PropertyChanged}"
+                 IsEditable="True"
                  AutomationProperties.AutomationId="PanelCourseSelector"/>
        <Grid Margin="0,8,0,0">
         <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
         <StackPanel Margin="0,0,5,0">
          <TextBlock Text="Módulo" Style="{StaticResource Label}"/>
-         <ComboBox ItemsSource="{Binding Modules}" SelectedItem="{Binding SelectedModuleName}"
+         <ComboBox ItemsSource="{Binding Modules}" Text="{Binding SelectedModuleName, UpdateSourceTrigger=PropertyChanged}"
+                   IsEditable="True"
                    AutomationProperties.AutomationId="PanelModuleSelector"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Margin="5,0,0,0">
-         <TextBlock Text="Sesión" Style="{StaticResource Label}"/>
-         <ComboBox ItemsSource="{Binding AvailableSessions}" SelectedItem="{Binding SelectedSession}"
-                   DisplayMemberPath="Name" AutomationProperties.AutomationId="PanelSessionSelector"/>
+         <TextBlock Text="Sección del curso" Style="{StaticResource Label}"/>
+         <ComboBox ItemsSource="{Binding Sections}" SelectedValuePath="Id" DisplayMemberPath="AcademicPath"
+                   SelectedValue="{Binding SelectedSectionId}"
+                   AutomationProperties.AutomationId="PanelSectionSelector"/>
         </StackPanel>
        </Grid>
-       <TextBlock Text="{Binding SectionName, StringFormat=Sección activa: {0}}"
-                  Foreground="#2563EB" FontWeight="SemiBold" Margin="0,8,0,0"/>
+       <DockPanel Margin="0,8,0,0">
+        <Button DockPanel.Dock="Right" Content="+ Crear sección" Command="{Binding AddSectionCommand}"
+                AutomationProperties.AutomationId="PanelAddSectionButton"/>
+        <TextBox Text="{Binding NewSectionName, UpdateSourceTrigger=PropertyChanged}"
+                 ToolTip="Nombre de la nueva sección del curso"/>
+       </DockPanel>
+       <TextBlock Text="{Binding SectionName, StringFormat=Destino activo: {0}}"
+                  Foreground="#2563EB" FontWeight="SemiBold" Margin="0,6,0,0"/>
       </StackPanel>
      </Border>
 
@@ -153,11 +167,20 @@
 
      <Expander Header="Más controles" Background="White" Padding="10">
       <StackPanel Margin="0,8,0,0">
-       <WrapPanel>
-        <ComboBox Width="105" ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}"
-                  AutomationProperties.AutomationId="CaptureModeSelector"/>
-        <Button Content="Pausar / reanudar" Command="{Binding TogglePauseCommand}" Margin="6,0"/>
-        <Button Content="{Binding RegionLockLabel}" Command="{Binding ToggleRegionLockCommand}"/>
+       <TextBlock Text="Qué quieres capturar" Style="{StaticResource Label}"/>
+       <ComboBox ItemsSource="{Binding Modes}" DisplayMemberPath="Label"
+                 SelectedValuePath="Mode" SelectedValue="{Binding Mode}"
+                 AutomationProperties.AutomationId="CaptureModeSelector"
+                 AutomationProperties.Name="Tipo de captura"/>
+       <TextBlock Text="{Binding RegionStatus}" Foreground="#475569" Margin="0,6,0,0"
+                  AutomationProperties.LiveSetting="Polite"/>
+       <WrapPanel Margin="0,8,0,0">
+        <Button Content="{Binding DefineRegionLabel}" Command="{Binding DefineRegionCommand}"
+                AutomationProperties.AutomationId="DefineRegionButton"/>
+        <Button Content="{Binding RegionLockLabel}" Command="{Binding ToggleRegionLockCommand}"
+                IsEnabled="{Binding HasRegion}" Margin="6,0,0,0"
+                AutomationProperties.AutomationId="RegionLockButton"/>
+        <Button Content="Pausar / reanudar" Command="{Binding TogglePauseCommand}" Margin="6,0,0,0"/>
        </WrapPanel>
        <WrapPanel Margin="0,8,0,0">
         <Button Content="◀ Sección" Command="{Binding PreviousSectionCommand}"/>
@@ -169,12 +192,6 @@
         <Button Content="Contexto último" Command="{Binding AddContextCommand}"
                 AutomationProperties.AutomationId="AddContextButton" AutomationProperties.Name="Editar contexto de la última captura"/>
        </WrapPanel>
-       <DockPanel Margin="0,8,0,0">
-        <Button DockPanel.Dock="Right" Content="+ Crear" Command="{Binding AddSectionCommand}"
-                AutomationProperties.AutomationId="PanelAddSectionButton"/>
-        <TextBox Text="{Binding NewSectionName, UpdateSourceTrigger=PropertyChanged}"
-                 ToolTip="Nueva sección"/>
-       </DockPanel>
        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
         <TextBlock Text="Opacidad" VerticalAlignment="Center"/>
         <Slider Width="100" Minimum="0.55" Maximum="1" Value="{Binding PanelOpacity}" Margin="8,0"/>

@@ -94,7 +94,7 @@
              <TextBlock Text="{Binding DisplayTitle, TargetNullValue=Sin título}"
                         FontWeight="SemiBold" FontSize="15"/>
              <TextBlock Foreground="#64748B">
-              <Run Text="{Binding Section.Title, TargetNullValue=Sin sección}"/><Run Text=" · "/>
+              <Run Text="{Binding Section.AcademicPath, TargetNullValue=Sin sección}"/><Run Text=" · "/>
               <Run Text="{Binding CapturedAt, StringFormat={}{0:HH:mm:ss}}"/>
              </TextBlock>
              <TextBlock Text="{Binding UserContext}" TextTrimming="CharacterEllipsis" MaxWidth="420"/>
@@ -148,7 +148,7 @@
      <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
      <DockPanel Margin="0,0,8,0">
       <TextBlock DockPanel.Dock="Top" Text="Fuente Markdown" FontWeight="SemiBold" Margin="0,0,0,7"/>
-      <TextBox Text="{Binding PreviewMarkdown}" IsReadOnly="True" AcceptsReturn="True"
+      <TextBox Text="{Binding PreviewMarkdown, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
                TextWrapping="NoWrap" FontFamily="Consolas"
                VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
      </DockPanel>

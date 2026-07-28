@@ -5,7 +5,8 @@ using VisualNotes.Core.Models;
 
 namespace VisualNotes.App.ViewModels;
 
-public enum CapturePanelMode { Region, Monitor, Desktop, Window }
+public enum CapturePanelMode { Monitor, Region, Window, Desktop }
+public sealed record CaptureModeChoice(CapturePanelMode Mode, string Label, string Description);
 public enum CapturePanelPlacement { Flotante, Izquierda, Derecha, Arriba, Abajo }
 public enum ContextEditorPlacement { Dentro, Izquierda, Derecha, Debajo, Flotante }
 public enum DraftChangeDecision { SaveAsNote, Discard, Cancel }
@@ -20,7 +21,7 @@ public sealed class CapturePanelViewModel : ViewModelBase
 {
     private readonly MainViewModel _main;
     private readonly Func<bool, Task<bool>>? _setRegionLock;
-    private CapturePanelMode _mode = CapturePanelMode.Region;
+    private CapturePanelMode _mode = CapturePanelMode.Monitor;
     private int _queuedCaptures;
     private int _captureCount;
     private bool _isMinimal;
@@ -32,6 +33,7 @@ public sealed class CapturePanelViewModel : ViewModelBase
     private string _captureTags = string.Empty;
     private string _newSectionName = string.Empty;
     private bool _isRegionLocked;
+    private bool _hasRegion;
     private string _selectedCourseName = string.Empty;
     private string _selectedModuleName = string.Empty;
     private NoteSession? _selectedSession;
@@ -57,7 +59,8 @@ public sealed class CapturePanelViewModel : ViewModelBase
         RunSessionBatchCommand = _main.Captures.RunSessionBatchCommand;
         AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
         {
-            var section = await _main.AddSectionAsync(NewSectionName, cancellationToken);
+            var (course, module) = ResolveAcademicContext();
+            var section = await _main.AddSectionAsync(NewSectionName, course, module, cancellationToken);
             NewSectionName = string.Empty;
             OnPropertyChanged(nameof(Sections));
             OnPropertyChanged(nameof(SelectedSectionId));
@@ -69,6 +72,7 @@ public sealed class CapturePanelViewModel : ViewModelBase
             if (_setRegionLock is not null && await _setRegionLock(requested))
                 SetRegionLockState(requested);
         });
+        DefineRegionCommand = main.RedefineRegionCommand;
         TogglePauseCommand = main.TogglePauseCommand;
         NextSectionCommand = new RelayCommand(_ => ChangeSection(1));
         PreviousSectionCommand = new RelayCommand(_ => ChangeSection(-1));
@@ -93,16 +97,14 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public string SessionName => _main.ActiveSessionName;
     public string SectionName => _main.ActiveSectionName;
     public string SessionStatus => _main.SessionStatus;
-    public IReadOnlyList<string> Courses => _main.Sessions.RecentSessions
-        .Select(SessionCourseName).Distinct(StringComparer.CurrentCultureIgnoreCase)
+    public IReadOnlyList<string> Courses => AcademicLocations()
+        .Select(location => location.Course.Name).Distinct(StringComparer.CurrentCultureIgnoreCase)
         .OrderBy(x => x).ToArray();
-    public IReadOnlyList<string> Modules => _main.Sessions.RecentSessions
-        .Where(session => SessionCourseName(session) == SelectedCourseName)
-        .Select(SessionModuleName).Distinct(StringComparer.CurrentCultureIgnoreCase)
+    public IReadOnlyList<string> Modules => AcademicLocations()
+        .Where(location => location.Course.Name.Equals(SelectedCourseName, StringComparison.CurrentCultureIgnoreCase))
+        .Select(location => location.Module.Name).Distinct(StringComparer.CurrentCultureIgnoreCase)
         .OrderBy(x => x).ToArray();
     public IReadOnlyList<NoteSession> AvailableSessions => _main.Sessions.RecentSessions
-        .Where(session => SessionCourseName(session) == SelectedCourseName &&
-            SessionModuleName(session) == SelectedModuleName)
         .OrderByDescending(session => session.ModifiedAt).ToArray();
     public string SelectedCourseName
     {
@@ -144,14 +146,28 @@ public sealed class CapturePanelViewModel : ViewModelBase
         {
             if (value is not { } id || id == _main.ActiveSession?.ActiveSectionId) return;
             var section = Sections.FirstOrDefault(item => item.Id == id);
-            if (section is not null) _main.Sessions.ActivateSectionCommand.Execute(section);
+            if (section is not null)
+            {
+                _main.Sessions.ActivateSectionCommand.Execute(section);
+                SelectAcademicContext(section);
+            }
         }
     }
     public string NewSectionName { get => _newSectionName; set { _newSectionName = value; OnPropertyChanged(); } }
+    public bool HasRegion => _hasRegion;
     public bool IsRegionLocked => _isRegionLocked;
-    public string RegionLockLabel => IsRegionLocked ? "Desbloquear región" : "Bloquear región";
+    public string RegionStatus => !HasRegion ? "Región sin definir" :
+        IsRegionLocked ? "Región bloqueada" : "Región lista";
+    public string DefineRegionLabel => HasRegion ? "Redefinir región" : "Definir región";
+    public string RegionLockLabel => IsRegionLocked ? "Desbloquear" : "Bloquear";
     public CapturePanelMode Mode { get => _mode; set { _mode = value; OnPropertyChanged(); } }
-    public IReadOnlyList<CapturePanelMode> Modes { get; } = Enum.GetValues<CapturePanelMode>();
+    public IReadOnlyList<CaptureModeChoice> Modes { get; } =
+    [
+        new(CapturePanelMode.Monitor, "Pantalla", "Monitor donde está el cursor"),
+        new(CapturePanelMode.Region, "Región", "Área reutilizable de la pantalla"),
+        new(CapturePanelMode.Window, "Ventana", "Ventana que elijas"),
+        new(CapturePanelMode.Desktop, "Todos los monitores", "Escritorio virtual completo")
+    ];
     public CapturePanelPlacement Placement
     {
         get => _placement;
@@ -205,6 +221,7 @@ public sealed class CapturePanelViewModel : ViewModelBase
     public ICommand RunSessionBatchCommand { get; }
     public ICommand AddSectionCommand { get; }
     public ICommand ToggleRegionLockCommand { get; }
+    public ICommand DefineRegionCommand { get; }
     public ICommand TogglePauseCommand { get; }
     public ICommand NextSectionCommand { get; }
     public ICommand PreviousSectionCommand { get; }
@@ -223,13 +240,19 @@ public sealed class CapturePanelViewModel : ViewModelBase
         if (clearContext) ClearDraft();
     }
 
-    public void SetRegionLockState(bool isLocked)
+    public void SetRegionState(bool hasRegion, bool isLocked)
     {
-        if (_isRegionLocked == isLocked) return;
+        if (_hasRegion == hasRegion && _isRegionLocked == isLocked) return;
+        _hasRegion = hasRegion;
         _isRegionLocked = isLocked;
+        OnPropertyChanged(nameof(HasRegion));
         OnPropertyChanged(nameof(IsRegionLocked));
+        OnPropertyChanged(nameof(RegionStatus));
+        OnPropertyChanged(nameof(DefineRegionLabel));
         OnPropertyChanged(nameof(RegionLockLabel));
     }
+
+    public void SetRegionLockState(bool isLocked) => SetRegionState(true, isLocked);
 
     public static Rect ConstrainToWorkArea(Rect requested, Rect workArea)
     {
@@ -301,8 +324,12 @@ public sealed class CapturePanelViewModel : ViewModelBase
     private void RefreshSession()
     {
         _selectedSession = _main.ActiveSession;
-        _selectedCourseName = _selectedSession is null ? Courses.FirstOrDefault() ?? string.Empty : SessionCourseName(_selectedSession);
-        _selectedModuleName = _selectedSession is null ? Modules.FirstOrDefault() ?? string.Empty : SessionModuleName(_selectedSession);
+        var activeSection = _selectedSession?.Sections.FirstOrDefault(section =>
+            section.Id == _selectedSession.ActiveSectionId);
+        _selectedCourseName = activeSection?.Course?.Name ??
+            _selectedSession?.Course?.Name ?? Courses.FirstOrDefault() ?? "Sin clasificar";
+        _selectedModuleName = activeSection?.CourseModule?.Name ??
+            _selectedSession?.CourseModule?.Name ?? Modules.FirstOrDefault() ?? "Sin clasificar";
         OnPropertyChanged(nameof(SessionName));
         OnPropertyChanged(nameof(SectionName));
         OnPropertyChanged(nameof(SessionStatus));
@@ -346,9 +373,45 @@ public sealed class CapturePanelViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasDraft));
     }
 
-    private static string SessionCourseName(NoteSession session) =>
-        string.IsNullOrWhiteSpace(session.Course?.Name) ? "Sin clasificar" : session.Course.Name;
-    private static string SessionModuleName(NoteSession session) =>
-        !string.IsNullOrWhiteSpace(session.CourseModule?.Name) ? session.CourseModule.Name :
-        !string.IsNullOrWhiteSpace(session.Module) ? session.Module : "Sin clasificar";
+    private IReadOnlyList<(Course Course, CourseModule Module)> AcademicLocations()
+    {
+        var fromSections = _main.Sessions.RecentSessions.SelectMany(session => session.Sections)
+            .Where(section => section.Course is not null && section.CourseModule is not null)
+            .Select(section => (Course: section.Course!, Module: section.CourseModule!));
+        var legacy = _main.Sessions.RecentSessions
+            .Where(session => session.Course is not null && session.CourseModule is not null)
+            .Select(session => (Course: session.Course!, Module: session.CourseModule!));
+        return fromSections.Concat(legacy)
+            .DistinctBy(location => (location.Item1.Id, location.Item2.Id)).ToArray();
+    }
+
+    private (Course Course, CourseModule Module) ResolveAcademicContext()
+    {
+        var courseName = string.IsNullOrWhiteSpace(SelectedCourseName) ? "Sin clasificar" : SelectedCourseName.Trim();
+        var moduleName = string.IsNullOrWhiteSpace(SelectedModuleName) ? "Sin clasificar" : SelectedModuleName.Trim();
+        var locations = AcademicLocations();
+        var course = locations.Select(location => location.Course).FirstOrDefault(item =>
+            item.Name.Equals(courseName, StringComparison.CurrentCultureIgnoreCase)) ??
+            new Course { Name = courseName };
+        var module = locations.Where(location => location.Course.Id == course.Id)
+            .Select(location => location.Module).FirstOrDefault(item =>
+                item.Name.Equals(moduleName, StringComparison.CurrentCultureIgnoreCase)) ??
+            course.Modules.FirstOrDefault(item =>
+                item.Name.Equals(moduleName, StringComparison.CurrentCultureIgnoreCase)) ??
+            new CourseModule
+            {
+                CourseId = course.Id,
+                Course = course,
+                Name = moduleName,
+                Order = course.Modules.Count
+            };
+        if (!course.Modules.Contains(module)) course.Modules.Add(module);
+        return (course, module);
+    }
+
+    private void SelectAcademicContext(NoteSection section)
+    {
+        if (section.Course is not null) SelectedCourseName = section.Course.Name;
+        if (section.CourseModule is not null) SelectedModuleName = section.CourseModule.Name;
+    }
 }

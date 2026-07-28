@@ -27,7 +27,18 @@ public sealed class CapturePanelUiTests
 
         persisted.GetValueOrDefault().ShouldBeTrue();
         panel.IsRegionLocked.ShouldBeTrue();
-        panel.RegionLockLabel.ShouldBe("Desbloquear región");
+        panel.RegionLockLabel.ShouldBe("Desbloquear");
+        panel.RegionStatus.ShouldBe("Región bloqueada");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Capture_defaults_to_the_monitor_under_the_pointer()
+    {
+        var panel = new CapturePanelViewModel(CreateMain());
+
+        panel.Mode.ShouldBe(CapturePanelMode.Monitor);
+        panel.Modes.First().Label.ShouldBe("Pantalla");
+        panel.RegionStatus.ShouldBe("Región sin definir");
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
@@ -165,6 +176,9 @@ public sealed class CapturePanelUiTests
         xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelCourseSelector\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelModuleSelector\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelSessionSelector\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"PanelSectionSelector\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"DefineRegionButton\"");
+        xaml.ShouldContain("AutomationProperties.AutomationId=\"RegionLockButton\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"CaptureTitleInput\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"CaptureTagsInput\"");
         xaml.ShouldContain("AutomationProperties.AutomationId=\"CaptureContextMarkdownInput\"");
@@ -221,10 +235,25 @@ public sealed class CapturePanelUiTests
 
         var ensure = source.IndexOf("await _viewModel.EnsureActiveSessionAsync();", StringComparison.Ordinal);
         var resume = source.IndexOf("await _viewModel.ResumeActiveSessionAsync();", ensure, StringComparison.Ordinal);
-        var capture = source.IndexOf("var frame = await _capture.CaptureAsync(new(captureMode));", StringComparison.Ordinal);
+        var capture = source.IndexOf("var frame = await _capture.CaptureAsync(new(captureMode, WindowHandle: windowHandle));", StringComparison.Ordinal);
         ensure.ShouldBeGreaterThanOrEqualTo(0);
         resume.ShouldBeGreaterThan(ensure);
         capture.ShouldBeGreaterThan(resume);
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Window_mode_uses_an_explicit_picker_and_never_targets_visual_notes_itself()
+    {
+        var appPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+            "src", "VisualNotes.App", "App.xaml.cs");
+        var servicePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+            "src", "VisualNotes.App", "Services", "WindowsScreenCaptureService.cs");
+
+        var app = File.ReadAllText(Path.GetFullPath(appPath));
+        app.ShouldContain("WindowCapturePicker.Choose");
+        app.ShouldContain("WindowHandle: windowHandle");
+        var service = File.ReadAllText(Path.GetFullPath(servicePath));
+        service.ShouldContain("processId == (uint)currentProcess");
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]

@@ -8,6 +8,16 @@ namespace VisualNotes.UiTests;
 public sealed class CaptureManagementUiTests
 {
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Read_only_markdown_preview_uses_a_one_way_binding()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+            "src", "VisualNotes.App", "Views", "CapturesView.xaml");
+
+        File.ReadAllText(Path.GetFullPath(path))
+            .ShouldContain("Text=\"{Binding PreviewMarkdown, Mode=OneWay}\"");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
     public void Extended_selection_runs_destructive_action_and_keyboard_undo()
     {
         var captures = MakeCaptures();

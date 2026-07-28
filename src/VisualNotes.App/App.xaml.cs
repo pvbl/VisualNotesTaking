@@ -167,6 +167,7 @@ public partial class App : System.Windows.Application
             SetRegionLockAsync,
             _activeRegion?.IsLocked == true,
             ConfirmDraftSessionChangeAsync);
+        _capturePanelViewModel.SetRegionState(_activeRegion is not null, _activeRegion?.IsLocked == true);
         _capturePanelViewModel.CaptureRequested += CaptureFromPanel;
         _capturePanel = new Views.CapturePanelWindow { DataContext = _capturePanelViewModel };
         _contextPanel = new Views.ContextPanelWindow
@@ -228,7 +229,7 @@ public partial class App : System.Windows.Application
             IsLocked: metadata.RegionIsLocked,
             IsHidden: metadata.RegionIsHidden);
         await _regions.SaveAsync(_activeRegion);
-        _capturePanelViewModel?.SetRegionLockState(_activeRegion.IsLocked);
+        _capturePanelViewModel?.SetRegionState(true, _activeRegion.IsLocked);
         _regionBorder?.Show(_activeRegion);
     }
 
@@ -267,8 +268,31 @@ public partial class App : System.Windows.Application
         await _viewModel.ResumeActiveSessionAsync();
         if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(draft, true); return; }
         var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
-        var frame = await _capture.CaptureAsync(new(captureMode));
+        nint? windowHandle = null;
+        if (mode == CapturePanelMode.Window)
+        {
+            windowHandle = Views.WindowCapturePicker.Choose(WindowsScreenCaptureService.GetCapturableWindows());
+            if (windowHandle is null) return;
+        }
+        var frame = await _capture.CaptureAsync(new(captureMode, WindowHandle: windowHandle));
+        if (mode == CapturePanelMode.Region && frame?.Metadata is not null)
+            await RememberRegionAsync(frame.Metadata);
         if (frame is not null) await PersistCapturedFrameAsync(frame, draft, true);
+    }
+
+    private async Task RememberRegionAsync(CaptureMetadata metadata)
+    {
+        if (_regions is null || _viewModel is null) return;
+        var monitors = WindowsScreenCaptureService.GetMonitors();
+        var monitor = monitors.FirstOrDefault(x => x.DeviceName == metadata.MonitorDeviceName) ??
+            monitors.FirstOrDefault();
+        if (monitor is null) return;
+        _activeRegion = new(metadata.PhysicalBounds, monitor.DeviceName, monitor.DpiX, monitor.DpiY,
+            _viewModel.ActiveSession?.Id ?? Guid.Empty, monitor.Bounds,
+            IsLocked: metadata.RegionIsLocked, IsHidden: metadata.RegionIsHidden);
+        await _regions.SaveAsync(_activeRegion);
+        _capturePanelViewModel?.SetRegionState(true, _activeRegion.IsLocked);
+        _regionBorder?.Show(_activeRegion);
     }
 
     private void CreateTrayIcon()

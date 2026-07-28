@@ -21,11 +21,29 @@ public interface IRegionSelectionOverlay
 }
 
 public sealed record RegionSelectionResult(PhysicalRectangle Bounds, bool IsLocked, bool IsHidden);
+public sealed record CapturableWindow(nint Handle, string Title);
 
 /// <summary>Captures physical desktop pixels after all VisualNotes surfaces have been hidden.</summary>
 public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay overlay) : IScreenCaptureService
 {
     public static IReadOnlyList<MonitorCaptureInfo> GetMonitors() => Forms.Screen.AllScreens.Select(GetMonitor).ToArray();
+
+    public static IReadOnlyList<CapturableWindow> GetCapturableWindows()
+    {
+        var currentProcess = Environment.ProcessId;
+        var windows = new List<CapturableWindow>();
+        NativeMethods.EnumWindows((handle, parameter) =>
+        {
+            if (!NativeMethods.IsWindowVisible(handle) || NativeMethods.GetWindowTextLength(handle) == 0)
+                return true;
+            NativeMethods.GetWindowThreadProcessId(handle, out var processId);
+            if (processId == (uint)currentProcess) return true;
+            var title = GetWindowTitle(handle);
+            if (!string.IsNullOrWhiteSpace(title)) windows.Add(new(handle, title));
+            return true;
+        }, 0);
+        return windows.OrderBy(window => window.Title, StringComparer.CurrentCultureIgnoreCase).ToArray();
+    }
 
     public async Task<CapturedFrame?> CaptureAsync(CaptureRequest request, CancellationToken cancellationToken = default)
     {
@@ -134,6 +152,7 @@ public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay 
 
     private static partial class NativeMethods
     {
+        internal delegate bool EnumWindowsProc(nint window, nint parameter);
         [StructLayout(LayoutKind.Sequential)]
         internal readonly struct Point(int x, int y)
         {
@@ -142,6 +161,9 @@ public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay 
         }
         [StructLayout(LayoutKind.Sequential)] internal struct Rect { internal int Left, Top, Right, Bottom; }
         [LibraryImport("user32.dll")] internal static partial nint GetForegroundWindow();
+        [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static partial bool EnumWindows(EnumWindowsProc callback, nint parameter);
+        [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static partial bool IsWindowVisible(nint window);
+        [LibraryImport("user32.dll")] internal static partial uint GetWindowThreadProcessId(nint window, out uint processId);
         [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] internal static partial bool GetWindowRect(nint window, out Rect rectangle);
         [LibraryImport("user32.dll", EntryPoint = "GetWindowTextLengthW", StringMarshalling = StringMarshalling.Utf16)] internal static partial int GetWindowTextLength(nint window);
         [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(nint window, StringBuilder text, int count);
