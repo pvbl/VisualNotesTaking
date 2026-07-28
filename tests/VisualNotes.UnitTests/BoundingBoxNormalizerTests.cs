@@ -1,6 +1,8 @@
 using FsCheck;
 using FsCheck.Xunit;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -59,7 +61,7 @@ public sealed class BoundingBoxNormalizerTests
     }
 
     [Property(MaxTest = 5000, QuietOnSuccess = true)]
-    public Property Every_accepted_random_box_stays_inside_the_exact_image(
+    public bool Every_accepted_random_box_stays_inside_the_exact_image(
         PositiveInt widthValue, PositiveInt heightValue, int ax, int ay, int bx, int by, NonNegativeInt marginValue)
     {
         var width = Math.Clamp(widthValue.Get, 2, 4096);
@@ -72,12 +74,11 @@ public sealed class BoundingBoxNormalizerTests
         {
             var crop = BoundingBoxNormalizer.Normalize(new(y1, x1, y2, x2), CoordinateSystem.Pixels,
                 width, height, new(Math.Min(marginValue.Get, 100), 1, 1)).Pixels;
-            return (crop.X >= 0 && crop.Y >= 0 && crop.Right <= width && crop.Bottom <= height && !crop.IsEmpty)
-                .ToProperty();
+            return crop.X >= 0 && crop.Y >= 0 && crop.Right <= width && crop.Bottom <= height && !crop.IsEmpty;
         }
         catch (ArgumentException)
         {
-            return true.ToProperty();
+            return true;
         }
     }
 }

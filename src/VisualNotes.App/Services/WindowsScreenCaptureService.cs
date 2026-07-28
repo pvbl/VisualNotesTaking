@@ -5,8 +5,10 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Interop;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+
 using DrawingSize = System.Drawing.Size;
 using Forms = System.Windows.Forms;
 using WpfApplication = System.Windows.Application;
@@ -127,7 +129,7 @@ public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay 
         }
         [StructLayout(LayoutKind.Sequential)] internal struct Rect { internal int Left, Top, Right, Bottom; }
         [LibraryImport("user32.dll")] internal static partial nint GetForegroundWindow();
-        [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static partial bool GetWindowRect(nint window, out Rect rectangle);
+        [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] internal static partial bool GetWindowRect(nint window, out Rect rectangle);
         [LibraryImport("user32.dll", EntryPoint = "GetWindowTextLengthW", StringMarshalling = StringMarshalling.Utf16)] internal static partial int GetWindowTextLength(nint window);
         [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(nint window, StringBuilder text, int count);
         [LibraryImport("user32.dll")] internal static partial nint MonitorFromPoint(Point point, uint flags);

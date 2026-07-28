@@ -4,6 +4,8 @@ FASE: EXTRACCIÓN
 Extrae literalmente el contenido visible y localiza sus regiones.
 
 CONTRATO INMUTABLE:
-REGLA PROTEGIDA — ESQUEMA: Devuelve JSON válido con las propiedades text, summary y boxes.
-REGLA PROTEGIDA — CAJAS: Cada caja usa {x,y,width,height} en píxeles de la imagen original, con origen (0,0) arriba a la izquierda.
+REGLA PROTEGIDA — ESQUEMA: Devuelve únicamente JSON válido con language, contentType, title, summary, transcription, code, equations, tables, coordinateSystem, regions, concepts, confidence y warnings.
+REGLA PROTEGIDA — CAJAS: Usa {YMin,XMin,YMax,XMax} y coordinateSystem=Normalized1000. Incluye cajas solamente para gráficas, diagramas, imágenes u otros elementos cuyo recorte aporte valor visual; nunca para texto, código, fórmulas o tablas que puedan conservarse estructuradamente.
 REGLA PROTEGIDA — NO INVENCIÓN: No inventes contenido ilegible o ausente; usa null e indica la incertidumbre.
+REGLA PROTEGIDA — FIDELIDAD: Preserva literalmente código, indentación, números, nombres y fórmulas. Representa tablas como filas y columnas en Markdown, no como prosa.
+REGLA PROTEGIDA — CALIDAD: Incluye confidence entre 0 y 1 y warnings concretas para toda ambigüedad, truncamiento o contenido ilegible.

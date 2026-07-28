@@ -1,4 +1,5 @@
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -45,7 +46,7 @@ public sealed class CaptureLibraryTests
         library.MoveToSection(ids, section);
         captures.Take(2).ShouldAllBe(x => x.SectionId == section);
         library.Undo().ShouldBeTrue();
-        captures.ShouldAllBe(x => x.SectionId is null);
+        captures.ShouldAllBe(x => x.SectionId == null);
     }
 
     [Theory, Trait("Category", "Unit")]

@@ -1,5 +1,7 @@
 using DocumentFormat.OpenXml.Packaging;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure;
@@ -26,8 +28,11 @@ public sealed class PersistedCaptureDocumentJourneyTests : IDisposable
         };
         var capture = new Screenshot
         {
-            SessionId = session.Id, SectionId = section.Id, ProcessingStatus = ScreenshotStatus.NeedsReview,
-            UserContext = "Definición destacada por el estudiante", AnalysisJobs = [job]
+            SessionId = session.Id,
+            SectionId = section.Id,
+            ProcessingStatus = ScreenshotStatus.NeedsReview,
+            UserContext = "Definición destacada por el estudiante",
+            AnalysisJobs = [job]
         };
         job.ScreenshotId = capture.Id;
         await runtime.Coordinator.AddCaptureAsync(session, capture);

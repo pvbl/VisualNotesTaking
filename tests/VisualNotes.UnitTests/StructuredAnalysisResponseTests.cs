@@ -1,8 +1,15 @@
+using System.Text.Encodings.Web;
+using System.Text.Json;
+
 using FsCheck.Xunit;
+
 using Shouldly;
+
 using VerifyXunit;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+
 using Xunit;
 
 namespace VisualNotes.UnitTests;
@@ -10,6 +17,12 @@ namespace VisualNotes.UnitTests;
 [Trait("Category", "Unit")]
 public sealed class StructuredAnalysisResponseTests
 {
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = true
+    };
+
     private const string ValidJson = """
         {
           "language": "es",
@@ -83,6 +96,10 @@ public sealed class StructuredAnalysisResponseTests
     }
 
     [Fact]
-    public Task Representative_normalized_result_is_reviewable() =>
-        Verifier.Verify(StructuredAnalysisResponseParser.Parse(ValidJson, new(false)).NormalizedJson).UseExtension("json");
+    public Task Representative_normalized_result_is_reviewable()
+    {
+        var normalized = StructuredAnalysisResponseParser.Parse(ValidJson, new(false)).NormalizedJson;
+        var reviewable = JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>(normalized), SnapshotJsonOptions);
+        return Verifier.Verify(reviewable, extension: "json");
+    }
 }

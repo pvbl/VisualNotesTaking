@@ -24,17 +24,26 @@ public sealed class SessionWorkspace : Migration
         m.AddColumn<Guid>("ParentSectionId", "Sections", nullable: true);
         m.CreateIndex("IX_Sessions_ActiveSectionId", "Sessions", "ActiveSectionId");
         m.CreateIndex("IX_Sections_ParentSectionId", "Sections", "ParentSectionId");
-        m.AddForeignKey("FK_Sessions_Sections_ActiveSectionId", "Sessions", "ActiveSectionId", "Sections", principalColumn: "Id", onDelete: ReferentialAction.SetNull);
-        m.AddForeignKey("FK_Sections_Sections_ParentSectionId", "Sections", "ParentSectionId", "Sections", principalColumn: "Id", onDelete: ReferentialAction.Restrict);
+        if (!IsSqlite(m))
+        {
+            m.AddForeignKey("FK_Sessions_Sections_ActiveSectionId", "Sessions", "ActiveSectionId", "Sections", principalColumn: "Id", onDelete: ReferentialAction.SetNull);
+            m.AddForeignKey("FK_Sections_Sections_ParentSectionId", "Sections", "ParentSectionId", "Sections", principalColumn: "Id", onDelete: ReferentialAction.Restrict);
+        }
     }
 
     protected override void Down(MigrationBuilder m)
     {
-        m.DropForeignKey("FK_Sessions_Sections_ActiveSectionId", "Sessions");
-        m.DropForeignKey("FK_Sections_Sections_ParentSectionId", "Sections");
+        if (!IsSqlite(m))
+        {
+            m.DropForeignKey("FK_Sessions_Sections_ActiveSectionId", "Sessions");
+            m.DropForeignKey("FK_Sections_Sections_ParentSectionId", "Sections");
+        }
         m.DropIndex("IX_Sessions_ActiveSectionId", "Sessions");
         m.DropIndex("IX_Sections_ParentSectionId", "Sections");
         foreach (var column in new[] { "Module", "Topic", "Professor", "Language", "WorkingFolder", "PlannedDocumentName", "InstructionTemplate", "ActiveSectionId", "ProcessingStatus", "LastExportedAt" }) m.DropColumn(column, "Sessions");
         m.DropColumn("Description", "Sections"); m.DropColumn("ParentSectionId", "Sections");
     }
+
+    private static bool IsSqlite(MigrationBuilder migrationBuilder) =>
+        string.Equals(migrationBuilder.ActiveProvider, "Microsoft.EntityFrameworkCore.Sqlite", StringComparison.Ordinal);
 }

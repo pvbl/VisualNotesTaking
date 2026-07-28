@@ -1,5 +1,7 @@
 using Shouldly;
+
 using VisualNotes.Core.Models;
+
 using Xunit;
 
 namespace VisualNotes.UnitTests;
@@ -14,7 +16,7 @@ public sealed class NoteSessionTests
 
         session.Id.ShouldNotBe(Guid.Empty);
         session.IsPaused.ShouldBeFalse();
-        session.Frames.ShouldBeEmpty();
+        session.Screenshots.ShouldBeEmpty();
         session.Sections.ShouldBeEmpty();
     }
 }

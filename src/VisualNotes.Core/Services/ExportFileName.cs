@@ -18,6 +18,7 @@ public static class ExportFileName
 
         var result = builder.ToString().Trim().TrimEnd('.');
         if (string.IsNullOrWhiteSpace(result)) result = fallback;
-        return result.Length <= maximumLength ? result : result[..maximumLength].TrimEnd(' ', '.');
+        result = result.Length <= maximumLength ? result : result[..maximumLength].TrimEnd(' ', '.');
+        return string.IsNullOrWhiteSpace(result) ? fallback[..Math.Min(fallback.Length, maximumLength)].TrimEnd(' ', '.') : result;
     }
 }

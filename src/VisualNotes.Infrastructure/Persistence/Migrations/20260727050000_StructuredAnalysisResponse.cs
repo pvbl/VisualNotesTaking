@@ -1,8 +1,11 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace VisualNotes.Infrastructure.Persistence.Migrations;
 
-public partial class StructuredAnalysisResponse : Migration
+[Migration("20260727050000_StructuredAnalysisResponse")]
+[DbContext(typeof(VisualNotesDbContext))]
+public sealed class StructuredAnalysisResponse : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {

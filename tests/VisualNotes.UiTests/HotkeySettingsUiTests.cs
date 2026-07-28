@@ -1,4 +1,5 @@
 using Shouldly;
+
 using VisualNotes.App.ViewModels;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;

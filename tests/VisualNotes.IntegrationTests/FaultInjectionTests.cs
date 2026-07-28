@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Documents;
@@ -37,7 +39,7 @@ public sealed class FaultInjectionTests
         var original = new NoteSession { Name = "before" }; db.Sessions.Add(original); await db.SaveChangesAsync();
         await using var transaction = await db.Database.BeginTransactionAsync();
         original.Name = "after";
-        db.Sessions.Add(new NoteSession { Id = original.Id }); // injected unique-key failure
+        db.Settings.AddRange(new AppSetting { Key = "duplicate" }, new AppSetting { Key = "duplicate" }); // injected unique-key failure
         await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
         await transaction.RollbackAsync();
         db.ChangeTracker.Clear();

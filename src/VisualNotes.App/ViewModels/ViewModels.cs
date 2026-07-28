@@ -2,9 +2,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
-using VisualNotes.Infrastructure.Processing;
 
 namespace VisualNotes.App.ViewModels;
 
@@ -27,9 +27,10 @@ public interface INotificationService
     void ShowError(string message);
 }
 
-public sealed class AsyncRelayCommand : ViewModelBase, ICommand
+public sealed class AsyncRelayCommand : INotifyPropertyChanged, ICommand
 {
     public static INotificationService? DefaultNotificationService { get; set; }
+    public event PropertyChangedEventHandler? PropertyChanged;
     private readonly Func<object?, CancellationToken, Task> _execute;
     private readonly Predicate<object?>? _canExecute;
     private readonly INotificationService? _notifications;
@@ -77,6 +78,7 @@ public sealed class AsyncRelayCommand : ViewModelBase, ICommand
 
     public void Cancel() => _cancellation?.Cancel();
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
 }
 
 public static class AsyncCommandOperations
@@ -132,7 +134,7 @@ public sealed class MainViewModel : ViewModelBase
         IApiCredentialStore? credentials = null, ICaptureWorkspace? captureWorkspace = null,
         IDocumentExporter? documentExporter = null, IExportInteraction? exportInteraction = null,
         ISettingsRepository? settingsRepository = null, IUnitOfWork? unitOfWork = null,
-        DurableAnalysisJobProcessor? analysisJobs = null, ICaptureActionContract? captureActions = null)
+        IAnalysisJobProcessor? analysisJobs = null, ICaptureActionContract? captureActions = null)
     {
         _coordinator = coordinator; _repository = repository;
         _captureWorkspace = captureWorkspace; _documentExporter = documentExporter; _exportInteraction = exportInteraction;
@@ -150,8 +152,11 @@ public sealed class MainViewModel : ViewModelBase
                 Document.ReplaceDocument(await _captureWorkspace.ComposeAsync(ActiveSession));
             CurrentViewModel = page switch
             {
-                "Captures" => Captures, "Instructions" => Instructions,
-                "Document" => Document, "Settings" => _settings ?? Settings, _ => Sessions
+                "Captures" => Captures,
+                "Instructions" => Instructions,
+                "Document" => Document,
+                "Settings" => _settings ?? Settings,
+                _ => Sessions
             };
         });
         TogglePauseCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
@@ -256,9 +261,15 @@ public sealed class SessionViewModel : ViewModelBase
     public NoteSession? SelectedSession { get => _selected; set { _selected = value; OnPropertyChanged(); OnPropertyChanged(nameof(OrderedSections)); if (value is not null) _activate(value); } }
     public NoteSection? SelectedSection { get => _selectedSection; set { _selectedSection = value; OnPropertyChanged(); } }
     public IEnumerable<NoteSection> OrderedSections => SelectedSession is null ? [] : SelectedSession.Sections.OrderBy(x => x.Order);
-    public ICommand CreateCommand { get; } public ICommand DuplicateCommand { get; } public ICommand ContinueCommand { get; }
-    public ICommand SaveCommand { get; } public ICommand AddSectionCommand { get; } public ICommand ActivateSectionCommand { get; }
-    public ICommand RenameSectionCommand { get; } public ICommand MoveUpCommand { get; } public ICommand MoveDownCommand { get; }
+    public ICommand CreateCommand { get; }
+    public ICommand DuplicateCommand { get; }
+    public ICommand ContinueCommand { get; }
+    public ICommand SaveCommand { get; }
+    public ICommand AddSectionCommand { get; }
+    public ICommand ActivateSectionCommand { get; }
+    public ICommand RenameSectionCommand { get; }
+    public ICommand MoveUpCommand { get; }
+    public ICommand MoveDownCommand { get; }
 
     public async Task LoadAsync() { RecentSessions.Clear(); foreach (var session in await _repository.ListAsync()) RecentSessions.Add(session); }
     private static NoteSession NewDraft() => new() { WorkingFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), PlannedDocumentName = "Apuntes.md" };
@@ -269,7 +280,7 @@ public sealed class CapturesViewModel : ViewModelBase
     private CaptureLibrary _library;
     private readonly ICaptureWorkspace? _workspace;
     private readonly Func<NoteSession?>? _activeSession;
-    private readonly DurableAnalysisJobProcessor? _analysisJobs;
+    private readonly IAnalysisJobProcessor? _analysisJobs;
     private Screenshot? _selectedCapture;
     private bool _isQuickContextOpen;
     private Guid? _sectionFilter;
@@ -280,7 +291,7 @@ public sealed class CapturesViewModel : ViewModelBase
     private ReviewFilter _reviewFilter;
 
     public CapturesViewModel(IEnumerable<Screenshot>? captures = null, ICaptureWorkspace? workspace = null,
-        Func<NoteSession?>? activeSession = null, DurableAnalysisJobProcessor? analysisJobs = null)
+        Func<NoteSession?>? activeSession = null, IAnalysisJobProcessor? analysisJobs = null)
     {
         _workspace = workspace; _activeSession = activeSession;
         _analysisJobs = analysisJobs;
@@ -466,6 +477,7 @@ public sealed class DocumentViewModel : ViewModelBase
 public sealed class SettingsViewModel : ViewModelBase
 {
     internal const string SettingsDocumentKey = "hierarchical-settings";
+    private const string ImageTransmissionConsentKey = "privacy.image-upload-consent";
     private readonly IGlobalHotkeyService? _hotkeys;
     private readonly EffectiveSettingsResolver _settingsResolver = new();
     private readonly Dictionary<SettingsLevel, SettingsValues> _layers = [];
@@ -559,7 +571,7 @@ public sealed class SettingsViewModel : ViewModelBase
             ? new SettingsDocument()
             : await _repository.GetAsync<SettingsDocument>(SettingsDocumentKey, cancellationToken) ?? new SettingsDocument();
         LoadLayersFromDocument();
-        _imageUploadConsent = _repository is not null && await _repository.GetAsync<bool?>(SettingsImageTransmissionConsent.Key, cancellationToken) == true;
+        _imageUploadConsent = _repository is not null && await _repository.GetAsync<bool?>(ImageTransmissionConsentKey, cancellationToken) == true;
         OnPropertyChanged(nameof(ImageUploadConsent));
         RefreshEffectiveValues();
     }
@@ -598,8 +610,11 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         _layers[SettingsLevel.ApplicationDefaults] = new()
         {
-            Language = "Español", Provider = "OpenAI", Model = "gpt-4.1-mini",
-            PromptTemplate = "Genera apuntes claros y estructurados.", IncludeImages = true,
+            Language = "Español",
+            Provider = "OpenAI",
+            Model = "gpt-4.1-mini",
+            PromptTemplate = "Genera apuntes claros y estructurados.",
+            IncludeImages = true,
             MaximumImageSide = 2560
         };
         _layers[SettingsLevel.Global] = new();
@@ -642,7 +657,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private async Task PersistConsentAsync()
     {
         if (_repository is null) return;
-        await _repository.SetAsync(SettingsImageTransmissionConsent.Key, ImageUploadConsent);
+        await _repository.SetAsync(ImageTransmissionConsentKey, ImageUploadConsent);
         if (_unitOfWork is not null) await _unitOfWork.SaveChangesAsync();
     }
 

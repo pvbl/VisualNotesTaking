@@ -1,10 +1,14 @@
 using System.Net;
 using System.Text;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+
 using Shouldly;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.LanguageModels;
@@ -34,7 +38,7 @@ public sealed class OfflineResilienceTests : IDisposable
     {
         var json = new string('[', 40) + new string(']', 40);
         Should.Throw<AnalysisResponseValidationException>(() => StructuredAnalysisResponseParser.Parse(json))
-            .InnerException.ShouldBeOfType<System.Text.Json.JsonException>();
+            .InnerException.ShouldBeAssignableTo<System.Text.Json.JsonException>();
     }
 
     [Fact]
@@ -99,16 +103,19 @@ public sealed class OfflineResilienceTests : IDisposable
     {
         Directory.CreateDirectory(root);
         var path = Path.Combine(root, "busy.db");
-        var options = new DbContextOptionsBuilder<VisualNotesDbContext>().UseSqlite($"Data Source={path};Default Timeout=0;Pooling=False").Options;
+        var options = new DbContextOptionsBuilder<VisualNotesDbContext>().UseSqlite($"Data Source={path};Default Timeout=1;Pooling=False").Options;
         await using (var setup = new VisualNotesDbContext(options)) { await setup.Database.EnsureCreatedAsync(); }
-        await using var lockConnection = new SqliteConnection($"Data Source={path};Default Timeout=0;Pooling=False");
+        await using var lockConnection = new SqliteConnection($"Data Source={path};Default Timeout=1;Pooling=False");
         await lockConnection.OpenAsync();
         await using var command = lockConnection.CreateCommand();
         command.CommandText = "BEGIN EXCLUSIVE;";
         await command.ExecuteNonQueryAsync();
         await using var blocked = new VisualNotesDbContext(options);
         blocked.Sessions.Add(new NoteSession { Name = "must-not-commit" });
-        await Should.ThrowAsync<SqliteException>(() => blocked.SaveChangesAsync());
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var failure = await Should.ThrowAsync<DbUpdateException>(() => blocked.SaveChangesAsync(timeout.Token));
+        var sqliteFailure = failure.InnerException.ShouldBeOfType<SqliteException>();
+        (sqliteFailure.SqliteErrorCode is 5 or 6).ShouldBeTrue();
         command.CommandText = "ROLLBACK;";
         await command.ExecuteNonQueryAsync();
         await using var verify = new VisualNotesDbContext(options);
@@ -142,7 +149,8 @@ public sealed class OfflineResilienceTests : IDisposable
         public override long Length => throw new NotSupportedException(); public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
         public override int Read(byte[] buffer, int offset, int count) => throw error;
         public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => ValueTask.FromException<int>(error);
-        public override void Flush() { } public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
         public override void SetLength(long value) => throw new NotSupportedException(); public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 }

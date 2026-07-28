@@ -1,7 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+
 using Shouldly;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
@@ -68,15 +71,15 @@ public sealed class VisualAnalysisPrivacyTests : IAsyncDisposable
 
     public ValueTask DisposeAsync() { if (Directory.Exists(root)) Directory.Delete(root, true); return ValueTask.CompletedTask; }
 
-    private sealed class Consent(bool value) : IImageTransmissionConsent { public Task<bool> HasConsentAsync(Guid _, CancellationToken cancellationToken = default) => Task.FromResult(value); }
+    private sealed class Consent(bool value) : IImageTransmissionConsent { public Task<bool> HasConsentAsync(Guid screenshotId, CancellationToken cancellationToken = default) => Task.FromResult(value); }
     private sealed class CredentialStore(bool exists) : IApiCredentialStore
     {
-        public Task<string?> GetAsync(ApiCredentialProfile _, CancellationToken cancellationToken = default) => Task.FromResult<string?>(exists ? "secret" : null);
-        public Task SaveAsync(ApiCredentialProfile p, string c, CancellationToken t = default) => Task.CompletedTask;
-        public Task<bool> ExistsAsync(ApiCredentialProfile p, CancellationToken t = default) => Task.FromResult(exists);
-        public Task<bool> VerifyAsync(ApiCredentialProfile p, string c, CancellationToken t = default) => Task.FromResult(exists);
-        public Task DeleteAsync(ApiCredentialProfile p, CancellationToken t = default) => Task.CompletedTask;
-        public Task<string?> GetMaskedAsync(ApiCredentialProfile p, CancellationToken t = default) => Task.FromResult<string?>(null);
+        public Task<string?> GetAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default) => Task.FromResult<string?>(exists ? "secret" : null);
+        public Task SaveAsync(ApiCredentialProfile profile, string credential, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> ExistsAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default) => Task.FromResult(exists);
+        public Task<bool> VerifyAsync(ApiCredentialProfile profile, string candidate, CancellationToken cancellationToken = default) => Task.FromResult(exists);
+        public Task DeleteAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<string?> GetMaskedAsync(ApiCredentialProfile profile, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
     }
     private sealed class DeterministicVlmProvider : IVisionLanguageModelProvider
     {
@@ -84,7 +87,7 @@ public sealed class VisualAnalysisPrivacyTests : IAsyncDisposable
         public Task<LanguageModelResponse> GenerateAsync(VisionLanguageModelRequest request, CancellationToken cancellationToken = default)
         {
             RequestCount++;
-            const string json = """{"language":"en","contentType":"slide","title":"Deterministic","summary":"Stable result","transcription":"","code":[],"equations":[],"tables":[],"coordinateSystem":"Normalized1000","regions":[],"concepts":[],"confidence":1,"warnings":[]}""";
+            const string json = """{"language":"en","contentType":"slide","title":"Deterministic","summary":"Stable result","transcription":"Deterministic transcription","code":[],"equations":[],"tables":[],"coordinateSystem":"Normalized1000","regions":[],"concepts":[],"confidence":1,"warnings":[]}""";
             return Task.FromResult(new LanguageModelResponse(json, request.Options.Model, new(null, null)));
         }
     }

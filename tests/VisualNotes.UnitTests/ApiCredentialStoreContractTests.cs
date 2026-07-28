@@ -1,6 +1,9 @@
 using System.Security.Cryptography;
+
 using Shouldly;
+
 using VisualNotes.Core.Services;
+
 using Xunit;
 
 namespace VisualNotes.UnitTests;

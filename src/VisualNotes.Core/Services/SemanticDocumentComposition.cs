@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Core.Services;

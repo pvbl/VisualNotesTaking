@@ -1,5 +1,7 @@
-using Shouldly;
 using System.Windows;
+
+using Shouldly;
+
 using VisualNotes.App.ViewModels;
 
 namespace VisualNotes.UiTests;

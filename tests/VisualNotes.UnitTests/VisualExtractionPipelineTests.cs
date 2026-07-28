@@ -1,7 +1,11 @@
 using System.Text.Json;
+
 using NSubstitute;
+
 using Shouldly;
+
 using VisualNotes.Core.Services;
+
 using Xunit;
 
 namespace VisualNotes.UnitTests;
@@ -32,7 +36,7 @@ public sealed class VisualExtractionPipelineTests
         var store = new MemoryStore();
         var pipeline = new VisualExtractionPipeline(normalizer, model, store);
 
-        var result = await pipeline.ExtractAsync(new("chart", "image/png", [1], 1, 1), new("fixture-vlm"));
+        var result = await pipeline.ExtractAsync(new("chart", "image/png", new byte[] { 1 }, 1, 1), new("fixture-vlm"));
         var regenerated = await pipeline.RegenerateNoteAsync(result.Extraction.ExtractionId);
 
         regenerated.ShouldBe(result.Note);
@@ -57,7 +61,7 @@ public sealed class VisualExtractionPipelineTests
     {
         using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Fixture("dataset.json")));
         manifest.RootElement.GetProperty("datasetVersion").GetString().ShouldBe("1.0.0");
-        manifest.RootElement.GetProperty("privacy").GetString().ShouldContain("Synthetic");
+        manifest.RootElement.GetProperty("privacy").GetString().ShouldNotBeNull().ShouldContain("Synthetic");
         var cases = manifest.RootElement.GetProperty("cases").EnumerateArray().ToArray();
         cases.Length.ShouldBe(8);
         foreach (var item in cases)

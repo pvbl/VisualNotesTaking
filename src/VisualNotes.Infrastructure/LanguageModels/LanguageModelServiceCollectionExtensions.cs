@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+
 using Polly;
+
 using VisualNotes.Core.Services;
 
 namespace VisualNotes.Infrastructure.LanguageModels;

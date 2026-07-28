@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+
 using Shouldly;
 
 namespace VisualNotes.UiTests;
@@ -11,7 +12,6 @@ public sealed class AccessibilityUiTests
     [Fact, Trait("Category", "UI"), Trait("Category", "Accessibility")]
     public void Critical_controls_expose_stable_automation_ids_and_accessible_names()
     {
-        XNamespace automation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         var requiredIds = new[] { "MainWindow", "SessionNameInput", "CreateSessionButton", "CaptureList",
             "CaptureContextInput", "DocumentReviewList", "ExportButton", "CapturePanelWindow", "CaptureNowButton" };
         var elements = Directory.EnumerateFiles(AppDirectory, "*.xaml", SearchOption.AllDirectories)
@@ -19,9 +19,10 @@ public sealed class AccessibilityUiTests
 
         foreach (var id in requiredIds)
         {
-            var element = elements.SingleOrDefault(candidate => (string?)candidate.Attribute(automation + "AutomationProperties.AutomationId") == id);
+            var element = elements.SingleOrDefault(candidate => candidate.Attributes()
+                .Any(attribute => attribute.Name.LocalName == "AutomationProperties.AutomationId" && attribute.Value == id));
             element.ShouldNotBeNull($"AutomationId '{id}' must remain available to UI Automation");
-            var hasName = element.Attribute(automation + "AutomationProperties.Name") is not null ||
+            var hasName = element.Attributes().Any(attribute => attribute.Name.LocalName == "AutomationProperties.Name") ||
                           element.Attribute("Content") is not null;
             hasName.ShouldBeTrue($"'{id}' must expose a name, directly or through its button content");
         }

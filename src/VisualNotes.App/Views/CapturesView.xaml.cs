@@ -1,10 +1,12 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+
 using VisualNotes.App.ViewModels;
 using VisualNotes.Core.Models;
-using WpfDragEventArgs = System.Windows.DragEventArgs;
+
 using WpfDragDropEffects = System.Windows.DragDropEffects;
+using WpfDragEventArgs = System.Windows.DragEventArgs;
 using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
 using WpfPoint = System.Windows.Point;
 using WpfUserControl = System.Windows.Controls.UserControl;

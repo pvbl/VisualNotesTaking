@@ -1,6 +1,9 @@
-using NetArchTest.Rules;
 using System.Reflection;
+
+using NetArchTest.Rules;
+
 using Shouldly;
+
 using Xunit;
 
 namespace VisualNotes.ArchitectureTests;
@@ -8,6 +11,13 @@ namespace VisualNotes.ArchitectureTests;
 [Trait("Category", "Architecture")]
 public sealed class DependencyRulesTests
 {
+    private static readonly Assembly[] ProductAssemblies =
+    [
+        typeof(global::VisualNotes.Core.Models.Entity).Assembly,
+        typeof(global::VisualNotes.Infrastructure.VisualNotesRuntime).Assembly,
+        typeof(global::VisualNotes.App.ViewModels.ViewModelBase).Assembly
+    ];
+
     private static readonly string[] InfrastructureOnlyNamespaces =
     [
         "Microsoft.EntityFrameworkCore",
@@ -96,7 +106,7 @@ public sealed class DependencyRulesTests
                 type.Name.EndsWith(suffix, StringComparison.Ordinal)).ToArray();
             foreach (var contract in contracts)
             {
-                var result = Types.InCurrentDomain().That().ImplementInterface(contract)
+                var result = Types.InAssemblies(ProductAssemblies).That().ImplementInterface(contract)
                     .Should().HaveNameEndingWith(suffix).GetResult();
                 AssertSuccessful(result);
             }

@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Testing.Fixtures;
 using VisualNotes.Testing.Infrastructure;
 using VisualNotes.Testing.Utilities;
+
 using Xunit;
 
 namespace VisualNotes.IntegrationTests;

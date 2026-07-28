@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 

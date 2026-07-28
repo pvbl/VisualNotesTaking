@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+
 using VisualNotes.Core.Services;
 
 namespace VisualNotes.Infrastructure.Security;

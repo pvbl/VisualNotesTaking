@@ -1,5 +1,7 @@
 using FsCheck.Xunit;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -71,7 +73,11 @@ public sealed class EffectiveSettingsResolverTests
 
     private static SettingsValues Values(string value, bool includeImages, int maximumSide) => new()
     {
-        Language = value, Provider = value, Model = value, PromptTemplate = value,
-        IncludeImages = includeImages, MaximumImageSide = maximumSide
+        Language = value,
+        Provider = value,
+        Model = value,
+        PromptTemplate = value,
+        IncludeImages = includeImages,
+        MaximumImageSide = maximumSide
     };
 }

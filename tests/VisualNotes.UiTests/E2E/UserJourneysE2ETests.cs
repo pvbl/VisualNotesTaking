@@ -1,7 +1,9 @@
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Input;
 using FlaUI.Core.WindowsAPI;
+
 using Shouldly;
+
 using VisualNotes.Core.Services;
 
 namespace VisualNotes.UiTests.E2E;
@@ -54,7 +56,7 @@ public sealed class UserJourneysE2ETests
         {
             VisualNotesApplication.ById(window, "SessionNameInput").Focus();
             Keyboard.Type(VirtualKeyShort.TAB);
-            window.Automation.GetFocusedElement().Properties.HasKeyboardFocus.Value.ShouldBeTrue();
+            window.Automation.FocusedElement().Properties.HasKeyboardFocus.Value.ShouldBeTrue();
             Keyboard.Press(VirtualKeyShort.ESCAPE);
             window.IsAvailable.ShouldBeTrue();
         });

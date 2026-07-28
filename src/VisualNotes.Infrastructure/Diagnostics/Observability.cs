@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.RegularExpressions;
+
 using Microsoft.Extensions.Logging;
+
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
@@ -92,7 +95,7 @@ public sealed class VisualNotesTelemetry : IDisposable
 public static class VisualNotesActivity { public static readonly ActivitySource Source = new(VisualNotesTelemetry.SourceName); }
 
 /// <summary>Removes likely credentials and prohibited content from every event before it reaches a sink.</summary>
-public sealed partial class RedactingSink(ILogEventSink inner) : ILogEventSink
+public sealed partial class RedactingSink(ILogEventSink inner) : ILogEventSink, IDisposable
 {
     private const string Redacted = "[REDACTED]";
     public void Emit(LogEvent logEvent)
@@ -112,6 +115,14 @@ public sealed partial class RedactingSink(ILogEventSink inner) : ILogEventSink
         _ => value
     };
     private static Exception? RedactException(Exception? error) => error is null ? null : new Exception($"{error.GetType().Name}: diagnostic details redacted");
+    public void Dispose()
+    {
+        if (inner is IDisposable disposable)
+        {
+            disposable.Dispose();
+        }
+    }
+
     [GeneratedRegex("(?i)(api[_-]?key|authorization|bearer|token|secret|prompt|image|context)\\s*[:=]\\s*[^\\s,;]+")]
     private static partial Regex SecretPattern();
 }
@@ -123,8 +134,10 @@ public static class LoggingFactory
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(logPath))!);
         var configuration = new LoggerConfiguration().MinimumLevel.Information().Enrich.FromLogContext();
         configure?.Invoke(configuration);
-        var file = new Serilog.Sinks.File.FileSink(logPath, new Serilog.Formatting.Json.JsonFormatter(), null);
-        var logger = configuration.WriteTo.Sink(new RedactingSink(file)).CreateLogger();
+        var fileLogger = new LoggerConfiguration()
+            .WriteTo.File(new Serilog.Formatting.Json.JsonFormatter(), logPath)
+            .CreateLogger();
+        var logger = configuration.WriteTo.Sink(new RedactingSink(fileLogger)).CreateLogger();
         return (new SerilogLoggerFactory(logger, dispose: false), logger);
     }
 }

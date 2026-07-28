@@ -5,6 +5,7 @@ using System.Windows.Media;
 
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+
 using Brushes = System.Windows.Media.Brushes;
 
 namespace VisualNotes.App.Services;
@@ -14,9 +15,16 @@ public sealed class PersistentRegionBorder : IDisposable
 {
     private readonly Window _window = new()
     {
-        AllowsTransparency = true, Background = Brushes.Transparent, BorderBrush = Brushes.DeepSkyBlue,
-        BorderThickness = new Thickness(2), WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
-        ShowInTaskbar = false, Topmost = true, IsHitTestVisible = false, Focusable = false
+        AllowsTransparency = true,
+        Background = Brushes.Transparent,
+        BorderBrush = Brushes.DeepSkyBlue,
+        BorderThickness = new Thickness(2),
+        WindowStyle = WindowStyle.None,
+        ResizeMode = ResizeMode.NoResize,
+        ShowInTaskbar = false,
+        Topmost = true,
+        IsHitTestVisible = false,
+        Focusable = false
     };
 
     public PersistentRegionBorder() => _window.SourceInitialized += (_, _) =>

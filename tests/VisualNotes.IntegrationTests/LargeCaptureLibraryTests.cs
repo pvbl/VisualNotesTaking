@@ -1,5 +1,7 @@
 using System.Diagnostics;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -13,8 +15,10 @@ public sealed class LargeCaptureLibraryTests
         var section = Guid.NewGuid();
         var source = Enumerable.Range(0, 1_000).Select(i => new Screenshot
         {
-            CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(i), SectionId = i % 2 == 0 ? section : null,
-            Tags = i % 5 == 0 ? "important, diagram" : "lecture", Importance = i % 5 == 0 ? CaptureImportance.Important : CaptureImportance.Normal,
+            CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(i),
+            SectionId = i % 2 == 0 ? section : null,
+            Tags = i % 5 == 0 ? "important, diagram" : "lecture",
+            Importance = i % 5 == 0 ? CaptureImportance.Important : CaptureImportance.Normal,
             ProcessingStatus = i % 10 == 0 ? ScreenshotStatus.NeedsReview : ScreenshotStatus.Ready,
             Image = new ScreenshotImage { RelativePath = $"images/{i:D4}.png", ByteLength = 8_000_000 }
         }).ToArray();

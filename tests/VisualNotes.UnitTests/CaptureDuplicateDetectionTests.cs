@@ -1,5 +1,7 @@
 using System.Text.Json;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -94,8 +96,12 @@ public sealed class CaptureDuplicateDetectionTests
 
     private static Screenshot Capture(Guid? section, int seconds, string exact, string perceptual) => new()
     {
-        SectionId = section, CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds), Width = 1920, Height = 1080,
-        Image = new ScreenshotImage { Sha256 = exact }, PerceptualHash = perceptual
+        SectionId = section,
+        CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(seconds),
+        Width = 1920,
+        Height = 1080,
+        Image = new ScreenshotImage { Sha256 = exact },
+        PerceptualHash = perceptual
     };
 
     private sealed record Dataset(int Version, string Description, DatasetCase[] Cases);

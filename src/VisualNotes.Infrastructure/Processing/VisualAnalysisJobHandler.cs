@@ -1,7 +1,10 @@
 using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.LanguageModels;

@@ -1,7 +1,10 @@
 using System.IO.Compression;
 using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Testing.Infrastructure;

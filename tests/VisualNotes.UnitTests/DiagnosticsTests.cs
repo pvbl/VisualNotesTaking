@@ -1,9 +1,13 @@
 using System.IO.Compression;
+
 using Microsoft.Extensions.Logging;
+
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
+
 using Shouldly;
+
 using VisualNotes.Infrastructure.Diagnostics;
 
 namespace VisualNotes.UnitTests;
@@ -35,8 +39,8 @@ public sealed class DiagnosticsTests
         logger.Information("apiKey={ApiKey} prompt={Prompt} image={Image} context={Context} authorization=Bearer-topsecret",
             "sk-secret-value", "private instructions", "base64pixels", "private notes");
 
-        var output = sink.Events.Single().ToString();
-        output.ShouldNotContain("sk-secret-value");
+        var output = sink.Events.Single().RenderMessage();
+        output.ShouldNotBeNull().ShouldNotContain("sk-secret-value");
         output.ShouldNotContain("private instructions");
         output.ShouldNotContain("base64pixels");
         output.ShouldNotContain("private notes");

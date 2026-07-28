@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+
 using Microsoft.EntityFrameworkCore;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Infrastructure.Processing;

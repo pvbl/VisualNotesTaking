@@ -1,5 +1,7 @@
 using NSubstitute;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -26,7 +28,10 @@ public sealed class PersistentRegionServiceTests
     }
 
     [Theory, Trait("Category", "Unit")]
-    [InlineData(0, 100)] [InlineData(100, 0)] [InlineData(7, 100)] [InlineData(100, 7)]
+    [InlineData(0, 100)]
+    [InlineData(100, 0)]
+    [InlineData(7, 100)]
+    [InlineData(100, 7)]
     public async Task Save_rejects_invalid_coordinates(int width, int height)
     {
         var service = new PersistentRegionService(Substitute.For<ISettingsStore>());

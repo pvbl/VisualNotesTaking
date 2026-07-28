@@ -1,6 +1,10 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+
 using Shouldly;
+
 using VerifyXunit;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -8,6 +12,12 @@ namespace VisualNotes.UnitTests;
 
 public sealed class SemanticDocumentCompositionTests
 {
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = true
+    };
+
     private static readonly Guid SectionId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid CaptureId = Guid.Parse("20000000-0000-0000-0000-000000000001");
 
@@ -87,8 +97,8 @@ public sealed class SemanticDocumentCompositionTests
                     Sources = node.SourceReferences.Select(source => source.ScreenshotId)
                 })
             })
-        }, new JsonSerializerOptions { WriteIndented = true });
-        return Verifier.Verify(snapshot).UseExtension("json");
+        }, SnapshotJsonOptions);
+        return Verifier.Verify(snapshot, extension: "json");
     }
 
     private static CaptureSemanticContent Capture(Guid id, Guid section, int minute, SemanticNode node, string context = "") =>

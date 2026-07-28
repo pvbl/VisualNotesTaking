@@ -1,6 +1,10 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+
 using VerifyXunit;
+
 using VisualNotes.Testing.Fixtures;
+
 using Xunit;
 
 namespace VisualNotes.UnitTests;
@@ -8,14 +12,20 @@ namespace VisualNotes.UnitTests;
 [Trait("Category", "Unit")]
 public sealed class SnapshotTests
 {
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = true
+    };
+
     [Fact]
     public Task Prompt_snapshot_is_reviewable() => Verifier.Verify("Analiza la captura y devuelve texto estructurado en español.");
 
     [Fact]
     public Task Normalized_json_snapshot_is_reviewable()
     {
-        var normalized = JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>("{\"section\":\"Definición\",\"order\":1}"), new JsonSerializerOptions { WriteIndented = true });
-        return Verifier.Verify(normalized).UseExtension("json");
+        var normalized = JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>("{\"section\":\"Definición\",\"order\":1}"), SnapshotJsonOptions);
+        return Verifier.Verify(normalized, extension: "json");
     }
 
     [Fact]
@@ -26,7 +36,7 @@ public sealed class SnapshotTests
         {
             document.Title,
             Sections = document.Sections.Select(x => new { x.Title, x.Order, x.Content })
-        }, new JsonSerializerOptions { WriteIndented = true });
-        return Verifier.Verify(structure).UseExtension("json");
+        }, SnapshotJsonOptions);
+        return Verifier.Verify(structure, extension: "json");
     }
 }

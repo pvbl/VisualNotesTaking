@@ -1,10 +1,16 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Validation;
+
 using Shouldly;
+
 using VerifyXunit;
+
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Documents;
+
 using Xunit;
 
 namespace VisualNotes.IntegrationTests;
@@ -12,6 +18,12 @@ namespace VisualNotes.IntegrationTests;
 [Trait("Category", "Integration")]
 public sealed class OpenXmlDocumentExporterTests
 {
+    private static readonly JsonSerializerOptions SnapshotJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = true
+    };
+
     [Fact]
     public async Task Exported_package_can_be_opened_and_walked()
     {
@@ -44,12 +56,12 @@ public sealed class OpenXmlDocumentExporterTests
             var body = package.MainDocumentPart!.Document.Body!;
             var snapshot = JsonSerializer.Serialize(new
             {
-                Parts = package.Parts.Select(x => x.OpenXmlPart.ContentType).Order().ToArray(),
+                Parts = package.GetAllParts().Select(x => x.ContentType).Order().ToArray(),
                 Elements = body.ChildElements.Select(x => x.LocalName).ToArray(),
-                Styles = package.MainDocumentPart.StyleDefinitionsPart!.Styles!.Elements<DocumentFormat.OpenXml.Wordprocessing.Style>().Select(x => x.StyleId).ToArray(),
+                Styles = package.MainDocumentPart.StyleDefinitionsPart!.Styles!.Elements<DocumentFormat.OpenXml.Wordprocessing.Style>().Select(x => x.StyleId?.Value).ToArray(),
                 Text = body.InnerText
-            }, new JsonSerializerOptions { WriteIndented = true });
-            await Verifier.Verify(snapshot).UseExtension("json");
+            }, SnapshotJsonOptions);
+            await Verifier.Verify(snapshot, extension: "json");
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+
 using VisualNotes.Core.Services;
 
 namespace VisualNotes.Infrastructure.LanguageModels;

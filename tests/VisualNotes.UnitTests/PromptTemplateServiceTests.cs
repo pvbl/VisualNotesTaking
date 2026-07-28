@@ -1,5 +1,7 @@
 using System.Text.Json;
+
 using Shouldly;
+
 using VisualNotes.Core.Services;
 
 namespace VisualNotes.UnitTests;

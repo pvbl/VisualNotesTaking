@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -179,9 +180,10 @@ public sealed class SessionBackupService(VisualNotesDbContext db, string dataDir
     {
         var source = (SqliteConnection)db.Database.GetDbConnection();
         if (source.State != System.Data.ConnectionState.Open) await source.OpenAsync(ct);
-        await using (var target = new SqliteConnection($"Data Source={path}"))
+        var snapshotConnectionString = new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString();
+        await using (var target = new SqliteConnection(snapshotConnectionString))
         { await target.OpenAsync(ct); source.BackupDatabase(target); }
-        await using var sanitized = new SqliteConnection($"Data Source={path}");
+        await using var sanitized = new SqliteConnection(snapshotConnectionString);
         await sanitized.OpenAsync(ct);
         await using var transaction = await sanitized.BeginTransactionAsync(ct);
         await using var command = sanitized.CreateCommand();

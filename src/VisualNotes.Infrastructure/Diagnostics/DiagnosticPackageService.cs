@@ -10,13 +10,15 @@ public sealed class DiagnosticPackageService
     {
         using var archive = new ZipArchive(destination, ZipArchiveMode.Create, leaveOpen: true);
         var entry = archive.CreateEntry("environment.json");
-        await using var stream = entry.Open();
-        await JsonSerializer.SerializeAsync(stream, new
+        await using (var stream = entry.Open())
         {
-            application = "VisualNotes",
-            os = Environment.OSVersion.Platform.ToString(),
-            runtime = Environment.Version.ToString()
-        }, cancellationToken: cancellationToken);
+            await JsonSerializer.SerializeAsync(stream, new
+            {
+                application = "VisualNotes",
+                os = Environment.OSVersion.Platform.ToString(),
+                runtime = Environment.Version.ToString()
+            }, cancellationToken: cancellationToken);
+        }
         if (diagnosticEvents is not null)
         {
             var events = archive.CreateEntry("events.json");

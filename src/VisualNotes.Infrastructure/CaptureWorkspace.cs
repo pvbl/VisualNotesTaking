@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;

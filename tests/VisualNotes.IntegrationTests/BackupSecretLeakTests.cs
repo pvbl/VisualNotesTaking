@@ -1,11 +1,15 @@
 using System.IO.Compression;
 using System.Text;
+
 using Microsoft.EntityFrameworkCore;
+
 using Shouldly;
+
 using VisualNotes.Core.Models;
-using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Infrastructure.Diagnostics;
+using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Testing.Infrastructure;
+
 using Xunit;
 
 namespace VisualNotes.IntegrationTests;
@@ -41,7 +45,7 @@ public sealed class BackupSecretLeakTests
         {
             using var stream = entry.Open();
             using var reader = new StreamReader(stream, Encoding.UTF8);
-            reader.ReadToEnd().ShouldNotContain(secret, $"secret leaked through {entry.FullName}");
+            reader.ReadToEnd().ShouldNotContain(secret, customMessage: $"secret leaked through {entry.FullName}");
         }
     }
 }

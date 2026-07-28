@@ -1,8 +1,11 @@
 using System.Net;
 using System.Text;
+
 using Shouldly;
+
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.LanguageModels;
+
 using Xunit;
 
 namespace VisualNotes.UnitTests;

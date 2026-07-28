@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Core.Services;

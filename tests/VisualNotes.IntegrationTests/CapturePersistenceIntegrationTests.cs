@@ -1,6 +1,8 @@
+using Shouldly;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure;
@@ -29,8 +31,13 @@ public sealed class CapturePersistenceIntegrationTests : IDisposable
             var metadata = frame.Metadata!;
             var screenshot = new Screenshot
             {
-                Id = frame.Id, SessionId = session.Id, SectionId = section.Id, CapturedAt = metadata.CapturedAt,
-                Width = metadata.PixelWidth, Height = metadata.PixelHeight, PerceptualHash = stored.Optimized.Sha256,
+                Id = frame.Id,
+                SessionId = session.Id,
+                SectionId = section.Id,
+                CapturedAt = metadata.CapturedAt,
+                Width = metadata.PixelWidth,
+                Height = metadata.PixelHeight,
+                PerceptualHash = stored.Optimized.Sha256,
                 Image = new ScreenshotImage { ScreenshotId = frame.Id, RelativePath = stored.Optimized.RelativePath, MediaType = "image/png", ByteLength = stored.Optimized.Size, Sha256 = stored.Optimized.Sha256 },
                 Context = new ScreenshotContext { ScreenshotId = frame.Id, MonitorDeviceName = metadata.MonitorDeviceName, CaptureMode = metadata.Mode, PhysicalX = metadata.PhysicalBounds.X, PhysicalY = metadata.PhysicalBounds.Y, DpiX = metadata.DpiX, DpiY = metadata.DpiY }
             };

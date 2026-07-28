@@ -1,6 +1,8 @@
 using Shouldly;
+
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Documents;
+
 using Xunit;
 
 namespace VisualNotes.IntegrationTests;

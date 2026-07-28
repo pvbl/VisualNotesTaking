@@ -1,5 +1,7 @@
 using NSubstitute;
+
 using Shouldly;
+
 using VisualNotes.App.Services;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;

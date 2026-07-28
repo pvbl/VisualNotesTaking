@@ -13,6 +13,9 @@
     <!-- Legacy public APIs are not fully documented yet. Keep this exception to the
          specific compiler diagnostic while XML output is introduced incrementally. -->
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- WPF creates a randomly named temporary project while compiling markup.
+         Its synthetic root namespace makes IDE0130 report false positives. -->
+    <NoWarn Condition="$([System.String]::Copy('$(MSBuildProjectName)').Contains('_wpftmp'))">$(NoWarn);IDE0130</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

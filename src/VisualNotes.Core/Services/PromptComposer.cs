@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Core.Services;
@@ -54,8 +55,11 @@ public sealed partial class PromptComposer
 
     private static string ScopeName(PromptScope scope) => scope switch
     {
-        PromptScope.Course => "curso", PromptScope.Session => "sesión",
-        PromptScope.Section => "sección", PromptScope.Capture => "captura", _ => scope.ToString()
+        PromptScope.Course => "curso",
+        PromptScope.Session => "sesión",
+        PromptScope.Section => "sección",
+        PromptScope.Capture => "captura",
+        _ => scope.ToString()
     };
 
     private static string StageName(PromptStage stage) => stage == PromptStage.Extraction ? "EXTRACCIÓN" : "COMPOSICIÓN";

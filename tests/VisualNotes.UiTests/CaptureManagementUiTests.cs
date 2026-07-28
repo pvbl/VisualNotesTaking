@@ -1,4 +1,5 @@
 using Shouldly;
+
 using VisualNotes.App.ViewModels;
 using VisualNotes.Core.Models;
 
@@ -62,6 +63,7 @@ public sealed class CaptureManagementUiTests
 
     private static Screenshot[] MakeCaptures() => Enumerable.Range(0, 3).Select(i => new Screenshot
     {
-        CapturedAt = DateTimeOffset.UnixEpoch.AddMinutes(i), ProcessingStatus = ScreenshotStatus.Ready
+        CapturedAt = DateTimeOffset.UnixEpoch.AddMinutes(i),
+        ProcessingStatus = ScreenshotStatus.Ready
     }).ToArray();
 }

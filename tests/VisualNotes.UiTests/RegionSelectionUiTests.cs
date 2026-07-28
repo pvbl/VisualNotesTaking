@@ -1,4 +1,5 @@
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -45,7 +46,7 @@ public sealed class RegionSelectionUiTests
         const int visualBorderThickness = 2;
         var captureRequest = new CaptureRequest(ScreenCaptureMode.OneTimeRegion, selection.Selection);
         captureRequest.Region.ShouldBe(new PhysicalRectangle(50, 60, 800, 450));
-        captureRequest.Region.Width.ShouldNotBe(800 + visualBorderThickness * 2);
+        captureRequest.Region.ShouldNotBeNull().Width.ShouldNotBe(800 + visualBorderThickness * 2);
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]

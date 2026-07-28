@@ -1,4 +1,5 @@
 using Shouldly;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.UnitTests;

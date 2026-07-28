@@ -1,4 +1,5 @@
 using System.Text.Json;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Core.Services;
@@ -33,7 +34,7 @@ public sealed class PromptTemplateService
     public IReadOnlyList<PromptTemplateDifference> Compare(Guid leftId, Guid rightId)
     {
         var left = Get(leftId); var right = Get(rightId);
-        return new[] { new PromptTemplateDifference("Name", left.Name, right.Name), new("Stage", left.Stage.ToString(), right.Stage.ToString()), new("Instructions", left.Instructions, right.Instructions) }
+        return new[] { new PromptTemplateDifference("Stage", left.Stage.ToString(), right.Stage.ToString()), new("Instructions", left.Instructions, right.Instructions) }
             .Where(x => !StringComparer.Ordinal.Equals(x.Left, x.Right)).ToArray();
     }
 
@@ -62,7 +63,7 @@ public sealed class PromptTemplateService
 
     private PromptTemplateDefinition Get(Guid id) => templates.TryGetValue(id, out var value) ? value : throw new KeyNotFoundException("Plantilla no encontrada.");
     private void SaveHistory(PromptTemplateDefinition value) { if (!history.TryGetValue(value.Id, out var versions)) history[value.Id] = versions = []; versions.Add(value); }
-    private static string Required(string value) => string.IsNullOrWhiteSpace(value) ? throw new ArgumentException("El valor no puede estar vacío.") : value.Trim();
+    private static string Required(string value) => string.IsNullOrWhiteSpace(value) ? throw new ArgumentException("El valor no puede estar vacío.", nameof(value)) : value.Trim();
 }
 
 public static class DefaultPromptTemplates

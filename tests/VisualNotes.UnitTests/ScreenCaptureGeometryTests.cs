@@ -1,4 +1,5 @@
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
@@ -7,7 +8,10 @@ namespace VisualNotes.UnitTests;
 public sealed class ScreenCaptureGeometryTests
 {
     [Theory]
-    [InlineData(100, 96, 100)] [InlineData(100, 120, 125)] [InlineData(100, 144, 150)] [InlineData(100, 192, 200)]
+    [InlineData(100, 96, 100)]
+    [InlineData(100, 120, 125)]
+    [InlineData(100, 144, 150)]
+    [InlineData(100, 192, 200)]
     [Trait("Category", "Unit")]
     public void Dip_conversion_obeys_monitor_dpi(double dip, uint dpi, int expected) =>
         ScreenCaptureGeometry.DipToPhysical(dip, dpi).ShouldBe(expected);

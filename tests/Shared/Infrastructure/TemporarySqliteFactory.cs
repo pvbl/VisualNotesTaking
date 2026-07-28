@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+
 using VisualNotes.Infrastructure.Persistence;
 
 namespace VisualNotes.Testing.Infrastructure;

@@ -1,6 +1,8 @@
 using Shouldly;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+
 using Xunit;
 
 namespace VisualNotes.UnitTests;

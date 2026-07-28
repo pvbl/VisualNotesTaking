@@ -1,4 +1,5 @@
 using System.Text.Json;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Infrastructure.Settings;

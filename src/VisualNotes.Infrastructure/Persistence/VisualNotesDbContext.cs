@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Infrastructure.Persistence;
@@ -24,10 +25,18 @@ public sealed class VisualNotesDbContext(DbContextOptions<VisualNotesDbContext> 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Ignore<CaptureMetadata>();
+        modelBuilder.Ignore<CaptureRegion>();
+        modelBuilder.Ignore<CapturedFrame>();
+        modelBuilder.Ignore<ExtractedContent>();
+        modelBuilder.Ignore<ExportDocument>();
+
         foreach (var entity in modelBuilder.Model.GetEntityTypes().Where(x => typeof(Entity).IsAssignableFrom(x.ClrType)))
         {
-            modelBuilder.Entity(entity.ClrType).Property(nameof(Entity.Version)).IsConcurrencyToken();
+            modelBuilder.Entity(entity.ClrType).Property(nameof(Entity.Id)).ValueGeneratedNever();
+            modelBuilder.Entity(entity.ClrType).Property(nameof(Entity.Version)).IsConcurrencyToken(false);
         }
+
         modelBuilder.Entity<NoteSession>().HasIndex(x => x.CourseId);
         modelBuilder.Entity<NoteSection>().HasIndex(x => x.SessionId);
         modelBuilder.Entity<NoteSection>().HasOne(x => x.ParentSection).WithMany(x => x.Children).HasForeignKey(x => x.ParentSectionId).OnDelete(DeleteBehavior.Restrict);

@@ -93,9 +93,13 @@ public sealed class SessionCoordinator(ISessionRepository sessions, IScreenshotR
     {
         capture.Revisions.Add(new CaptureRevision
         {
-            ScreenshotId = capture.Id, RevisionNumber = capture.Revisions.Count + 1,
-            UserContext = capture.UserContext, CaptureInstruction = capture.CaptureInstruction,
-            Tags = capture.Tags, Importance = capture.Importance, IncludeInDocument = capture.IncludeInDocument
+            ScreenshotId = capture.Id,
+            RevisionNumber = capture.Revisions.Count + 1,
+            UserContext = capture.UserContext,
+            CaptureInstruction = capture.CaptureInstruction,
+            Tags = capture.Tags,
+            Importance = capture.Importance,
+            IncludeInDocument = capture.IncludeInDocument
         });
         await unitOfWork.SaveChangesAsync(ct);
     }

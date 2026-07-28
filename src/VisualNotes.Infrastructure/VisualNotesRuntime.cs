@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+
 using VisualNotes.Core.Services;
-using VisualNotes.Infrastructure.Persistence;
-using VisualNotes.Infrastructure.Security;
 using VisualNotes.Infrastructure.Documents;
+using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Infrastructure.Processing;
+using VisualNotes.Infrastructure.Security;
 
 namespace VisualNotes.Infrastructure;
 
@@ -61,8 +62,13 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(dataDirectory);
+        var connectionString = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+        {
+            DataSource = Path.Combine(dataDirectory, "visualnotes.db"),
+            Pooling = false
+        }.ToString();
         var database = new VisualNotesDbContext(new DbContextOptionsBuilder<VisualNotesDbContext>()
-            .UseSqlite($"Data Source={Path.Combine(dataDirectory, "visualnotes.db")}")
+            .UseSqlite(connectionString)
             .Options);
 
         try
@@ -75,7 +81,7 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
             var imageFiles = new ImageFileStore(dataDirectory);
             var settings = new SettingsRepository(database);
             var coordinator = new SessionCoordinator(sessions, screenshots, settings, unitOfWork);
-            var factory = new RuntimeDbContextFactory(database.Database.GetDbConnection().ConnectionString);
+            var factory = new RuntimeDbContextFactory(connectionString);
             var artifacts = new FileExtractionArtifactStore(dataDirectory);
             var credentials = new WindowsDpapiCredentialStore();
             var handler = new VisualAnalysisJobHandler(factory, dataDirectory, credentials,

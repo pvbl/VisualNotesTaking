@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Core.Services;

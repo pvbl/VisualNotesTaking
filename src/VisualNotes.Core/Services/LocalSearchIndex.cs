@@ -44,10 +44,14 @@ public static class SearchTokenizer
             var category = Rune.GetUnicodeCategory(rune);
             if (category is UnicodeCategory.UppercaseLetter or UnicodeCategory.LowercaseLetter or
                 UnicodeCategory.TitlecaseLetter or UnicodeCategory.ModifierLetter or UnicodeCategory.OtherLetter or
-                UnicodeCategory.DecimalDigitNumber or UnicodeCategory.LetterNumber or UnicodeCategory.OtherNumber ||
+                UnicodeCategory.DecimalDigitNumber or UnicodeCategory.LetterNumber ||
                 rune.Value == '_')
             {
                 current.Append(rune.ToString().ToLowerInvariant());
+            }
+            else if (category == UnicodeCategory.OtherNumber && TryGetNumericToken(rune, out var numeric))
+            {
+                current.Append(numeric);
             }
             else
             {
@@ -75,6 +79,20 @@ public static class SearchTokenizer
         if (current.Length == 0) return;
         tokens.Add(current.ToString());
         current.Clear();
+    }
+
+    private static bool TryGetNumericToken(Rune rune, out string token)
+    {
+        token = rune.Value switch
+        {
+            0x00B2 => "2",
+            0x00B3 => "3",
+            0x00B9 => "1",
+            >= 0x2070 and <= 0x2079 => (rune.Value == 0x2070 ? 0 : rune.Value - 0x2070).ToString(CultureInfo.InvariantCulture),
+            >= 0x2080 and <= 0x2089 => (rune.Value - 0x2080).ToString(CultureInfo.InvariantCulture),
+            _ => string.Empty
+        };
+        return token.Length > 0;
     }
 }
 

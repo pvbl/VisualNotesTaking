@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+
 using Microsoft.EntityFrameworkCore;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
@@ -22,7 +24,7 @@ public interface IAnalysisJobHandler
 }
 
 /// <summary>A persistent, lease-based processor. Database state is the queue, so restarting never loses work.</summary>
-public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
+public sealed class DurableAnalysisJobProcessor : IAnalysisJobProcessor, IAsyncDisposable
 {
     private readonly IDbContextFactory<VisualNotesDbContext> _contexts;
     private readonly IAnalysisJobHandler _handler;
@@ -112,11 +114,25 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
         await using var db = await _contexts.CreateDbContextAsync(token);
         await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, token);
         var now = DateTimeOffset.UtcNow;
-        var jobs = await db.AnalysisJobs
-            .Where(x => triggers.Contains(x.Trigger) &&
-                ((x.JobStatus == AnalysisJobStatus.Pending && (x.NextAttemptAt == null || x.NextAttemptAt <= now)) ||
-                 (x.JobStatus == AnalysisJobStatus.Running && x.LeaseExpiresAt < now)))
-            .OrderBy(x => x.CreatedAt).Take(_options.GlobalConcurrency).ToListAsync(token);
+        var automatic = triggers.Contains(AnalysisJobTrigger.Automatic);
+        var manual = triggers.Contains(AnalysisJobTrigger.Manual);
+        var batch = triggers.Contains(AnalysisJobTrigger.Batch);
+        var sessionEnd = triggers.Contains(AnalysisJobTrigger.SessionEnd);
+        var candidates = await db.AnalysisJobs
+            .Where(x =>
+                (automatic && x.Trigger == AnalysisJobTrigger.Automatic) ||
+                (manual && x.Trigger == AnalysisJobTrigger.Manual) ||
+                (batch && x.Trigger == AnalysisJobTrigger.Batch) ||
+                (sessionEnd && x.Trigger == AnalysisJobTrigger.SessionEnd))
+            .Where(x =>
+                x.JobStatus == AnalysisJobStatus.Pending ||
+                x.JobStatus == AnalysisJobStatus.Running)
+            .ToListAsync(token);
+        var jobs = candidates
+            .Where(x =>
+                (x.JobStatus == AnalysisJobStatus.Pending && (x.NextAttemptAt == null || x.NextAttemptAt <= now)) ||
+                x.JobStatus == AnalysisJobStatus.Running)
+            .OrderBy(x => x.CreatedAt).Take(_options.GlobalConcurrency).ToList();
         foreach (var job in jobs)
         {
             job.JobStatus = AnalysisJobStatus.Running;
@@ -170,6 +186,7 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
         var job = await db.AnalysisJobs.Include(x => x.Result).SingleAsync(x => x.Id == id, token);
         if (job.JobStatus != AnalysisJobStatus.Running || job.LeaseOwner != _workerId || job.Result is not null) return;
         result.AnalysisJobId = id;
+        db.CaptureAnalyses.Add(result);
         job.Result = result;
         job.JobStatus = AnalysisJobStatus.Completed;
         job.CompletedAt = DateTimeOffset.UtcNow;
@@ -223,8 +240,10 @@ public sealed class DurableAnalysisJobProcessor : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        var runningIds = _running.Keys.ToArray();
         _stopping.Cancel();
         while (!_running.IsEmpty) await Task.Delay(10);
+        foreach (var id in runningIds) await ReleaseAfterStopAsync(id);
         _stopping.Dispose(); _global.Dispose();
         foreach (var semaphore in _providers.Values) semaphore.Dispose();
     }

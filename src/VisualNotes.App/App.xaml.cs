@@ -2,15 +2,18 @@ using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
-using Forms = System.Windows.Forms;
-using MessageBox = System.Windows.MessageBox;
-using VisualNotes.App.ViewModels;
-using VisualNotes.Infrastructure;
+
+using Microsoft.Extensions.Logging;
+
 using VisualNotes.App.Services;
+using VisualNotes.App.ViewModels;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
-using Microsoft.Extensions.Logging;
+using VisualNotes.Infrastructure;
 using VisualNotes.Infrastructure.Diagnostics;
+
+using Forms = System.Windows.Forms;
+using MessageBox = System.Windows.MessageBox;
 
 namespace VisualNotes.App;
 

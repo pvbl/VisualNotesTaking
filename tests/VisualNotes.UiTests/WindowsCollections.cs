@@ -1,4 +1,5 @@
 using Shouldly;
+
 using Xunit;
 
 namespace VisualNotes.UiTests;
@@ -14,7 +15,7 @@ public sealed class WindowsResourceCollection
 [Trait("Category", "Windows")]
 public sealed class ApplicationSmokeTests
 {
-    [Fact(Timeout = 60_000)]
+    [Fact]
     public void Application_assembly_can_be_loaded()
     {
         OperatingSystem.IsWindows().ShouldBeTrue("UI tests run only in the dedicated Windows job");

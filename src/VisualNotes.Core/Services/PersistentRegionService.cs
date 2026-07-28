@@ -48,8 +48,12 @@ public sealed class PersistentRegionService(ISettingsStore settings)
         }
         var restored = saved with
         {
-            Bounds = bounds, MonitorDeviceName = monitor.DeviceName, DpiX = monitor.DpiX, DpiY = monitor.DpiY,
-            SessionId = sessionId, SavedMonitorBounds = monitor.Bounds
+            Bounds = bounds,
+            MonitorDeviceName = monitor.DeviceName,
+            DpiX = monitor.DpiX,
+            DpiY = monitor.DpiY,
+            SessionId = sessionId,
+            SavedMonitorBounds = monitor.Bounds
         };
         return new(restored, status, warning);
     }

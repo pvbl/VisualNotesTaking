@@ -1,14 +1,17 @@
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Validation;
-using W = DocumentFormat.OpenXml.Wordprocessing;
-using DW = DocumentFormat.OpenXml.Drawing.Wordprocessing;
-using A = DocumentFormat.OpenXml.Drawing;
-using PIC = DocumentFormat.OpenXml.Drawing.Pictures;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
+
 using VisualNotes.Core.Services;
+
+using A = DocumentFormat.OpenXml.Drawing;
+using DW = DocumentFormat.OpenXml.Drawing.Wordprocessing;
+using PIC = DocumentFormat.OpenXml.Drawing.Pictures;
+using W = DocumentFormat.OpenXml.Wordprocessing;
 
 namespace VisualNotes.Infrastructure.Documents;
 
@@ -74,7 +77,7 @@ public sealed class OpenXmlDocumentExporter : IDocumentExporter
             await CreatePackageAsync(request, temporary, cancellationToken).ConfigureAwait(false);
             IReadOnlyList<string> errors;
             using (var package = WordprocessingDocument.Open(temporary, false))
-                errors = new OpenXmlValidator().Validate(package, CancellationToken.None).Select(x => x.Description).ToArray();
+                errors = new OpenXmlValidator().Validate(package, CancellationToken.None).Select(x => $"{x.Path?.XPath}: {x.Description}").ToArray();
             if (errors.Count != 0)
                 throw new InvalidDataException("El paquete Open XML no es válido: " + string.Join("; ", errors));
 
@@ -256,8 +259,17 @@ public sealed class OpenXmlDocumentExporter : IDocumentExporter
     private static W.Table CreateTable(string content)
     {
         var table = new W.Table(new W.TableProperties(new W.TableStyle { Val = "TableGrid" }));
-        foreach (var line in content.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            table.Append(new W.TableRow(line.Trim().Trim('|').Split('|').Select(cell => new W.TableCell(Paragraph(cell.Trim(), "Normal")))));
+        var rows = content.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim().Trim('|').Split('|').Select(cell => cell.Trim()).ToArray())
+            .ToArray();
+        var columnCount = rows.Length == 0 ? 1 : rows.Max(row => row.Length);
+        table.Append(new W.TableGrid(Enumerable.Range(0, columnCount).Select(_ => new W.GridColumn())));
+        foreach (var row in rows)
+        {
+            var cells = row.Concat(Enumerable.Repeat(string.Empty, columnCount - row.Length))
+                .Select(cell => new W.TableCell(new W.TableCellProperties(new W.TableCellWidth { Type = W.TableWidthUnitValues.Auto }), Paragraph(cell, "Normal")));
+            table.Append(new W.TableRow(cells));
+        }
         return table;
     }
 
@@ -275,10 +287,11 @@ public sealed class OpenXmlDocumentExporter : IDocumentExporter
 
     private static W.Style Style(string id, string name, int size, bool bold = false, bool italic = false, int? outline = null, string? font = null, string? shade = null)
     {
-        var run = new W.StyleRunProperties(new W.RunFonts { Ascii = font ?? "Aptos", HighAnsi = font ?? "Aptos" }, new W.FontSize { Val = size.ToString() });
-        if (bold) run.Append(new W.Bold()); if (italic) run.Append(new W.Italic());
+        var run = new W.StyleRunProperties(new W.RunFonts { Ascii = font ?? "Aptos", HighAnsi = font ?? "Aptos" });
+        if (bold) run.Append(new W.Bold { Val = true }); if (italic) run.Append(new W.Italic { Val = true });
+        run.Append(new W.FontSize { Val = size.ToString() });
         var paragraph = new W.StyleParagraphProperties(); if (outline.HasValue) paragraph.Append(new W.OutlineLevel { Val = outline.Value });
-        if (shade is not null) paragraph.Append(new W.Shading { Fill = shade });
+        if (shade is not null) paragraph.Append(new W.Shading { Val = W.ShadingPatternValues.Clear, Fill = shade });
         return new W.Style(new W.StyleName { Val = name }, paragraph, run) { Type = W.StyleValues.Paragraph, StyleId = id, CustomStyle = id is not ("Normal" or "Title" or "Subtitle" or "Heading1" or "Heading2") };
     }
 

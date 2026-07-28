@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+
 using VisualNotes.Core.Models;
 
 namespace VisualNotes.Infrastructure.Settings;

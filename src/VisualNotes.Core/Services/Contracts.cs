@@ -14,6 +14,14 @@ public interface IDocumentExporter
     Task<string> ExportAsync(SemanticDocument document, string destinationPath, CancellationToken cancellationToken = default);
 }
 
+public interface IAnalysisJobProcessor
+{
+    Task<AnalysisJob> EnqueueAsync(AnalysisJob job, CancellationToken cancellationToken = default);
+    Task<int> RunManualAsync(CancellationToken cancellationToken = default);
+    Task CancelAsync(Guid jobId, CancellationToken cancellationToken = default);
+    Task RetryAsync(Guid jobId, CancellationToken cancellationToken = default);
+}
+
 public interface IScreenCaptureService
 {
     Task<CapturedFrame?> CaptureAsync(CaptureRequest request, CancellationToken cancellationToken = default);

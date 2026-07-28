@@ -1,11 +1,13 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
-using VisualNotes.Core.Models;
-using VisualNotes.Core.Services;
-using VisualNotes.Infrastructure.Persistence;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+
+using VisualNotes.Core.Models;
+using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Documents;
+using VisualNotes.Infrastructure.Persistence;
 
 BenchmarkRunner.Run<DocumentBenchmarks>();
 BenchmarkRunner.Run<ScreenshotStorageBenchmarks>();
@@ -52,7 +54,8 @@ public class CaptureListBenchmarks
     [GlobalSetup]
     public void Setup() => _library = new CaptureLibrary(Enumerable.Range(0, 1_000).Select(i => new Screenshot
     {
-        CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(i), Tags = i % 4 == 0 ? "diagram" : "lecture",
+        CapturedAt = DateTimeOffset.UnixEpoch.AddSeconds(i),
+        Tags = i % 4 == 0 ? "diagram" : "lecture",
         ProcessingStatus = i % 10 == 0 ? ScreenshotStatus.NeedsReview : ScreenshotStatus.Ready,
         Image = new ScreenshotImage { RelativePath = $"captures/{i}.png", ByteLength = 12_000_000 }
     }));

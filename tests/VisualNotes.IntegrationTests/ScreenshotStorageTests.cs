@@ -1,6 +1,8 @@
+using Shouldly;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using Shouldly;
+
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
 

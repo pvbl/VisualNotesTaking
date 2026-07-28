@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Processing;
+
 using VisualNotes.Core.Services;
 
 namespace VisualNotes.Infrastructure.Persistence;
@@ -16,13 +18,13 @@ public sealed class ScreenshotStorageService(
     public async Task<StoredScreenshot> StoreAsync(ScreenshotStorageRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request.Content);
-        var max = request.SizePreset switch { ScreenshotSizePreset.Default2560 => 2560, ScreenshotSizePreset.FullHd1920 => 1920, ScreenshotSizePreset.Original => int.MaxValue, ScreenshotSizePreset.Custom when request.CustomMaximumSide > 0 => request.CustomMaximumSide.Value, _ => throw new ArgumentOutOfRangeException(nameof(request.CustomMaximumSide)) };
-        if (request.ThumbnailMaximumSide <= 0) throw new ArgumentOutOfRangeException(nameof(request.ThumbnailMaximumSide));
+        var max = request.SizePreset switch { ScreenshotSizePreset.Default2560 => 2560, ScreenshotSizePreset.FullHd1920 => 1920, ScreenshotSizePreset.Original => int.MaxValue, ScreenshotSizePreset.Custom when request.CustomMaximumSide > 0 => request.CustomMaximumSide.Value, _ => throw new ArgumentOutOfRangeException(nameof(request), "Custom maximum side must be positive when using the custom size preset.") };
+        if (request.ThumbnailMaximumSide <= 0) throw new ArgumentOutOfRangeException(nameof(request), "Thumbnail maximum side must be positive.");
         var paths = ScreenshotPaths.For(request.SessionId);
-        CreateWorkspace(paths);
+        Directory.CreateDirectory(dataDirectory);
 
-        if (maximumInputBytes < 1) throw new ArgumentOutOfRangeException(nameof(maximumInputBytes));
-        if (maximumPixels < 1) throw new ArgumentOutOfRangeException(nameof(maximumPixels));
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumInputBytes, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(maximumPixels, 1);
         using var input = new MemoryStream();
         var buffer = new byte[81920];
         int read;
@@ -32,7 +34,8 @@ public sealed class ScreenshotStorageService(
                 throw new InvalidDataException($"Screenshot exceeds the {maximumInputBytes}-byte input limit.");
             await input.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
         }
-        EnsureSpace(input.Length * 3 + reservedFreeBytes);
+        EnsureSpace(SaturatingAdd(SaturatingMultiply(input.Length, 3), reservedFreeBytes));
+        CreateWorkspace(paths);
         input.Position = 0;
         using var image = await Image.LoadAsync(input, cancellationToken); // ImageSharp reports corrupt/truncated input.
         if ((long)image.Width * image.Height > maximumPixels)
@@ -63,6 +66,12 @@ public sealed class ScreenshotStorageService(
         var root = Path.GetPathRoot(Path.GetFullPath(dataDirectory))!;
         if (new DriveInfo(root).AvailableFreeSpace < needed) throw new IOException("Insufficient disk space to store screenshot.");
     }
+
+    private static long SaturatingAdd(long left, long right) =>
+        left > long.MaxValue - right ? long.MaxValue : left + right;
+
+    private static long SaturatingMultiply(long value, long factor) =>
+        value > long.MaxValue / factor ? long.MaxValue : value * factor;
 
     private static void ResizeToFit(IImageProcessingContext context, int maximumSide, int width, int height)
     {
