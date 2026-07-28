@@ -51,6 +51,7 @@ jobs:
           dotnet publish src/VisualNotes.App/VisualNotes.App.csproj
           --configuration Release --no-restore
           -p:Version=${{ env.VERSION }} -p:PublishSingleFile=false
+          --runtime win-x64 --self-contained true
           --output artifacts/publish
       - name: Import ephemeral Authenticode certificate
         id: certificate
@@ -116,6 +117,9 @@ jobs:
           if ($LASTEXITCODE) { throw 'Installer signing failed.' }
           & $env:SIGNTOOL verify /pa /all $installer.FullName
           if ($LASTEXITCODE) { throw 'Installer signature verification failed.' }
+      - name: Smoke test clean install, repair and uninstall
+        shell: pwsh
+        run: ./eng/test-installed-artifact.ps1 -Installer "artifacts/release/VisualNotes-$env:VERSION-win-x64-setup.exe"
       - name: Create and independently verify SHA-256 manifest
         shell: pwsh
         run: |
