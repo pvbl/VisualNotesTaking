@@ -7,6 +7,8 @@
    <StackPanel>
     <TextBlock Text="Configuración por niveles" FontSize="20" FontWeight="SemiBold" Foreground="#334155"/>
     <TextBlock Text="La captura prevalece sobre sección, sesión, global y valores predeterminados." Foreground="#64748B" Margin="0,4,0,14"/>
+    <CheckBox IsChecked="{Binding ImageUploadConsent}" Content="Consiento enviar capturas al proveedor configurado" Margin="0,0,0,14"
+              ToolTip="Sin este consentimiento explícito, ningún trabajo puede transmitir una imagen."/>
     <DockPanel Margin="0,0,0,12">
      <TextBlock Text="Editar nivel:" VerticalAlignment="Center" Margin="0,0,10,0"/>
      <ComboBox AutomationProperties.AutomationId="SettingsLevelSelector" ItemsSource="{Binding Levels}"

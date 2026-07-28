@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+using VisualNotes.Infrastructure.Processing;
 
 namespace VisualNotes.App.ViewModels;
 
@@ -35,13 +36,15 @@ public sealed class MainViewModel : ViewModelBase
 
     public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository, IGlobalHotkeyService? hotkeys = null,
         IApiCredentialStore? credentials = null, ICaptureWorkspace? captureWorkspace = null,
-        IDocumentExporter? documentExporter = null, IExportInteraction? exportInteraction = null)
+        IDocumentExporter? documentExporter = null, IExportInteraction? exportInteraction = null,
+        ISettingsRepository? settingsRepository = null, IUnitOfWork? unitOfWork = null,
+        DurableAnalysisJobProcessor? analysisJobs = null)
     {
         _coordinator = coordinator; _repository = repository;
         _captureWorkspace = captureWorkspace; _documentExporter = documentExporter; _exportInteraction = exportInteraction;
-        _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys, credentials);
+        _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys, credentials, settingsRepository, unitOfWork);
         Sessions = new SessionViewModel(coordinator, repository, Activate);
-        Captures = new CapturesViewModel(workspace: captureWorkspace, activeSession: () => ActiveSession);
+        Captures = new CapturesViewModel(workspace: captureWorkspace, activeSession: () => ActiveSession, analysisJobs: analysisJobs);
         Document = new DocumentViewModel();
         Document.ExportRequested += ExportDocument;
         _currentViewModel = Sessions;
@@ -88,7 +91,7 @@ public sealed class MainViewModel : ViewModelBase
 
     public async Task InitializeAsync()
     {
-        if (_settings is not null) await _settings.LoadCredentialsAsync();
+        if (_settings is not null) { await _settings.LoadCredentialsAsync(); await _settings.LoadSettingsAsync(); }
         await Sessions.LoadAsync();
         var restored = await _coordinator.RestoreLastOpenAsync();
         if (restored is not null) Activate(restored);
@@ -163,6 +166,7 @@ public sealed class CapturesViewModel : ViewModelBase
     private CaptureLibrary _library;
     private readonly ICaptureWorkspace? _workspace;
     private readonly Func<NoteSession?>? _activeSession;
+    private readonly DurableAnalysisJobProcessor? _analysisJobs;
     private Screenshot? _selectedCapture;
     private bool _isQuickContextOpen;
     private Guid? _sectionFilter;
@@ -173,16 +177,19 @@ public sealed class CapturesViewModel : ViewModelBase
     private ReviewFilter _reviewFilter;
 
     public CapturesViewModel(IEnumerable<Screenshot>? captures = null, ICaptureWorkspace? workspace = null,
-        Func<NoteSession?>? activeSession = null)
+        Func<NoteSession?>? activeSession = null, DurableAnalysisJobProcessor? analysisJobs = null)
     {
         _workspace = workspace; _activeSession = activeSession;
+        _analysisJobs = analysisJobs;
         _library = new CaptureLibrary(captures ?? []);
         Sections = _library.Captures.Where(capture => capture.Section is not null).Select(capture => capture.Section!).DistinctBy(section => section.Id).OrderBy(section => section.Order).ToArray();
         SelectedCaptures.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectionCount));
         ApplyChipCommand = new RelayCommand(async value => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); await PersistAndRefreshAsync([SelectedCapture]); });
         CloseQuickContextCommand = new RelayCommand(_ => IsQuickContextOpen = false);
-        ReanalyzeCommand = new RelayCommand(async _ => await RunAsync(_library.Reprocess));
-        RegenerateNoteCommand = new RelayCommand(async _ => await RunAsync(ids => { _library.Reprocess(ids); foreach (var capture in Selected()) capture.ProcessingStatus = ScreenshotStatus.NeedsReview; }));
+        ReanalyzeCommand = new RelayCommand(async _ => await QueueAnalysisAsync());
+        RegenerateNoteCommand = new RelayCommand(async _ => await QueueAnalysisAsync());
+        CancelAnalysisCommand = new RelayCommand(async value => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.CancelAsync(job.Id); await LoadAsync(); } });
+        RetryAnalysisCommand = new RelayCommand(async value => { if (_analysisJobs is not null && value is AnalysisJob job) { await _analysisJobs.RetryAsync(job.Id); await _analysisJobs.RunManualAsync(); await LoadAsync(); } });
         ExcludeCommand = new RelayCommand(async _ => await RunAsync(_library.Exclude));
         DeleteCommand = new RelayCommand(async _ => await RunAsync(_library.Delete));
         RestoreCommand = new RelayCommand(async _ => await RunAsync(_library.Restore));
@@ -213,6 +220,8 @@ public sealed class CapturesViewModel : ViewModelBase
     public ICommand CloseQuickContextCommand { get; }
     public ICommand ReanalyzeCommand { get; }
     public ICommand RegenerateNoteCommand { get; }
+    public ICommand CancelAnalysisCommand { get; }
+    public ICommand RetryAnalysisCommand { get; }
     public ICommand ExcludeCommand { get; }
     public ICommand DeleteCommand { get; }
     public ICommand RestoreCommand { get; }
@@ -252,6 +261,23 @@ public sealed class CapturesViewModel : ViewModelBase
         var changed = Selected().ToArray();
         action(SelectedIds());
         await PersistAndRefreshAsync(changed);
+    }
+    private async Task QueueAnalysisAsync()
+    {
+        if (_analysisJobs is null) { await RunAsync(_library.Reprocess); return; }
+        foreach (var capture in Selected().ToArray())
+        {
+            capture.ProcessingStatus = ScreenshotStatus.Queued;
+            await _analysisJobs.EnqueueAsync(new AnalysisJob
+            {
+                ScreenshotId = capture.Id,
+                Trigger = AnalysisJobTrigger.Manual,
+                IdempotencyKey = $"manual:{capture.Id:N}:{Guid.NewGuid():N}"
+            });
+        }
+        await PersistAndRefreshAsync(Selected().ToArray());
+        await _analysisJobs.RunManualAsync();
+        await LoadAsync();
     }
     private async Task PersistAndRefreshAsync(IReadOnlyCollection<Screenshot> changed)
     {
@@ -336,12 +362,20 @@ public sealed class DocumentViewModel : ViewModelBase
 }
 public sealed class SettingsViewModel : ViewModelBase
 {
+    internal const string SettingsDocumentKey = "hierarchical-settings";
     private readonly IGlobalHotkeyService? _hotkeys;
     private readonly EffectiveSettingsResolver _settingsResolver = new();
     private readonly Dictionary<SettingsLevel, SettingsValues> _layers = [];
     private string _conflictMessage = string.Empty;
     private SettingsLevel _selectedLevel = SettingsLevel.Global;
     private readonly IApiCredentialStore? _credentials;
+    private readonly ISettingsRepository? _repository;
+    private readonly IUnitOfWork? _unitOfWork;
+    private SettingsDocument _document = new();
+    private Guid? _sessionId;
+    private Guid? _sectionId;
+    private Guid? _screenshotId;
+    private bool _imageUploadConsent;
 
     public SettingsViewModel()
     {
@@ -350,9 +384,15 @@ public sealed class SettingsViewModel : ViewModelBase
     }
 
     public SettingsViewModel(IGlobalHotkeyService hotkeys, IApiCredentialStore? credentials = null)
+        : this(hotkeys, credentials, null, null) { }
+
+    public SettingsViewModel(IGlobalHotkeyService hotkeys, IApiCredentialStore? credentials,
+        ISettingsRepository? repository, IUnitOfWork? unitOfWork)
     {
         _hotkeys = hotkeys;
         _credentials = credentials;
+        _repository = repository;
+        _unitOfWork = unitOfWork;
         Bindings = new(DefaultBindings().Select(binding => new HotkeyBindingEditorViewModel(binding)));
         SaveCommand = new RelayCommand(_ => Save());
         SaveCredentialCommand = new RelayCommand(async value => await SaveCredentialAsync(value));
@@ -379,6 +419,11 @@ public sealed class SettingsViewModel : ViewModelBase
     }
     public ICommand OverrideSettingCommand { get; private set; } = null!;
     public ICommand RestoreSettingCommand { get; private set; } = null!;
+    public bool ImageUploadConsent
+    {
+        get => _imageUploadConsent;
+        set { if (_imageUploadConsent == value) return; _imageUploadConsent = value; OnPropertyChanged(); _ = PersistConsentAsync(); }
+    }
 
     public void ReplaceBinding(HotkeyAction action, HotkeyGesture gesture)
     {
@@ -401,6 +446,25 @@ public sealed class SettingsViewModel : ViewModelBase
         if (_credentials is null) return;
         foreach (var editor in CredentialProfiles) editor.MaskedValue = await _credentials.GetMaskedAsync(editor.Profile);
     }
+
+    /// <summary>Loads the four independently persisted scopes and selects the entities being edited.</summary>
+    public async Task LoadSettingsAsync(Guid? sessionId = null, Guid? sectionId = null, Guid? screenshotId = null,
+        CancellationToken cancellationToken = default)
+    {
+        _sessionId = sessionId; _sectionId = sectionId; _screenshotId = screenshotId;
+        _document = _repository is null
+            ? new SettingsDocument()
+            : await _repository.GetAsync<SettingsDocument>(SettingsDocumentKey, cancellationToken) ?? new SettingsDocument();
+        LoadLayersFromDocument();
+        _imageUploadConsent = _repository is not null && await _repository.GetAsync<bool?>(SettingsImageTransmissionConsent.Key, cancellationToken) == true;
+        OnPropertyChanged(nameof(ImageUploadConsent));
+        RefreshEffectiveValues();
+    }
+
+    public EffectiveSettings ResolveEffectiveSettings() => _settingsResolver.Resolve(new(
+        _layers[SettingsLevel.ApplicationDefaults], _layers[SettingsLevel.Global],
+        _layers[SettingsLevel.Session], _layers[SettingsLevel.Section],
+        _layers[SettingsLevel.ScreenshotOverride]));
 
     private async Task SaveCredentialAsync(object? value)
     {
@@ -444,6 +508,41 @@ public sealed class SettingsViewModel : ViewModelBase
         RefreshEffectiveValues();
     }
 
+    private void LoadLayersFromDocument()
+    {
+        _layers[SettingsLevel.Global] = _document.Global;
+        _layers[SettingsLevel.Session] = _sessionId is { } session && _document.Sessions.TryGetValue(session, out var sv) ? sv : new();
+        _layers[SettingsLevel.Section] = _sectionId is { } section && _document.Sections.TryGetValue(section, out var secv) ? secv : new();
+        _layers[SettingsLevel.ScreenshotOverride] = _screenshotId is { } screenshot && _document.ScreenshotOverrides.TryGetValue(screenshot, out var cv) ? cv : new();
+    }
+
+    private async Task PersistSelectedLayerAsync()
+    {
+        if (_repository is null || SelectedLevel == SettingsLevel.ApplicationDefaults) return;
+        var sessions = new Dictionary<Guid, SettingsValues>(_document.Sessions);
+        var sections = new Dictionary<Guid, SettingsValues>(_document.Sections);
+        var screenshots = new Dictionary<Guid, SettingsValues>(_document.ScreenshotOverrides);
+        var global = _document.Global;
+        switch (SelectedLevel)
+        {
+            case SettingsLevel.Global: global = _layers[SelectedLevel]; break;
+            case SettingsLevel.Session when _sessionId is { } id: sessions[id] = _layers[SelectedLevel]; break;
+            case SettingsLevel.Section when _sectionId is { } id: sections[id] = _layers[SelectedLevel]; break;
+            case SettingsLevel.ScreenshotOverride when _screenshotId is { } id: screenshots[id] = _layers[SelectedLevel]; break;
+            default: return;
+        }
+        _document = _document with { Global = global, Sessions = sessions, Sections = sections, ScreenshotOverrides = screenshots };
+        await _repository.SetAsync(SettingsDocumentKey, _document);
+        if (_unitOfWork is not null) await _unitOfWork.SaveChangesAsync();
+    }
+
+    private async Task PersistConsentAsync()
+    {
+        if (_repository is null) return;
+        await _repository.SetAsync(SettingsImageTransmissionConsent.Key, ImageUploadConsent);
+        if (_unitOfWork is not null) await _unitOfWork.SaveChangesAsync();
+    }
+
     private void Override(EffectiveSettingEditorViewModel row)
     {
         if (SelectedLevel == SettingsLevel.ApplicationDefaults) return;
@@ -459,6 +558,7 @@ public sealed class SettingsViewModel : ViewModelBase
             _ => values
         };
         RefreshEffectiveValues();
+        _ = PersistSelectedLayerAsync();
     }
 
     private void Restore(EffectiveSettingEditorViewModel row)
@@ -476,6 +576,7 @@ public sealed class SettingsViewModel : ViewModelBase
             _ => values
         };
         RefreshEffectiveValues();
+        _ = PersistSelectedLayerAsync();
     }
 
     private void RefreshEffectiveValues()

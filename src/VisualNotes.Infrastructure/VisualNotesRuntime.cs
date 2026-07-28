@@ -3,6 +3,7 @@ using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Infrastructure.Security;
 using VisualNotes.Infrastructure.Documents;
+using VisualNotes.Infrastructure.Processing;
 
 namespace VisualNotes.Infrastructure;
 
@@ -18,7 +19,8 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         IScreenshotRepository screenshots,
         IScreenshotStorageService screenshotStorage,
         ImageFileStore imageFiles,
-        IUnitOfWork unitOfWork, ICaptureWorkspace captureWorkspace, IDocumentExporter documentExporter)
+        IUnitOfWork unitOfWork, ICaptureWorkspace captureWorkspace, IDocumentExporter documentExporter,
+        ISettingsRepository settings, DurableAnalysisJobProcessor analysisJobs, IExtractionArtifactStore artifacts)
     {
         _database = database;
         Coordinator = coordinator;
@@ -30,6 +32,9 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         CaptureWorkspace = captureWorkspace;
         DocumentExporter = documentExporter;
         ApiCredentials = new WindowsDpapiCredentialStore();
+        Settings = settings;
+        AnalysisJobs = analysisJobs;
+        ExtractionArtifacts = artifacts;
     }
 
     public SessionCoordinator Coordinator { get; }
@@ -47,6 +52,9 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
     public IApiCredentialStore ApiCredentials { get; }
     public ICaptureWorkspace CaptureWorkspace { get; }
     public IDocumentExporter DocumentExporter { get; }
+    public ISettingsRepository Settings { get; }
+    public DurableAnalysisJobProcessor AnalysisJobs { get; }
+    public IExtractionArtifactStore ExtractionArtifacts { get; }
 
     public static async Task<VisualNotesRuntime> CreateAsync(
         string dataDirectory,
@@ -65,9 +73,16 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
             var unitOfWork = new UnitOfWork(database);
             var screenshotStorage = new ScreenshotStorageService(dataDirectory);
             var imageFiles = new ImageFileStore(dataDirectory);
-            var coordinator = new SessionCoordinator(sessions, screenshots, new SettingsRepository(database), unitOfWork);
+            var settings = new SettingsRepository(database);
+            var coordinator = new SessionCoordinator(sessions, screenshots, settings, unitOfWork);
+            var factory = new RuntimeDbContextFactory(database.Database.GetDbConnection().ConnectionString);
+            var artifacts = new FileExtractionArtifactStore(dataDirectory);
+            var credentials = new WindowsDpapiCredentialStore();
+            var handler = new VisualAnalysisJobHandler(factory, dataDirectory, credentials,
+                new SettingsImageTransmissionConsent(settings), artifacts);
+            var jobs = new DurableAnalysisJobProcessor(factory, handler);
             return new VisualNotesRuntime(database, coordinator, sessions, screenshots, screenshotStorage, imageFiles, unitOfWork,
-                new CaptureWorkspace(database, screenshots), new OpenXmlDocumentExporter());
+                new CaptureWorkspace(database, screenshots), new OpenXmlDocumentExporter(), settings, jobs, artifacts);
         }
         catch
         {
@@ -76,5 +91,17 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         }
     }
 
-    public ValueTask DisposeAsync() => _database.DisposeAsync();
+    public async Task<int> RecoverIncompleteJobsAsync(CancellationToken cancellationToken = default) =>
+        await AnalysisJobs.DrainAsync(Enum.GetValues<VisualNotes.Core.Models.AnalysisJobTrigger>(), cancellationToken);
+
+    public async ValueTask DisposeAsync()
+    {
+        await AnalysisJobs.DisposeAsync();
+        await _database.DisposeAsync();
+    }
+
+    private sealed class RuntimeDbContextFactory(string connectionString) : IDbContextFactory<VisualNotesDbContext>
+    {
+        public VisualNotesDbContext CreateDbContext() => new(new DbContextOptionsBuilder<VisualNotesDbContext>().UseSqlite(connectionString).Options);
+    }
 }

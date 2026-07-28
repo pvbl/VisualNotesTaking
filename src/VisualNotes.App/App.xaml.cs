@@ -73,7 +73,9 @@ public partial class App : System.Windows.Application
         }
         _hotkeys = new GlobalHotkeyService(new WindowsGlobalHotkeyAdapter());
         _viewModel = new MainViewModel(_runtime.Coordinator, _runtime.Sessions, _hotkeys, _runtime.ApiCredentials,
-            _runtime.CaptureWorkspace, _runtime.DocumentExporter, new WindowsExportInteraction());
+            _runtime.CaptureWorkspace, _runtime.DocumentExporter, new WindowsExportInteraction(),
+            _runtime.Settings, _runtime.UnitOfWork, _runtime.AnalysisJobs);
+        _ = _runtime.RecoverIncompleteJobsAsync();
         _hotkeys.HotkeyInvoked += OnHotkeyInvoked;
         var bindings = bootstrap?.EnableHotkeys == false
             ? SettingsViewModel.DefaultBindings().Select(binding => binding with { IsEnabled = false }).ToArray()
