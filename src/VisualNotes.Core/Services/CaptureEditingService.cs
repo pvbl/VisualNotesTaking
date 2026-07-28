@@ -15,7 +15,7 @@ public static class CaptureInstructionResolver
         ["código completo"] = "Conserva el código completo respetando formato e indentación."
     };
 
-    public static IReadOnlyCollection<string> QuickChips => Instructions.Keys;
+    public static IReadOnlyCollection<string> QuickChips { get; } = Instructions.Keys.ToArray();
 
     public static string Resolve(IEnumerable<string> chips, string instruction)
     {

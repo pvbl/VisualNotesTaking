@@ -73,7 +73,7 @@ jobs:
           --logger "trx;LogFileName=quality.trx" --results-directory TestResults
       - name: Generate HTML and Cobertura reports
         if: always()
-        run: reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/CoverageReport" "-reporttypes:Html;Cobertura;TextSummary"
+        run: dotnet tool run reportgenerator "-reports:TestResults/**/coverage.cobertura.xml" "-targetdir:TestResults/CoverageReport" "-reporttypes:Html;Cobertura;TextSummary"
       - name: Enforce coverage thresholds
         shell: pwsh
         env:

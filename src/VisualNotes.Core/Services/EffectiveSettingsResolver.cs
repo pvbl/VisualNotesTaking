@@ -24,8 +24,8 @@ public sealed class EffectiveSettingsResolver
             Resolve(layers, x => x.Provider),
             Resolve(layers, x => x.Model),
             Resolve(layers, x => x.PromptTemplate),
-            Resolve(layers, x => x.IncludeImages),
-            Resolve(layers, x => x.MaximumImageSide));
+            Resolve<bool>(layers, x => x.IncludeImages),
+            Resolve<int>(layers, x => x.MaximumImageSide));
     }
 
     private static EffectiveSetting<T> Resolve<T>(
