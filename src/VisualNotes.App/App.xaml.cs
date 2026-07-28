@@ -6,6 +6,8 @@ using VisualNotes.Infrastructure;
 using VisualNotes.App.Services;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+using Microsoft.Extensions.Logging;
+using VisualNotes.Infrastructure.Diagnostics;
 
 namespace VisualNotes.App;
 
@@ -22,18 +24,30 @@ public partial class App : System.Windows.Application
     private PersistentRegionBorder? _regionBorder;
     private PersistentCaptureRegion? _activeRegion;
     private IGlobalHotkeyService? _hotkeys;
+    private ILoggerFactory? _loggerFactory;
+    private Serilog.ILogger? _serilog;
+    private GlobalExceptionHandler? _exceptions;
+    private VisualNotesTelemetry? _telemetry;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         var dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VisualNotes");
+        (_loggerFactory, _serilog) = LoggingFactory.Create(Path.Combine(dataDirectory, "diagnostics", "visualnotes-.json"));
+        _telemetry = new VisualNotesTelemetry(enableLocalConsoleExporter: false);
+        _exceptions = new GlobalExceptionHandler(_loggerFactory.CreateLogger<GlobalExceptionHandler>(), ShowError, code => Shutdown(code));
+        DispatcherUnhandledException += (_, args) => { _exceptions.HandleDispatcher(args.Exception); args.Handled = true; };
+        TaskScheduler.UnobservedTaskException += (_, args) => { _exceptions.HandleUnobservedTask(args.Exception); args.SetObserved(); };
+        AppDomain.CurrentDomain.UnhandledException += (_, args) => _exceptions.HandleCritical(
+            args.ExceptionObject as Exception ?? new InvalidOperationException("Fallo crítico no administrado."));
         try
         {
             _runtime = await VisualNotesRuntime.CreateAsync(dataDirectory, CancellationToken.None);
         }
         catch (Exception exception)
         {
-            MessageBox.Show($"No se pudo preparar la base de datos local.\n\n{exception.Message}", "VisualNotes", MessageBoxButton.OK, MessageBoxImage.Error);
+            _loggerFactory.CreateLogger<App>().LogCritical(exception, "Local database initialization failed");
+            _exceptions.HandleDispatcher(exception);
             Shutdown(-1);
             return;
         }
@@ -126,8 +140,13 @@ public partial class App : System.Windows.Application
         _hotkeys?.Dispose();
         _window?.Close();
         if (_runtime is not null) await _runtime.DisposeAsync();
+        _telemetry?.Dispose();
+        _loggerFactory?.Dispose();
+        (_serilog as IDisposable)?.Dispose();
         Shutdown();
     }
+
+    private static void ShowError(UserFacingError error) => MessageBox.Show(error.Message, error.Title, MessageBoxButton.OK, MessageBoxImage.Error);
 
     private async void OnHotkeyInvoked(object? sender, HotkeyAction action)
     {
