@@ -86,4 +86,50 @@ public sealed class PersistenceTests : IAsyncLifetime
         loaded.CourseModule.ShouldNotBeNull().Name.ShouldBe("Álgebra");
         loaded.Screenshots.Single().DisplayTitle.ShouldBe("Transformaciones lineales");
     }
+
+    [Fact]
+    public async Task One_session_round_trips_sections_from_different_courses_and_modules()
+    {
+        var mathematics = new Course { Name = "Matemáticas" };
+        var algebra = new CourseModule
+        {
+            Course = mathematics, CourseId = mathematics.Id, Name = "Álgebra"
+        };
+        mathematics.Modules.Add(algebra);
+        var physics = new Course { Name = "Física" };
+        var mechanics = new CourseModule
+        {
+            Course = physics, CourseId = physics.Id, Name = "Mecánica"
+        };
+        physics.Modules.Add(mechanics);
+        var session = TestData.Session();
+        session.Sections.Add(new NoteSection
+        {
+            SessionId = session.Id,
+            Course = mathematics,
+            CourseId = mathematics.Id,
+            CourseModule = algebra,
+            CourseModuleId = algebra.Id,
+            Title = "Matrices"
+        });
+        session.Sections.Add(new NoteSection
+        {
+            SessionId = session.Id,
+            Course = physics,
+            CourseId = physics.Id,
+            CourseModule = mechanics,
+            CourseModuleId = mechanics.Id,
+            Title = "Fuerzas",
+            Order = 1
+        });
+
+        await new SessionRepository(_db).AddAsync(session);
+        await new UnitOfWork(_db).SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        var loaded = (await new SessionRepository(_db).GetAsync(session.Id)).ShouldNotBeNull();
+        loaded.Sections.OrderBy(section => section.Order)
+            .Select(section => section.AcademicPath)
+            .ShouldBe(["Matemáticas › Álgebra › Matrices", "Física › Mecánica › Fuerzas"]);
+    }
 }

@@ -59,9 +59,19 @@ Se requiere Windows 10/11 o Windows Server con .NET 8 SDK y una sesión de escri
 
 Los journeys E2E localizan controles exclusivamente por `AutomationId`, salvo la prueba marcada `Capture`, que puede inspeccionar límites físicos de monitores. Usan un VLM falso, sin red y determinista. Ante una excepción, el harness guarda `desktop.png`, `uia-tree.txt`, el error y los logs JSON en `VISUALNOTES_E2E_ARTIFACTS`; CI publica el directorio solo en fallos. El workflow `desktop-e2e.yml` ejecuta smoke en cada GitHub Release marcada como pre-release (release candidate), y la suite completa de martes a sábado y bajo demanda. Los recursos compartidos de captura/ventana se limpian al finalizar.
 
+`RuntimeXamlRegressionTests` no abre ventanas ni necesita un escritorio interactivo:
+crea las vistas en un hilo STA, fuerza el enlace y layout WPF y recorre las pestañas.
+Su objetivo es detectar durante CI propiedades de sólo lectura enlazadas en modo
+bidireccional, rutas de binding inválidas y excepciones de inicialización XAML. No
+sustituye los journeys UIA, que verifican foco, automatización y comportamiento real.
+
 ## Fixtures, SQLite y fugas
 
 `tests/Shared/Fixtures/TestData.cs` contiene sesiones, capturas, imágenes, respuestas VLM, configuraciones y documentos deterministas. `TemporarySqliteFactory` crea una base con `Pooling=False` y nombre aleatorio por contexto. Disponga primero el contexto, llame `AssertNoOpenConnections`, disponga la fábrica y use `TestGuards.AssertNoTemporaryFiles` para detectar conexiones o archivos fugados.
+
+Las migraciones que transforman datos deben incluir una prueba que lleve una base
+hasta la migración inmediatamente anterior, inserte datos representativos, aplique la
+versión actual y compruebe tanto la transformación como la conservación de entidades.
 
 ## Snapshots Verify
 
