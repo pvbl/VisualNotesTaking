@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
+
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 
