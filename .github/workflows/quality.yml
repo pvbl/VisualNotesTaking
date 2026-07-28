@@ -53,11 +53,14 @@ jobs:
         with:
           dotnet-version: 8.0.x
           cache: true
-          cache-dependency-path: "**/packages.lock.json"
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/packages.lock.json
       - name: Restore tools
         run: dotnet tool restore
       - name: Restore packages from lock files
-        run: dotnet restore VisualNotes.sln --locked-mode
+        shell: pwsh
+        run: ./eng/restore-locked.ps1 -Target VisualNotes.sln
       - name: Check formatting
         run: dotnet format VisualNotes.sln --verify-no-changes --no-restore
       - name: Build Debug with warnings as errors
@@ -123,9 +126,12 @@ jobs:
         with:
           dotnet-version: 8.0.x
           cache: true
-          cache-dependency-path: "**/packages.lock.json"
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/packages.lock.json
       - name: Restore packages from lock files
-        run: dotnet restore tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj --locked-mode
+        shell: pwsh
+        run: ./eng/restore-locked.ps1 -Target tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj
       - name: Run UI tests
         run: >-
           dotnet test tests/VisualNotes.UiTests/VisualNotes.UiTests.csproj

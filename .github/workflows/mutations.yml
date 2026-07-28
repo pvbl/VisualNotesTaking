@@ -44,8 +44,11 @@ jobs:
         with:
           dotnet-version: 8.0.x
           cache: true
-          cache-dependency-path: "**/packages.lock.json"
-      - run: dotnet restore VisualNotes.sln --locked-mode
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/packages.lock.json
+      - shell: pwsh
+        run: ./eng/restore-locked.ps1 -Target VisualNotes.sln
       - run: dotnet tool restore
       - name: Mutate critical VisualNotes.Core behavior
         run: dotnet stryker

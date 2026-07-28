@@ -2,8 +2,11 @@
 
 `Directory.Packages.props` es el único lugar donde se declaran versiones NuGet. Los
 proyectos solo declaran qué paquetes consumen. Cada cambio del grafo debe incluir los
-`packages.lock.json` regenerados y revisados; CI restaura exclusivamente con
-`--locked-mode` y ejecuta la auditoría transitiva de NuGet.
+`packages.lock.json` regenerados y revisados. `eng/restore-locked.ps1` crea el grafo
+inicial cuando un repositorio todavía no contiene locks y, a continuación, siempre
+ejecuta una segunda restauración con `--locked-mode`. Una vez versionados, CI no los
+regenera y falla ante cualquier divergencia. CI también ejecuta la auditoría transitiva
+de NuGet.
 
 ## Criterios para aceptar un paquete
 

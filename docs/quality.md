@@ -132,8 +132,10 @@ Esto evita que cargas lentas oculten el resultado principal. Los trabajos tienen
 y la cobertura se publica como artefacto. Toda modificación de estas puertas debe
 actualizar este documento y `tests/README.md` en el mismo pull request.
 
-Los restores de CI usan exclusivamente los `packages.lock.json` versionados mediante
-`--locked-mode`. La caché de NuGet se deriva del contenido de esos locks y no usa claves
+Los restores de CI pasan por `eng/restore-locked.ps1`. Durante la migración inicial, si
+no existe ningún lock, el script genera el grafo y comprueba inmediatamente una segunda
+restauración con `--locked-mode`; desde que los locks están versionados no se regeneran
+en CI y cualquier divergencia falla. La caché de NuGet se deriva de esos locks y no usa claves
 de fallback, de modo que una rama no puede reutilizar una caché con un grafo distinto.
 Cuando cambie una referencia, regenere los locks deliberadamente con `dotnet restore
 VisualNotes.sln --force-evaluate` y revise el diff antes de integrarlo.

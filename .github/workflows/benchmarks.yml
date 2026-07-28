@@ -25,8 +25,11 @@ jobs:
         with:
           dotnet-version: 8.0.x
           cache: true
-          cache-dependency-path: "**/packages.lock.json"
-      - run: dotnet restore tests/VisualNotes.Benchmarks/VisualNotes.Benchmarks.csproj --locked-mode
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/packages.lock.json
+      - shell: pwsh
+        run: ./eng/restore-locked.ps1 -Target tests/VisualNotes.Benchmarks/VisualNotes.Benchmarks.csproj
       - name: Run benchmarks
         run: dotnet run --configuration Release --no-restore --project tests/VisualNotes.Benchmarks -- --filter "*"
       - name: Publish benchmark results and logs
