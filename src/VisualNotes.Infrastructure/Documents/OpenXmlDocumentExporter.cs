@@ -45,9 +45,12 @@ public sealed class DocumentExportException(ExportFailureKind kind, string messa
 }
 
 /// <summary>Creates self-contained DOCX packages without automating or requiring Microsoft Word.</summary>
-public sealed class OpenXmlDocumentExporter
+public sealed class OpenXmlDocumentExporter : IDocumentExporter
 {
     private const long ImageWidth = 5_700_000;
+
+    async Task<string> IDocumentExporter.ExportAsync(SemanticDocument document, string destinationPath, CancellationToken cancellationToken) =>
+        (await ExportAsync(new(document, destinationPath, new()), cancellationToken).ConfigureAwait(false)).Path;
 
     public async Task<OpenXmlExportResult> ExportAsync(OpenXmlExportRequest request, CancellationToken cancellationToken = default)
     {

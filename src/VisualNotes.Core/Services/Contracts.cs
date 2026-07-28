@@ -2,6 +2,18 @@ using VisualNotes.Core.Models;
 
 namespace VisualNotes.Core.Services;
 
+public interface ICaptureWorkspace
+{
+    Task<IReadOnlyList<Screenshot>> LoadAsync(Guid sessionId, CancellationToken cancellationToken = default);
+    Task SaveAsync(IReadOnlyCollection<Screenshot> captures, CancellationToken cancellationToken = default);
+    Task<SemanticDocument> ComposeAsync(NoteSession session, CancellationToken cancellationToken = default);
+}
+
+public interface IDocumentExporter
+{
+    Task<string> ExportAsync(SemanticDocument document, string destinationPath, CancellationToken cancellationToken = default);
+}
+
 public interface IScreenCaptureService
 {
     Task<CapturedFrame?> CaptureAsync(CaptureRequest request, CancellationToken cancellationToken = default);

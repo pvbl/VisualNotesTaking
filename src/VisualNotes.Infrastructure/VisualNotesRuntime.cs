@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Infrastructure.Security;
+using VisualNotes.Infrastructure.Documents;
 
 namespace VisualNotes.Infrastructure;
 
@@ -17,7 +18,7 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         IScreenshotRepository screenshots,
         IScreenshotStorageService screenshotStorage,
         ImageFileStore imageFiles,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork, ICaptureWorkspace captureWorkspace, IDocumentExporter documentExporter)
     {
         _database = database;
         Coordinator = coordinator;
@@ -26,6 +27,8 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
         ScreenshotStorage = screenshotStorage;
         ImageFiles = imageFiles;
         UnitOfWork = unitOfWork;
+        CaptureWorkspace = captureWorkspace;
+        DocumentExporter = documentExporter;
         ApiCredentials = new WindowsDpapiCredentialStore();
     }
 
@@ -42,6 +45,8 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
     public IUnitOfWork UnitOfWork { get; }
 
     public IApiCredentialStore ApiCredentials { get; }
+    public ICaptureWorkspace CaptureWorkspace { get; }
+    public IDocumentExporter DocumentExporter { get; }
 
     public static async Task<VisualNotesRuntime> CreateAsync(
         string dataDirectory,
@@ -61,7 +66,8 @@ public sealed class VisualNotesRuntime : IAsyncDisposable
             var screenshotStorage = new ScreenshotStorageService(dataDirectory);
             var imageFiles = new ImageFileStore(dataDirectory);
             var coordinator = new SessionCoordinator(sessions, screenshots, new SettingsRepository(database), unitOfWork);
-            return new VisualNotesRuntime(database, coordinator, sessions, screenshots, screenshotStorage, imageFiles, unitOfWork);
+            return new VisualNotesRuntime(database, coordinator, sessions, screenshots, screenshotStorage, imageFiles, unitOfWork,
+                new CaptureWorkspace(database, screenshots), new OpenXmlDocumentExporter());
         }
         catch
         {

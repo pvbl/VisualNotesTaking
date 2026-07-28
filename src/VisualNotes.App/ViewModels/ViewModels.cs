@@ -29,17 +29,32 @@ public sealed class MainViewModel : ViewModelBase
     private NoteSession? _activeSession;
 
     private readonly SettingsViewModel? _settings;
+    private readonly ICaptureWorkspace? _captureWorkspace;
+    private readonly IDocumentExporter? _documentExporter;
+    private readonly IExportInteraction? _exportInteraction;
 
-    public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository, IGlobalHotkeyService? hotkeys = null, IApiCredentialStore? credentials = null)
+    public MainViewModel(SessionCoordinator coordinator, ISessionRepository repository, IGlobalHotkeyService? hotkeys = null,
+        IApiCredentialStore? credentials = null, ICaptureWorkspace? captureWorkspace = null,
+        IDocumentExporter? documentExporter = null, IExportInteraction? exportInteraction = null)
     {
         _coordinator = coordinator; _repository = repository;
+        _captureWorkspace = captureWorkspace; _documentExporter = documentExporter; _exportInteraction = exportInteraction;
         _settings = hotkeys is null ? null : new SettingsViewModel(hotkeys, credentials);
         Sessions = new SessionViewModel(coordinator, repository, Activate);
+        Captures = new CapturesViewModel(workspace: captureWorkspace, activeSession: () => ActiveSession);
+        Document = new DocumentViewModel();
+        Document.ExportRequested += ExportDocument;
         _currentViewModel = Sessions;
-        NavigateCommand = new RelayCommand(page => CurrentViewModel = page switch
+        NavigateCommand = new RelayCommand(async page =>
         {
-            "Captures" => new CapturesViewModel(ActiveSession?.Screenshots), "Instructions" => new InstructionsViewModel(),
-            "Document" => new DocumentViewModel(), "Settings" => _settings ?? new SettingsViewModel(), _ => Sessions
+            if (page as string == "Captures") await Captures.LoadAsync();
+            if (page as string == "Document" && ActiveSession is not null && _captureWorkspace is not null)
+                Document.ReplaceDocument(await _captureWorkspace.ComposeAsync(ActiveSession));
+            CurrentViewModel = page switch
+            {
+                "Captures" => Captures, "Instructions" => Instructions,
+                "Document" => Document, "Settings" => _settings ?? Settings, _ => Sessions
+            };
         });
         TogglePauseCommand = new RelayCommand(async _ =>
         {
@@ -52,6 +67,10 @@ public sealed class MainViewModel : ViewModelBase
     }
 
     public SessionViewModel Sessions { get; }
+    public CapturesViewModel Captures { get; }
+    public DocumentViewModel Document { get; }
+    public InstructionsViewModel Instructions { get; } = new();
+    public SettingsViewModel Settings { get; } = new();
     public ViewModelBase CurrentViewModel { get => _currentViewModel; private set { _currentViewModel = value; OnPropertyChanged(); } }
     public NoteSession? ActiveSession { get => _activeSession; private set { _activeSession = value; OnPropertyChanged(); RefreshHeader(); } }
     public string ActiveSessionName => ActiveSession?.Name ?? "Sin sesión activa";
@@ -75,14 +94,31 @@ public sealed class MainViewModel : ViewModelBase
         if (restored is not null) Activate(restored);
     }
 
-    public void CaptureAdded(Screenshot capture)
+    public async void CaptureAdded(Screenshot capture)
     {
         if (ActiveSession is not null && ActiveSession.Screenshots.All(item => item.Id != capture.Id))
             ActiveSession.Screenshots.Add(capture);
-        if (CurrentViewModel is CapturesViewModel captures) captures.AddCapture(capture);
+        Captures.AddCapture(capture);
+        if (_captureWorkspace is not null) await Captures.LoadAsync();
     }
 
-    private void Activate(NoteSession session) => ActiveSession = session;
+    private async void Activate(NoteSession session)
+    {
+        ActiveSession = session;
+        await Captures.LoadAsync();
+    }
+    private async void ExportDocument(SemanticDocument document, ExportScope _)
+    {
+        if (_documentExporter is null || _exportInteraction is null) return;
+        var path = _exportInteraction.SelectDocxPath(ActiveSession?.PlannedDocumentName);
+        if (path is null) return;
+        try
+        {
+            var exported = await _documentExporter.ExportAsync(document, path);
+            _exportInteraction.ShowExportSucceeded(exported);
+        }
+        catch (Exception exception) { _exportInteraction.ShowExportFailed(exception.Message); }
+    }
     public void RefreshHeader() { OnPropertyChanged(nameof(ActiveSessionName)); OnPropertyChanged(nameof(ActiveSectionName)); OnPropertyChanged(nameof(SessionStatus)); }
 }
 
@@ -124,7 +160,9 @@ public sealed class SessionViewModel : ViewModelBase
 
 public sealed class CapturesViewModel : ViewModelBase
 {
-    private readonly CaptureLibrary _library;
+    private CaptureLibrary _library;
+    private readonly ICaptureWorkspace? _workspace;
+    private readonly Func<NoteSession?>? _activeSession;
     private Screenshot? _selectedCapture;
     private bool _isQuickContextOpen;
     private Guid? _sectionFilter;
@@ -134,21 +172,23 @@ public sealed class CapturesViewModel : ViewModelBase
     private CaptureImportance? _importanceFilter;
     private ReviewFilter _reviewFilter;
 
-    public CapturesViewModel(IEnumerable<Screenshot>? captures = null)
+    public CapturesViewModel(IEnumerable<Screenshot>? captures = null, ICaptureWorkspace? workspace = null,
+        Func<NoteSession?>? activeSession = null)
     {
+        _workspace = workspace; _activeSession = activeSession;
         _library = new CaptureLibrary(captures ?? []);
         Sections = _library.Captures.Where(capture => capture.Section is not null).Select(capture => capture.Section!).DistinctBy(section => section.Id).OrderBy(section => section.Order).ToArray();
         SelectedCaptures.CollectionChanged += (_, _) => OnPropertyChanged(nameof(SelectionCount));
-        ApplyChipCommand = new RelayCommand(value => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); Refresh(); });
+        ApplyChipCommand = new RelayCommand(async value => { if (SelectedCapture is null || value is not string chip) return; SelectedCapture.Tags = string.Join(", ", SelectedCapture.Tags.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Append(chip).Distinct(StringComparer.OrdinalIgnoreCase)); SelectedCapture.CaptureInstruction = CaptureInstructionResolver.Resolve([chip], SelectedCapture.CaptureInstruction); OnPropertyChanged(nameof(SelectedCapture)); await PersistAndRefreshAsync([SelectedCapture]); });
         CloseQuickContextCommand = new RelayCommand(_ => IsQuickContextOpen = false);
-        ReanalyzeCommand = new RelayCommand(_ => Run(_library.Reprocess));
-        RegenerateNoteCommand = new RelayCommand(_ => Run(ids => { _library.Reprocess(ids); foreach (var capture in Selected()) capture.ProcessingStatus = ScreenshotStatus.NeedsReview; }));
-        ExcludeCommand = new RelayCommand(_ => Run(_library.Exclude));
-        DeleteCommand = new RelayCommand(_ => Run(_library.Delete));
-        RestoreCommand = new RelayCommand(_ => Run(_library.Restore));
-        UndoCommand = new RelayCommand(_ => { if (_library.Undo()) Refresh(); });
-        MoveToSectionCommand = new RelayCommand(value => { if (value is Guid id) Run(ids => _library.MoveToSection(ids, id)); });
-        ReorderCommand = new RelayCommand(value => { if (value is int index) Run(ids => _library.Reorder(ids, index)); });
+        ReanalyzeCommand = new RelayCommand(async _ => await RunAsync(_library.Reprocess));
+        RegenerateNoteCommand = new RelayCommand(async _ => await RunAsync(ids => { _library.Reprocess(ids); foreach (var capture in Selected()) capture.ProcessingStatus = ScreenshotStatus.NeedsReview; }));
+        ExcludeCommand = new RelayCommand(async _ => await RunAsync(_library.Exclude));
+        DeleteCommand = new RelayCommand(async _ => await RunAsync(_library.Delete));
+        RestoreCommand = new RelayCommand(async _ => await RunAsync(_library.Restore));
+        UndoCommand = new RelayCommand(async _ => { if (_library.Undo()) await PersistAndRefreshAsync(_library.Captures); });
+        MoveToSectionCommand = new RelayCommand(async value => { if (value is Guid id) await RunAsync(ids => _library.MoveToSection(ids, id)); });
+        ReorderCommand = new RelayCommand(async value => { if (value is int index) await RunAsync(ids => _library.Reorder(ids, index)); });
         ClearFiltersCommand = new RelayCommand(_ => { SectionFilter = null; TagFilter = string.Empty; StatusFilter = null; ImportanceFilter = null; ReviewFilter = VisualNotes.Core.Services.ReviewFilter.All; });
         Refresh();
     }
@@ -156,7 +196,7 @@ public sealed class CapturesViewModel : ViewModelBase
     public ObservableCollection<Screenshot> Captures { get; } = [];
     public ObservableCollection<Screenshot> SelectedCaptures { get; } = [];
     public IReadOnlyCollection<string> QuickChips => CaptureInstructionResolver.QuickChips;
-    public IReadOnlyList<NoteSection> Sections { get; }
+    public IReadOnlyList<NoteSection> Sections { get; private set; }
     public IReadOnlyList<ScreenshotStatus> Statuses { get; } = Enum.GetValues<ScreenshotStatus>();
     public IReadOnlyList<CaptureImportance> Importances { get; } = Enum.GetValues<CaptureImportance>();
     public IReadOnlyList<ReviewFilter> ReviewOptions { get; } = Enum.GetValues<ReviewFilter>();
@@ -194,9 +234,30 @@ public sealed class CapturesViewModel : ViewModelBase
         Refresh();
     }
 
+    public async Task LoadAsync()
+    {
+        if (_workspace is null || _activeSession?.Invoke() is not { } session) return;
+        var selectedIds = SelectedCaptures.Select(x => x.Id).ToHashSet();
+        _library = new(await _workspace.LoadAsync(session.Id));
+        Sections = session.Sections.OrderBy(x => x.Order).ToArray();
+        OnPropertyChanged(nameof(Sections));
+        Refresh();
+        ReplaceSelection(Captures.Where(x => selectedIds.Contains(x.Id)));
+    }
+
     private IReadOnlyCollection<Guid> SelectedIds() => Selected().Select(capture => capture.Id).ToArray();
     private IEnumerable<Screenshot> Selected() => SelectedCaptures.Count == 0 && SelectedCapture is not null ? [SelectedCapture] : SelectedCaptures;
-    private void Run(Action<IReadOnlyCollection<Guid>> action) { action(SelectedIds()); Refresh(); }
+    private async Task RunAsync(Action<IReadOnlyCollection<Guid>> action)
+    {
+        var changed = Selected().ToArray();
+        action(SelectedIds());
+        await PersistAndRefreshAsync(changed);
+    }
+    private async Task PersistAndRefreshAsync(IReadOnlyCollection<Screenshot> changed)
+    {
+        if (_workspace is not null) await _workspace.SaveAsync(changed);
+        Refresh();
+    }
     private void Refresh()
     {
         var selectedIds = SelectedCaptures.Select(capture => capture.Id).ToHashSet();
@@ -208,7 +269,7 @@ public sealed class CapturesViewModel : ViewModelBase
 public sealed class InstructionsViewModel : ViewModelBase;
 public sealed class DocumentViewModel : ViewModelBase
 {
-    private readonly SemanticDocumentPreview _preview;
+    private SemanticDocumentPreview _preview;
     private ExportScope _scope;
     private PreviewItem? _selectedItem;
 
@@ -238,6 +299,17 @@ public sealed class DocumentViewModel : ViewModelBase
 
     public SemanticDocument CreateExportDocument() => _preview.CreateDocument(Scope,
         SelectedItem?.Node.Type == SemanticNodeType.Section ? SelectedItem.StableKey : SelectedItem?.SectionKey);
+
+    public void ReplaceDocument(SemanticDocument document)
+    {
+        var excluded = Items.Where(x => !x.IsIncluded).Select(x => x.StableKey).ToHashSet();
+        var states = Items.ToDictionary(x => x.StableKey, x => x.State);
+        var selectedKey = SelectedItem?.StableKey;
+        _preview = new(document, states);
+        _preview.SetIncluded(excluded, false);
+        Refresh();
+        SelectedItem = Items.FirstOrDefault(x => x.StableKey == selectedKey);
+    }
 
     private void SetIncluded(object? value, bool included)
     {
