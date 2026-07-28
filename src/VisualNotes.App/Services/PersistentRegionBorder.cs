@@ -5,6 +5,7 @@ using System.Windows.Media;
 
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+using Brushes = System.Windows.Media.Brushes;
 
 namespace VisualNotes.App.Services;
 

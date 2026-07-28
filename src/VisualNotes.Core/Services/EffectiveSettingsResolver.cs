@@ -24,8 +24,8 @@ public sealed class EffectiveSettingsResolver
             Resolve(layers, x => x.Provider),
             Resolve(layers, x => x.Model),
             Resolve(layers, x => x.PromptTemplate),
-            Resolve<bool>(layers, x => x.IncludeImages),
-            Resolve<int>(layers, x => x.MaximumImageSide));
+            ResolveValue(layers, x => x.IncludeImages),
+            ResolveValue(layers, x => x.MaximumImageSide));
     }
 
     private static EffectiveSetting<T> Resolve<T>(
@@ -36,6 +36,21 @@ public sealed class EffectiveSettingsResolver
         {
             if (values is not null && selector(values) is { } value)
                 return new(value, level);
+        }
+
+        throw new InvalidOperationException("Application defaults must define every setting.");
+    }
+
+    private static EffectiveSetting<T> ResolveValue<T>(
+        IEnumerable<(SettingsLevel Level, SettingsValues? Values)> layers,
+        Func<SettingsValues, T?> selector)
+        where T : struct
+    {
+        foreach (var (level, values) in layers)
+        {
+            var value = values is null ? null : selector(values);
+            if (value.HasValue)
+                return new(value.Value, level);
         }
 
         throw new InvalidOperationException("Application defaults must define every setting.");

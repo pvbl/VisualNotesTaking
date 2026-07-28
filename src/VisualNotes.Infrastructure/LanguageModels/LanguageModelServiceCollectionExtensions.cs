@@ -25,7 +25,8 @@ public static class LanguageModelServiceCollectionExtensions
         return services;
     }
 
-    private static IHttpClientBuilder AddProviderResilience(this IHttpClientBuilder builder) =>
+    private static IHttpClientBuilder AddProviderResilience(this IHttpClientBuilder builder)
+    {
         builder.AddStandardResilienceHandler(options =>
         {
             options.Retry.MaxRetryAttempts = 2;
@@ -42,4 +43,6 @@ public static class LanguageModelServiceCollectionExtensions
             options.CircuitBreaker.ShouldHandle = static arguments => ValueTask.FromResult(
                 arguments.Outcome.Exception is HttpRequestException || (int?)arguments.Outcome.Result?.StatusCode >= 500);
         });
+        return builder;
+    }
 }

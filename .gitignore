@@ -5,5 +5,8 @@
 *.suo
 TestResults/
 
+# Keep NuGet lock files versioned for reproducible restores in CI and local builds.
+!**/packages.lock.json
+
 **/*.received.*
 BenchmarkDotNet.Artifacts/

@@ -3,12 +3,17 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using VisualNotes.App.ViewModels;
 using VisualNotes.Core.Models;
+using WpfDragEventArgs = System.Windows.DragEventArgs;
+using WpfDragDropEffects = System.Windows.DragDropEffects;
+using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
+using WpfPoint = System.Windows.Point;
+using WpfUserControl = System.Windows.Controls.UserControl;
 
 namespace VisualNotes.App.Views;
 
-public partial class CapturesView : UserControl
+public partial class CapturesView : WpfUserControl
 {
-    private Point _dragStart;
+    private WpfPoint _dragStart;
     public CapturesView() => InitializeComponent();
 
     private void SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -17,14 +22,14 @@ public partial class CapturesView : UserControl
             viewModel.ReplaceSelection(CaptureList.SelectedItems.Cast<Screenshot>());
     }
 
-    private void CaptureMouseMove(object sender, MouseEventArgs e)
+    private void CaptureMouseMove(object sender, WpfMouseEventArgs e)
     {
         if (e.LeftButton == MouseButtonState.Pressed && Math.Abs(e.GetPosition(this).Y - _dragStart.Y) > SystemParameters.MinimumVerticalDragDistance)
-            DragDrop.DoDragDrop(CaptureList, CaptureList.SelectedItems.Cast<Screenshot>().Select(item => item.Id).ToArray(), DragDropEffects.Move);
+            DragDrop.DoDragDrop(CaptureList, CaptureList.SelectedItems.Cast<Screenshot>().Select(item => item.Id).ToArray(), WpfDragDropEffects.Move);
         else if (e.LeftButton == MouseButtonState.Pressed) _dragStart = e.GetPosition(this);
     }
 
-    private void CaptureDrop(object sender, DragEventArgs e)
+    private void CaptureDrop(object sender, WpfDragEventArgs e)
     {
         if (DataContext is not CapturesViewModel viewModel || e.Data.GetData(typeof(Guid[])) is not Guid[]) return;
         var target = (e.OriginalSource as FrameworkElement)?.DataContext as Screenshot;

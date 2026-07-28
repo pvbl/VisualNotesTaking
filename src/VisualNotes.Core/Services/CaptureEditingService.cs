@@ -49,8 +49,14 @@ public sealed class DebouncedCaptureSaver(Func<Screenshot, CancellationToken, Ta
     public async Task FlushAsync()
     {
         Task pending; Screenshot? latest;
-        lock (_gate) { _pending?.Cancel(); pending = _saveTask; latest = _latest; _latest = null; }
-        try { await pending.ConfigureAwait(false); } catch (OperationCanceledException) { }
+        CancellationTokenSource? pendingCancellation;
+        lock (_gate) { pendingCancellation = _pending; pending = _saveTask; latest = _latest; _latest = null; }
+        if (pendingCancellation is not null) await pendingCancellation.CancelAsync().ConfigureAwait(false);
+        try { await pending.ConfigureAwait(false); }
+        catch (OperationCanceledException)
+        {
+            // The scheduled save was intentionally cancelled so the latest draft can be flushed immediately.
+        }
         if (latest is not null) await save(latest, CancellationToken.None).ConfigureAwait(false);
     }
 

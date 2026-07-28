@@ -1,8 +1,10 @@
 using System.Drawing;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 
 using Forms = System.Windows.Forms;
+using MessageBox = System.Windows.MessageBox;
 
 namespace VisualNotes.App;
 

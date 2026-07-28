@@ -255,7 +255,7 @@ public sealed class SessionViewModel : ViewModelBase
     public NoteSession Draft { get => _draft; set { _draft = value; OnPropertyChanged(); } }
     public NoteSession? SelectedSession { get => _selected; set { _selected = value; OnPropertyChanged(); OnPropertyChanged(nameof(OrderedSections)); if (value is not null) _activate(value); } }
     public NoteSection? SelectedSection { get => _selectedSection; set { _selectedSection = value; OnPropertyChanged(); } }
-    public IEnumerable<NoteSection> OrderedSections => SelectedSession?.Sections.OrderBy(x => x.Order) ?? [];
+    public IEnumerable<NoteSection> OrderedSections => SelectedSession is null ? [] : SelectedSession.Sections.OrderBy(x => x.Order);
     public ICommand CreateCommand { get; } public ICommand DuplicateCommand { get; } public ICommand ContinueCommand { get; }
     public ICommand SaveCommand { get; } public ICommand AddSectionCommand { get; } public ICommand ActivateSectionCommand { get; }
     public ICommand RenameSectionCommand { get; } public ICommand MoveUpCommand { get; } public ICommand MoveDownCommand { get; }

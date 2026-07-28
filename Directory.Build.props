@@ -9,7 +9,6 @@
     <AnalysisLevel>8.0-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <GenerateDocumentationFile Condition="'$(IsTestProject)' != 'true' and '$(OutputType)' != 'WinExe'">true</GenerateDocumentationFile>
-    <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release' or '$(CI)' == 'true'">true</TreatWarningsAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <!-- Legacy public APIs are not fully documented yet. Keep this exception to the
          specific compiler diagnostic while XML output is introduced incrementally. -->

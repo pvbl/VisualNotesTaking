@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using VisualNotes.Core.Models;
+using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
 
 namespace VisualNotes.Infrastructure.Processing;

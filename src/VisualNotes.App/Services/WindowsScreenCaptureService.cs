@@ -1,12 +1,15 @@
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Interop;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
+using DrawingSize = System.Drawing.Size;
 using Forms = System.Windows.Forms;
+using WpfApplication = System.Windows.Application;
 
 namespace VisualNotes.App.Services;
 
@@ -16,7 +19,7 @@ public interface IRegionSelectionOverlay
 }
 
 /// <summary>Captures physical desktop pixels after all VisualNotes surfaces have been hidden.</summary>
-public sealed class WindowsScreenCaptureService(IRegionSelectionOverlay overlay) : IScreenCaptureService
+public sealed partial class WindowsScreenCaptureService(IRegionSelectionOverlay overlay) : IScreenCaptureService
 {
     public static IReadOnlyList<MonitorCaptureInfo> GetMonitors() => Forms.Screen.AllScreens.Select(GetMonitor).ToArray();
 
@@ -26,7 +29,7 @@ public sealed class WindowsScreenCaptureService(IRegionSelectionOverlay overlay)
         var target = await ResolveTargetAsync(request, cancellationToken).ConfigureAwait(true);
         if (target is null) return null;
 
-        var visibleApplicationWindows = Application.Current.Windows.Cast<Window>().Where(x => x.IsVisible).ToArray();
+        var visibleApplicationWindows = WpfApplication.Current.Windows.Cast<Window>().Where(x => x.IsVisible).ToArray();
         foreach (var window in visibleApplicationWindows) window.Hide();
         // The selector is closed before this point. Yield once so DWM can compose a frame without
         // the overlay, persistent border, or floating panel before CopyFromScreen executes.
@@ -44,7 +47,7 @@ public sealed class WindowsScreenCaptureService(IRegionSelectionOverlay overlay)
         }
         finally
         {
-            await Application.Current.Dispatcher.InvokeAsync(() =>
+            await WpfApplication.Current.Dispatcher.InvokeAsync(() =>
             {
                 foreach (var window in visibleApplicationWindows) window.Show();
             });
@@ -84,7 +87,7 @@ public sealed class WindowsScreenCaptureService(IRegionSelectionOverlay overlay)
     {
         using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppPArgb);
         using (var graphics = Graphics.FromImage(bitmap))
-            graphics.CopyFromScreen(bounds.X, bounds.Y, 0, 0, new Size(bounds.Width, bounds.Height), CopyPixelOperation.SourceCopy);
+            graphics.CopyFromScreen(bounds.X, bounds.Y, 0, 0, new DrawingSize(bounds.Width, bounds.Height), CopyPixelOperation.SourceCopy);
         using var stream = new MemoryStream();
         bitmap.Save(stream, ImageFormat.Png);
         return stream.ToArray();
@@ -126,7 +129,7 @@ public sealed class WindowsScreenCaptureService(IRegionSelectionOverlay overlay)
         [LibraryImport("user32.dll")] internal static partial nint GetForegroundWindow();
         [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] internal static partial bool GetWindowRect(nint window, out Rect rectangle);
         [LibraryImport("user32.dll", EntryPoint = "GetWindowTextLengthW", StringMarshalling = StringMarshalling.Utf16)] internal static partial int GetWindowTextLength(nint window);
-        [LibraryImport("user32.dll", EntryPoint = "GetWindowTextW", StringMarshalling = StringMarshalling.Utf16)] internal static partial int GetWindowText(nint window, StringBuilder text, int count);
+        [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode)] internal static extern int GetWindowText(nint window, StringBuilder text, int count);
         [LibraryImport("user32.dll")] internal static partial nint MonitorFromPoint(Point point, uint flags);
         [LibraryImport("Shcore.dll")] internal static partial int GetDpiForMonitor(nint monitor, int type, out uint dpiX, out uint dpiY);
     }

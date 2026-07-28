@@ -128,6 +128,8 @@ public sealed class LocalSearchIndex
                 if (candidates.Count == 0) return [];
             }
 
+            if (candidates is null) return [];
+
             return candidates.Select(id => Match(_blocks[id], queryTokens, filter))
                 .Where(result => result is not null)
                 .Select(result => result!)

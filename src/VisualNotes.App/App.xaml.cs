@@ -1,6 +1,9 @@
 using System.Drawing;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using Forms = System.Windows.Forms;
+using MessageBox = System.Windows.MessageBox;
 using VisualNotes.App.ViewModels;
 using VisualNotes.Infrastructure;
 using VisualNotes.App.Services;
@@ -44,7 +47,7 @@ public partial class App : System.Windows.Application
         if (e.Args is ["--smoke-test", var markerPath])
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(markerPath))!);
-            await File.WriteAllTextAsync(markerPath, $"VisualNotes {Environment.ProcessArchitecture} OK");
+            await File.WriteAllTextAsync(markerPath, $"VisualNotes {RuntimeInformation.ProcessArchitecture} OK");
             Shutdown();
             return;
         }
@@ -62,7 +65,7 @@ public partial class App : System.Windows.Application
         var dataDirectory = environmentDirectory ?? bootstrap?.DataDirectory ?? localDirectory;
         (_loggerFactory, _serilog) = LoggingFactory.Create(Path.Combine(dataDirectory, "diagnostics", "visualnotes-.json"));
         _telemetry = new VisualNotesTelemetry(enableLocalConsoleExporter: false);
-        _exceptions = new GlobalExceptionHandler(_loggerFactory.CreateLogger<GlobalExceptionHandler>(), ShowError, code => Shutdown(code));
+        _exceptions = new GlobalExceptionHandler(_loggerFactory!.CreateLogger<GlobalExceptionHandler>(), ShowError, code => Shutdown(code));
         DispatcherUnhandledException += (_, args) => { _exceptions.HandleDispatcher(args.Exception); args.Handled = true; };
         TaskScheduler.UnobservedTaskException += (_, args) => { _exceptions.HandleUnobservedTask(args.Exception); args.SetObserved(); };
         AppDomain.CurrentDomain.UnhandledException += (_, args) => _exceptions.HandleCritical(

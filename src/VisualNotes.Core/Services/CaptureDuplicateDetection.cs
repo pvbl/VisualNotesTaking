@@ -128,7 +128,7 @@ public sealed record DuplicateEvaluation(int TruePositives, int FalsePositives, 
 {
     public double Precision => Ratio(TruePositives, TruePositives + FalsePositives);
     public double Recall => Ratio(TruePositives, TruePositives + FalseNegatives);
-    public double F1 => Precision + Recall == 0 ? 0 : 2 * Precision * Recall / (Precision + Recall);
+    public double F1 => Precision + Recall <= double.Epsilon ? 0 : 2 * Precision * Recall / (Precision + Recall);
     public double FalsePositiveRate(int trueNegatives) => Ratio(FalsePositives, FalsePositives + trueNegatives);
     private static double Ratio(int numerator, int denominator) => denominator == 0 ? 0 : (double)numerator / denominator;
 }

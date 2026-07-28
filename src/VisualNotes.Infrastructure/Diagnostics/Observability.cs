@@ -45,7 +45,7 @@ public sealed class VisualNotesTelemetry : IDisposable
         meterProvider = metrics.Build();
     }
 
-    public async Task<T> MeasureAsync<T>(OperationBoundary boundary, CorrelationIds ids, Func<CancellationToken, Task<T>> action, ILogger logger, CancellationToken token = default)
+    public async Task<T> MeasureAsync<T>(OperationBoundary boundary, CorrelationIds ids, Func<CancellationToken, Task<T>> action, Microsoft.Extensions.Logging.ILogger logger, CancellationToken token = default)
     {
         ArgumentNullException.ThrowIfNull(action);
         using var activity = VisualNotesActivity.Source.StartActivity(boundary.ToString(), ActivityKind.Internal);
@@ -68,7 +68,7 @@ public sealed class VisualNotesTelemetry : IDisposable
         }
     }
 
-    public Task MeasureAsync(OperationBoundary boundary, CorrelationIds ids, Func<CancellationToken, Task> action, ILogger logger, CancellationToken token = default) =>
+    public Task MeasureAsync(OperationBoundary boundary, CorrelationIds ids, Func<CancellationToken, Task> action, Microsoft.Extensions.Logging.ILogger logger, CancellationToken token = default) =>
         MeasureAsync(boundary, ids, async ct => { await action(ct).ConfigureAwait(false); return true; }, logger, token);
 
     private void Record(OperationBoundary boundary, long start, bool failed)
@@ -99,7 +99,8 @@ public sealed partial class RedactingSink(ILogEventSink inner) : ILogEventSink
     {
         var properties = logEvent.Properties.ToDictionary(x => x.Key, x => IsSensitive(x.Key) ? new ScalarValue(Redacted) : Redact(x.Value));
         var message = SecretPattern().Replace(logEvent.MessageTemplate.Text, "$1=" + Redacted);
-        inner.Emit(new LogEvent(logEvent.Timestamp, logEvent.Level, RedactException(logEvent.Exception), new MessageTemplateParser().Parse(message), properties));
+        inner.Emit(new LogEvent(logEvent.Timestamp, logEvent.Level, RedactException(logEvent.Exception), new MessageTemplateParser().Parse(message),
+            properties.Select(property => new LogEventProperty(property.Key, property.Value))));
     }
     private static bool IsSensitive(string name) => name.Contains("key", StringComparison.OrdinalIgnoreCase) || name.Contains("token", StringComparison.OrdinalIgnoreCase) || name.Contains("prompt", StringComparison.OrdinalIgnoreCase) || name.Contains("image", StringComparison.OrdinalIgnoreCase) || name.Contains("context", StringComparison.OrdinalIgnoreCase) || name.Contains("content", StringComparison.OrdinalIgnoreCase);
     private static LogEventPropertyValue Redact(LogEventPropertyValue value) => value switch

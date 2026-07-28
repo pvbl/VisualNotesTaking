@@ -7,6 +7,16 @@ using System.Windows.Automation;
 using VisualNotes.Core.Models;
 using VisualNotes.Core.Services;
 using Forms = System.Windows.Forms;
+using WpfApplication = System.Windows.Application;
+using WpfBrushes = System.Windows.Media.Brushes;
+using WpfButton = System.Windows.Controls.Button;
+using WpfColor = System.Windows.Media.Color;
+using WpfHorizontalAlignment = System.Windows.HorizontalAlignment;
+using WpfKeyEventArgs = System.Windows.Input.KeyEventArgs;
+using WpfMouseEventArgs = System.Windows.Input.MouseEventArgs;
+using WpfOrientation = System.Windows.Controls.Orientation;
+using WpfPoint = System.Windows.Point;
+using WpfRectangle = System.Windows.Shapes.Rectangle;
 
 namespace VisualNotes.App.Services;
 
@@ -32,7 +42,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             window.SelectionChanged += () => { foreach (var item in windows) item.RefreshSelection(); };
             window.Show();
         }
-        var registration = cancellationToken.Register(() => Application.Current.Dispatcher.Invoke(() => Close(null)));
+        var registration = cancellationToken.Register(() => WpfApplication.Current.Dispatcher.Invoke(() => Close(null)));
         return AwaitAndDisposeAsync(completion.Task, registration);
     }
 
@@ -48,7 +58,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
         private readonly RegionSelectionController _controller;
         private readonly Canvas _canvas = new();
         private readonly TextBlock _status = new();
-        private readonly Rectangle _selection = new() { Stroke = Brushes.DeepSkyBlue, StrokeThickness = 2, Fill = new SolidColorBrush(Color.FromArgb(35, 0, 160, 255)) };
+        private readonly WpfRectangle _selection = new() { Stroke = WpfBrushes.DeepSkyBlue, StrokeThickness = 2, Fill = new SolidColorBrush(WpfColor.FromArgb(35, 0, 160, 255)) };
         public event Action? ConfirmRequested;
         public event Action? CancelRequested;
         public event Action? ResetRequested;
@@ -57,12 +67,12 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
         internal SelectionWindow(Forms.Screen screen, RegionSelectionController controller)
         {
             _screen = screen; _controller = controller;
-            WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = new SolidColorBrush(Color.FromArgb(55, 0, 0, 0));
+            WindowStyle = WindowStyle.None; AllowsTransparency = true; Background = new SolidColorBrush(WpfColor.FromArgb(55, 0, 0, 0));
             Topmost = true; ShowInTaskbar = false; ResizeMode = ResizeMode.NoResize;
             AutomationProperties.SetAutomationId(this, "RegionSelectionWindow");
             AutomationProperties.SetName(this, "Selector de región de captura");
             AutomationProperties.SetHelpText(this, "Arrastra para seleccionar. Enter confirma, Escape cancela, flechas mueven y Mayús más flechas cambia el tamaño.");
-            var source = PresentationSource.FromVisual(Application.Current.MainWindow);
+            var source = PresentationSource.FromVisual(WpfApplication.Current.MainWindow);
             var scaleX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1;
             var scaleY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1;
             Left = screen.Bounds.Left / scaleX; Top = screen.Bounds.Top / scaleY;
@@ -79,8 +89,8 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
         {
             var root = new Grid(); root.Children.Add(_canvas); _canvas.Children.Add(_selection);
             _canvas.Focusable = true;
-            var panel = new StackPanel { Background = Brushes.White, Margin = new Thickness(12), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
-            var controls = new StackPanel { Orientation = Orientation.Horizontal };
+            var panel = new StackPanel { Background = WpfBrushes.White, Margin = new Thickness(12), HorizontalAlignment = WpfHorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Top };
+            var controls = new StackPanel { Orientation = WpfOrientation.Horizontal };
             controls.Children.Add(Button("Confirmar", "ConfirmSelection", "Confirma la región seleccionada; Enter", () => ConfirmRequested?.Invoke()));
             controls.Children.Add(Button("Bloquear", "LockSelection", "Impide mover o redimensionar la región; L", () => { _controller.SetLocked(!_controller.IsLocked); SelectionChanged?.Invoke(); }));
             controls.Children.Add(Button("Ocultar", "HideSelection", "Oculta o muestra el borde de la región; H", () => { _controller.SetHidden(!_controller.IsHidden); SelectionChanged?.Invoke(); }));
@@ -88,7 +98,7 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             controls.Children.Add(Button("Reiniciar", "ResetSelection", "Descarta la región para volver a dibujarla; R", () => ResetRequested?.Invoke()));
             controls.Children.Add(Button("Cancelar", "CancelSelection", "Cierra el selector sin capturar; Escape", () => CancelRequested?.Invoke()));
             panel.Children.Add(controls);
-            _status.Foreground = Brushes.Black; _status.Margin = new Thickness(6); _status.Text = "Sin región seleccionada";
+            _status.Foreground = WpfBrushes.Black; _status.Margin = new Thickness(6); _status.Text = "Sin región seleccionada";
             AutomationProperties.SetAutomationId(_status, "RegionSelectionStatus");
             AutomationProperties.SetName(_status, "Estado de selección");
             AutomationProperties.SetLiveSetting(_status, AutomationLiveSetting.Polite);
@@ -96,9 +106,9 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             root.Children.Add(panel); return root;
         }
 
-        private static Button Button(string text, string automationId, string helpText, Action action)
+        private static WpfButton Button(string text, string automationId, string helpText, Action action)
         {
-            var button = new Button { Content = text, Margin = new Thickness(4), Padding = new Thickness(10, 4, 10, 4) };
+            var button = new WpfButton { Content = text, Margin = new Thickness(4), Padding = new Thickness(10, 4, 10, 4) };
             System.Windows.Automation.AutomationProperties.SetAutomationId(button, automationId);
             AutomationProperties.SetName(button, text);
             AutomationProperties.SetHelpText(button, helpText);
@@ -112,14 +122,14 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             CaptureMouse(); SelectionChanged?.Invoke();
         }
 
-        private void OnMouseMove(object sender, MouseEventArgs args)
+        private void OnMouseMove(object sender, WpfMouseEventArgs args)
         {
             if (args.LeftButton != MouseButtonState.Pressed) return;
             var point = PointToScreen(args.GetPosition(this));
             _controller.Update((int)Math.Round(point.X), (int)Math.Round(point.Y)); SelectionChanged?.Invoke();
         }
 
-        private void OnKeyDown(object sender, KeyEventArgs args)
+        private void OnKeyDown(object sender, WpfKeyEventArgs args)
         {
             if (args.Key == Key.Escape) CancelRequested?.Invoke();
             else if (args.Key == Key.Enter) ConfirmRequested?.Invoke();
@@ -146,8 +156,8 @@ public sealed class RegionSelectionOverlay : IRegionSelectionOverlay
             var intersection = ScreenCaptureGeometry.Intersect(region,
                 new(_screen.Bounds.X, _screen.Bounds.Y, _screen.Bounds.Width, _screen.Bounds.Height));
             if (intersection.IsEmpty) { _selection.Visibility = Visibility.Collapsed; return; }
-            var topLeft = PointFromScreen(new Point(intersection.X, intersection.Y));
-            var bottomRight = PointFromScreen(new Point(intersection.Right, intersection.Bottom));
+            var topLeft = PointFromScreen(new WpfPoint(intersection.X, intersection.Y));
+            var bottomRight = PointFromScreen(new WpfPoint(intersection.Right, intersection.Bottom));
             Canvas.SetLeft(_selection, topLeft.X); Canvas.SetTop(_selection, topLeft.Y);
             _selection.Width = bottomRight.X - topLeft.X; _selection.Height = bottomRight.Y - topLeft.Y;
             _selection.Visibility = Visibility.Visible;

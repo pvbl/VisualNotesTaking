@@ -74,7 +74,7 @@ public sealed class OpenXmlDocumentExporter : IDocumentExporter
             await CreatePackageAsync(request, temporary, cancellationToken).ConfigureAwait(false);
             IReadOnlyList<string> errors;
             using (var package = WordprocessingDocument.Open(temporary, false))
-                errors = new OpenXmlValidator().Validate(package).Select(x => x.Description).ToArray();
+                errors = new OpenXmlValidator().Validate(package, CancellationToken.None).Select(x => x.Description).ToArray();
             if (errors.Count != 0)
                 throw new InvalidDataException("El paquete Open XML no es válido: " + string.Join("; ", errors));
 
@@ -207,15 +207,27 @@ public sealed class OpenXmlDocumentExporter : IDocumentExporter
         var part = main.AddImagePart(ImagePartType.Png);
         using (var stream = new MemoryStream(bytes)) part.FeedData(stream);
         var relationship = main.GetIdOfPart(part);
+        var graphicData = new A.GraphicData(new PIC.Picture(
+            new PIC.NonVisualPictureProperties(new PIC.NonVisualDrawingProperties { Id = id, Name = $"capture-{id}.png" }, new PIC.NonVisualPictureDrawingProperties()),
+            new PIC.BlipFill(new A.Blip { Embed = relationship }, new A.Stretch(new A.FillRectangle())),
+            new PIC.ShapeProperties(new A.Transform2D(new A.Offset { X = 0, Y = 0 }, new A.Extents { Cx = ImageWidth, Cy = 3_200_000 }),
+                new A.PresetGeometry { Preset = A.ShapeTypeValues.Rectangle })))
+        {
+            Uri = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+        };
+
         var drawing = new W.Drawing(new DW.Inline(
             new DW.Extent { Cx = ImageWidth, Cy = 3_200_000 },
             new DW.EffectExtent { LeftEdge = 0, TopEdge = 0, RightEdge = 0, BottomEdge = 0 },
-            new DW.DocProperties { Id = id, Name = $"Captura {id}" }, new DW.NonVisualGraphicFrameDrawingProperties(new A.GraphicFrameLocks { NoChangeAspect = true }),
-            new A.Graphic(new A.GraphicData(new PIC.Picture(
-                new PIC.NonVisualPictureProperties(new PIC.NonVisualDrawingProperties { Id = id, Name = $"capture-{id}.png" }, new PIC.NonVisualPictureDrawingProperties()),
-                new PIC.BlipFill(new A.Blip { Embed = relationship }, new A.Stretch(new A.FillRectangle())),
-                new PIC.ShapeProperties(new A.Transform2D(new A.Offset { X = 0, Y = 0 }, new A.Extents { Cx = ImageWidth, Cy = 3_200_000 }), new A.PresetGeometry { Preset = A.ShapeTypeValues.Rectangle }))) { Uri = "http://schemas.openxmlformats.org/drawingml/2006/picture" }))
-            { DistanceFromTop = 0, DistanceFromBottom = 0, DistanceFromLeft = 0, DistanceFromRight = 0 }));
+            new DW.DocProperties { Id = id, Name = $"Captura {id}" },
+            new DW.NonVisualGraphicFrameDrawingProperties(new A.GraphicFrameLocks { NoChangeAspect = true }),
+            new A.Graphic(graphicData))
+        {
+            DistanceFromTop = 0,
+            DistanceFromBottom = 0,
+            DistanceFromLeft = 0,
+            DistanceFromRight = 0
+        });
         body.Append(new W.Paragraph(new W.Run(drawing)), Paragraph(node.Content, "Caption"));
     }
 
