@@ -1,4 +1,5 @@
 using NetArchTest.Rules;
+using System.Reflection;
 using Shouldly;
 using Xunit;
 
@@ -49,6 +50,15 @@ public sealed class DependencyRulesTests
     }
 
     [Fact]
+    public void Infrastructure_does_not_depend_on_the_application_layer()
+    {
+        var result = Types.InAssembly(typeof(global::VisualNotes.Infrastructure.VisualNotesRuntime).Assembly)
+            .ShouldNot().HaveDependencyOn("VisualNotes.App").GetResult();
+
+        AssertSuccessful(result);
+    }
+
+    [Fact]
     public void Provider_and_storage_sdks_are_confined_to_infrastructure()
     {
         var assemblies = new[]
@@ -66,6 +76,66 @@ public sealed class DependencyRulesTests
 
             AssertSuccessful(result);
         }
+    }
+
+    [Theory]
+    [InlineData("Handler")]
+    [InlineData("Provider")]
+    [InlineData("Repository")]
+    public void Role_types_follow_their_naming_convention(string suffix)
+    {
+        var assemblies = new[]
+        {
+            typeof(global::VisualNotes.Core.Models.Entity).Assembly,
+            typeof(global::VisualNotes.Infrastructure.VisualNotesRuntime).Assembly
+        };
+
+        foreach (var assembly in assemblies)
+        {
+            var contracts = assembly.GetTypes().Where(type => type.IsInterface &&
+                type.Name.EndsWith(suffix, StringComparison.Ordinal)).ToArray();
+            foreach (var contract in contracts)
+            {
+                var result = Types.InCurrentDomain().That().ImplementInterface(contract)
+                    .Should().HaveNameEndingWith(suffix).GetResult();
+                AssertSuccessful(result);
+            }
+        }
+    }
+
+    [Fact]
+    public void View_models_use_the_ViewModel_suffix()
+    {
+        var result = Types.InAssembly(typeof(global::VisualNotes.App.ViewModels.ViewModelBase).Assembly)
+            .That().ResideInNamespace("VisualNotes.App.ViewModels")
+            .And().Inherit(typeof(global::VisualNotes.App.ViewModels.ViewModelBase))
+            .Should().HaveNameEndingWith("ViewModel").GetResult();
+
+        AssertSuccessful(result);
+    }
+
+    [Fact]
+    public void Network_and_disk_async_boundaries_expose_cancellation()
+    {
+        var boundaryTypes = new[]
+        {
+            typeof(global::VisualNotes.Infrastructure.LanguageModels.OpenAiLanguageModelProvider),
+            typeof(global::VisualNotes.Infrastructure.LanguageModels.GeminiLanguageModelProvider),
+            typeof(global::VisualNotes.Infrastructure.JsonSettingsStore),
+            typeof(global::VisualNotes.Infrastructure.Persistence.ImageFileStore),
+            typeof(global::VisualNotes.Infrastructure.Persistence.ScreenshotStorageService),
+            typeof(global::VisualNotes.Infrastructure.Persistence.SessionBackupService),
+            typeof(global::VisualNotes.Infrastructure.Documents.OpenXmlDocumentExporter)
+        };
+
+        var offenders = boundaryTypes.SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+            .Where(method => typeof(Task).IsAssignableFrom(method.ReturnType) ||
+                             method.ReturnType.IsGenericType && method.ReturnType.GetGenericTypeDefinition() == typeof(ValueTask<>))
+            .Where(method => method.GetParameters().All(parameter => parameter.ParameterType != typeof(CancellationToken)))
+            .Select(method => $"{type.Name}.{method.Name}"))
+            .ToArray();
+
+        offenders.ShouldBeEmpty("Every public asynchronous network/disk operation must accept CancellationToken.");
     }
 
     private static void AssertSuccessful(TestResult result) =>
