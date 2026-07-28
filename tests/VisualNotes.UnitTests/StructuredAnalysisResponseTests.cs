@@ -81,6 +81,51 @@ public sealed class StructuredAnalysisResponseTests
         parsed.NormalizedJson.ShouldContain("\"language\": \"es\"");
     }
 
+    public static IEnumerable<object[]> InvalidBoundaries()
+    {
+        yield return [ValidJson.Replace("\"type\":\"Code\"", "\"type\":\"Text\"", StringComparison.Ordinal), "must have type"];
+        yield return [ValidJson.Replace("\"type\":\"Code\"", "\"type\":\"code\"", StringComparison.Ordinal), "unsupported"];
+        yield return [ValidJson.Replace("\"type\":\"Code\"", "\"type\":\"99\"", StringComparison.Ordinal), "unsupported"];
+        yield return [ValidJson.Replace("\"confidence\":0.98", "\"confidence\":-0.01", StringComparison.Ordinal), "between 0 and 1"];
+        yield return [ValidJson.Replace("\"confidence\":0.98", "\"confidence\":1.01", StringComparison.Ordinal), "between 0 and 1"];
+        yield return [ValidJson.Replace("\"label\":\"formula\",", string.Empty, StringComparison.Ordinal), "label"];
+        yield return [ValidJson.Replace("\"label\":\"formula\"", "\"label\":\" \"", StringComparison.Ordinal), "cannot be empty"];
+        yield return [ValidJson.Replace("\"regions\": [{\"label\":\"formula\",\"box\":{\"YMin\":200,\"XMin\":100,\"YMax\":400,\"XMax\":900},\"confidence\":0.98}]",
+            "\"regions\": [{\"label\":\"formula\",\"confidence\":0.98}]", StringComparison.Ordinal), "box"];
+        yield return [ValidJson.Replace("\"regions\": [{\"label\":\"formula\",\"box\":{\"YMin\":200,\"XMin\":100,\"YMax\":400,\"XMax\":900},\"confidence\":0.98}]",
+            "\"regions\": [null]", StringComparison.Ordinal), "objects"];
+        yield return [ValidJson.Replace("\"concepts\": [\"voltaje\", \"resistencia\"]", "\"concepts\": [42]", StringComparison.Ordinal), "must be a string"];
+        yield return [ValidJson.Replace("\"warnings\": [\"La unidad de R no es visible\"]", "\"warnings\": {}", StringComparison.Ordinal), "must be an array"];
+        yield return [ValidJson.Replace("\"warnings\": [\"La unidad de R no es visible\"]", "\"other\": []", StringComparison.Ordinal), "warnings"];
+        yield return [ValidJson.Replace("\"YMin\":200", "\"Other\":200", StringComparison.Ordinal), "YMin"];
+        yield return [ValidJson.Replace("\"code\": [{\"type\":\"Code\",\"content\":\"var voltage = current * resistance;\",\"box\":{\"YMin\":100,\"XMin\":50,\"YMax\":180,\"XMax\":700}}]",
+            "\"code\": [{\"type\":\"Code\",\"content\":\"ok\",\"box\":null}]", StringComparison.Ordinal), "never"];
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidBoundaries))]
+    public void Hostile_schema_boundaries_are_explicit(string json, string expectedMessage)
+    {
+        if (expectedMessage == "never")
+        {
+            StructuredAnalysisResponseParser.Parse(json).Value.Code.Single().Box.ShouldBeNull();
+            return;
+        }
+
+        Should.Throw<AnalysisResponseValidationException>(() => StructuredAnalysisResponseParser.Parse(json))
+            .Message.ShouldContain(expectedMessage);
+    }
+
+    [Fact]
+    public void Excessive_collection_is_rejected()
+    {
+        var concepts = string.Join(',', Enumerable.Repeat("\"item\"", 1_001));
+        var json = ValidJson.Replace("\"voltaje\", \"resistencia\"", concepts, StringComparison.Ordinal);
+
+        Should.Throw<AnalysisResponseValidationException>(() => StructuredAnalysisResponseParser.Parse(json))
+            .Message.ShouldContain("too many");
+    }
+
     [Property(MaxTest = 500)]
     public bool Arbitrary_input_never_leaks_parser_exceptions(string? input)
     {

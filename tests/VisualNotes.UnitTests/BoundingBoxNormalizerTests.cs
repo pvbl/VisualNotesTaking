@@ -52,12 +52,65 @@ public sealed class BoundingBoxNormalizerTests
         Should.Throw<ArgumentException>(() => BoundingBoxNormalizer.Normalize(new(1, 1, 1.5, 1.5), CoordinateSystem.Pixels, 10, 10));
     }
 
+    [Theory]
+    [InlineData(double.NaN, 0, 1, 1)]
+    [InlineData(0, double.PositiveInfinity, 1, 1)]
+    [InlineData(0, 0, double.NegativeInfinity, 1)]
+    [InlineData(0, 0, 1, double.NaN)]
+    public void Rejects_each_non_finite_coordinate(double y1, double x1, double y2, double x2) =>
+        Should.Throw<ArgumentException>(() =>
+            BoundingBoxNormalizer.Normalize(new(y1, x1, y2, x2), CoordinateSystem.Pixels, 10, 10));
+
+    [Fact]
+    public void Rejects_unknown_coordinate_system() =>
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            BoundingBoxNormalizer.Normalize(new(0, 0, 1, 1), (CoordinateSystem)999, 10, 10));
+
+    [Theory]
+    [InlineData(0, 10, 5, 15)]
+    [InlineData(10, 0, 15, 5)]
+    [InlineData(-5, 0, 0, 5)]
+    [InlineData(0, -5, 5, 0)]
+    public void Rejects_regions_outside_each_image_edge(double y1, double x1, double y2, double x2) =>
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            BoundingBoxNormalizer.Normalize(new(y1, x1, y2, x2), CoordinateSystem.Pixels, 10, 10));
+
+    [Theory]
+    [InlineData(-1, 2, 2)]
+    [InlineData(0, 0, 2)]
+    [InlineData(0, 2, 0)]
+    public void Rejects_invalid_normalization_options(int margin, int minimumWidth, int minimumHeight) =>
+        Should.Throw<ArgumentOutOfRangeException>(() =>
+            BoundingBoxNormalizer.Normalize(new(0, 0, 5, 5), CoordinateSystem.Pixels, 10, 10,
+                new(margin, minimumWidth, minimumHeight)));
+
     [Fact]
     public void Consolidates_transitively_overlapping_regions_but_not_touching_regions()
     {
         var result = BoundingBoxNormalizer.Consolidate([
             new(0, 0, 5, 5), new(4, 4, 5, 5), new(8, 8, 4, 4), new(20, 20, 2, 2)]);
         result.ShouldBe([new PhysicalRectangle(0, 0, 12, 12), new PhysicalRectangle(20, 20, 2, 2)]);
+    }
+
+    [Fact]
+    public void Consolidation_rejects_null_and_empty_input_regions()
+    {
+        Should.Throw<ArgumentNullException>(() => BoundingBoxNormalizer.Consolidate(null!));
+        Should.Throw<ArgumentException>(() =>
+            BoundingBoxNormalizer.Consolidate([new PhysicalRectangle(0, 0, 0, 1)]));
+    }
+
+    [Fact]
+    public void Consolidation_keeps_regions_separated_in_each_direction()
+    {
+        var result = BoundingBoxNormalizer.Consolidate([
+            new(10, 10, 2, 2),
+            new(0, 10, 2, 2),
+            new(10, 0, 2, 2),
+            new(20, 10, 2, 2),
+            new(10, 20, 2, 2)]);
+
+        result.Count.ShouldBe(5);
     }
 
     [Property(MaxTest = 5000, QuietOnSuccess = true)]

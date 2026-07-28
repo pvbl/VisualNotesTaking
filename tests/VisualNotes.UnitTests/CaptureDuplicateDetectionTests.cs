@@ -21,6 +21,31 @@ public sealed class CaptureDuplicateDetectionTests
     }
 
     [Fact, Trait("Category", "Unit")]
+    public void Perceptual_hash_records_luminance_decreases()
+    {
+        var pixels = Enumerable.Range(0, 8)
+            .SelectMany(_ => Enumerable.Range(0, 9).Select(value => (byte)(8 - value)))
+            .ToArray();
+
+        var result = CaptureHashCalculator.Calculate("descending"u8, pixels, 9, 8);
+
+        result.PerceptualHash.ShouldBe(ulong.MaxValue);
+        CaptureHashCalculator.ParsePerceptualHash(
+            CaptureHashCalculator.FormatPerceptualHash(result.PerceptualHash)).ShouldBe(ulong.MaxValue);
+    }
+
+    [Theory, Trait("Category", "Unit")]
+    [InlineData(0, 1, 0)]
+    [InlineData(1, 0, 0)]
+    [InlineData(2, 2, 3)]
+    public void Hashing_rejects_invalid_dimensions_or_pixel_count(int width, int height, int pixelCount)
+    {
+        var luminance = new byte[pixelCount];
+        Should.Throw<ArgumentException>(() =>
+            CaptureHashCalculator.Calculate("image"u8, luminance, width, height));
+    }
+
+    [Fact, Trait("Category", "Unit")]
     public void Only_compares_nearby_captures_in_the_same_section()
     {
         var section = Guid.NewGuid();
@@ -46,6 +71,43 @@ public sealed class CaptureDuplicateDetectionTests
         near.SuggestedResolution.ShouldBe(DuplicateResolution.Keep);
         detector.ComparePair(original, Capture(Guid.Empty, 1, "changed", "000000000000003f")).Similarity.ShouldBe(CaptureSimilarity.ProgressiveChange);
         detector.ComparePair(original, Capture(Guid.Empty, 1, "changed", "000000000000ffff")).Similarity.ShouldBe(CaptureSimilarity.Distinct);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void Missing_hashes_and_dimension_mismatches_are_never_auto_deduplicated()
+    {
+        var detector = new CaptureDuplicateDetector();
+        var missing = Capture(Guid.Empty, 0, string.Empty, string.Empty);
+        var otherMissing = Capture(Guid.Empty, 1, string.Empty, string.Empty);
+        otherMissing.Width = 0;
+
+        detector.ComparePair(missing, otherMissing).Similarity.ShouldBe(CaptureSimilarity.Distinct);
+        CaptureDuplicateDetector.HammingDistance(null, "0").ShouldBe(64);
+        CaptureDuplicateDetector.HammingDistance("0", null).ShouldBe(64);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void Exact_hash_matching_is_case_insensitive_but_requires_a_non_blank_hash()
+    {
+        var detector = new CaptureDuplicateDetector();
+        detector.ComparePair(
+            Capture(Guid.Empty, 0, "ABCDEF", "0"),
+            Capture(Guid.Empty, 1, "abcdef", "0")).Similarity.ShouldBe(CaptureSimilarity.ExactDuplicate);
+
+        detector.ComparePair(
+            Capture(Guid.Empty, 0, " ", "0"),
+            Capture(Guid.Empty, 1, " ", "0")).Similarity.ShouldBe(CaptureSimilarity.NearDuplicate);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void Empty_quality_dataset_reports_zero_for_undefined_rates()
+    {
+        var metrics = new DuplicateEvaluation(0, 0, 0);
+
+        metrics.Precision.ShouldBe(0);
+        metrics.Recall.ShouldBe(0);
+        metrics.F1.ShouldBe(0);
+        metrics.FalsePositiveRate(0).ShouldBe(0);
     }
 
     [Fact, Trait("Category", "Unit")]

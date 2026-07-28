@@ -56,6 +56,73 @@ public sealed class EffectiveSettingsResolverTests
             .ShouldBe(new EffectiveSetting<string>("global", SettingsLevel.Global));
     }
 
+    [Theory]
+    [InlineData(SettingsLevel.ApplicationDefaults, "Predeterminado de la aplicación")]
+    [InlineData(SettingsLevel.Global, "Global")]
+    [InlineData(SettingsLevel.Session, "Sesión")]
+    [InlineData(SettingsLevel.Section, "Sección")]
+    [InlineData(SettingsLevel.ScreenshotOverride, "Captura")]
+    [InlineData((SettingsLevel)999, "999")]
+    public void Effective_values_explain_their_configuration_source(SettingsLevel source, string expected) =>
+        new EffectiveSetting<string>("value", source).Provenance.ShouldBe(expected);
+
+    [Theory]
+    [InlineData("language")]
+    [InlineData("provider")]
+    [InlineData("model")]
+    [InlineData("prompt")]
+    [InlineData("images")]
+    [InlineData("maximum-side")]
+    public void Incomplete_application_defaults_are_rejected_at_the_boundary(string missing)
+    {
+        var defaults = Defaults with
+        {
+            Language = missing == "language" ? null : Defaults.Language,
+            Provider = missing == "provider" ? null : Defaults.Provider,
+            Model = missing == "model" ? null : Defaults.Model,
+            PromptTemplate = missing == "prompt" ? null : Defaults.PromptTemplate,
+            IncludeImages = missing == "images" ? null : Defaults.IncludeImages,
+            MaximumImageSide = missing == "maximum-side" ? null : Defaults.MaximumImageSide
+        };
+
+        Should.Throw<ArgumentException>(() => new EffectiveSettingsResolver().Resolve(new(defaults)));
+    }
+
+    [Fact]
+    public void Null_application_defaults_are_rejected() =>
+        Should.Throw<ArgumentNullException>(() =>
+            new EffectiveSettingsResolver().Resolve(new SettingsResolutionContext(null!)));
+
+    [Fact]
+    public void Every_editor_operation_can_override_and_restore_inheritance()
+    {
+        var values = new SettingsValues()
+            .OverrideLanguage("es")
+            .OverrideProvider("local")
+            .OverrideModel("model")
+            .OverridePromptTemplate("prompt")
+            .OverrideIncludeImages(true)
+            .OverrideMaximumImageSide(2048);
+
+        values.ShouldBe(new SettingsValues
+        {
+            Language = "es",
+            Provider = "local",
+            Model = "model",
+            PromptTemplate = "prompt",
+            IncludeImages = true,
+            MaximumImageSide = 2048
+        });
+
+        values.InheritLanguage()
+            .InheritProvider()
+            .InheritModel()
+            .InheritPromptTemplate()
+            .InheritIncludeImages()
+            .InheritMaximumImageSide()
+            .ShouldBe(new SettingsValues());
+    }
+
     [Property(MaxTest = 250)]
     public bool Resolving_the_same_configuration_is_deterministic(int mask, string? seed)
     {

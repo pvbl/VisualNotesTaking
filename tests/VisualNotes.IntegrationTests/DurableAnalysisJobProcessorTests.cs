@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
 using VisualNotes.Core.Models;
+using VisualNotes.Core.Services;
 using VisualNotes.Infrastructure.Persistence;
 using VisualNotes.Infrastructure.Processing;
 
@@ -59,7 +60,119 @@ public sealed class DurableAnalysisJobProcessorTests : IAsyncDisposable
         (await db.CaptureAnalyses.CountAsync()).ShouldBe(300);
     }
 
-    private AnalysisJob NewJob(string key, int provider = 0) => new() { IdempotencyKey = key, ScreenshotId = _screenshotId, ProviderProfileId = _providerIds[provider] };
+    [Theory]
+    [InlineData(LanguageModelErrorKind.Authentication, "authentication")]
+    [InlineData(LanguageModelErrorKind.RateLimited, "limit")]
+    [InlineData(LanguageModelErrorKind.BudgetExhausted, "limit")]
+    [InlineData(LanguageModelErrorKind.Timeout, "network")]
+    [InlineData(LanguageModelErrorKind.ServiceUnavailable, "network")]
+    [InlineData(LanguageModelErrorKind.InvalidResponse, "invalid-response")]
+    [InlineData(LanguageModelErrorKind.InvalidRequest, "configuration")]
+    [InlineData(LanguageModelErrorKind.Cancelled, "unknown")]
+    public async Task Language_model_failures_are_classified_and_persisted(
+        LanguageModelErrorKind kind, string classification)
+    {
+        await using var factory = await CreateFactoryAsync();
+        var handler = new Handler((_, _) => throw new LanguageModelException(kind, "controlled failure"));
+        await using var processor = new DurableAnalysisJobProcessor(factory, handler, new(1, 1, RetryBaseDelay: TimeSpan.Zero));
+        await processor.EnqueueAsync(NewJob($"failure-{kind}", maximumAttempts: 1));
+
+        (await processor.RunAutomaticAsync()).ShouldBe(1);
+
+        await using var db = await factory.CreateDbContextAsync();
+        var persisted = await db.AnalysisJobs.Include(x => x.AttemptHistory).SingleAsync();
+        persisted.JobStatus.ShouldBe(AnalysisJobStatus.Failed);
+        persisted.Error.ShouldStartWith(classification + ":");
+        persisted.CompletedAt.ShouldNotBeNull();
+        persisted.NextAttemptAt.ShouldBeNull();
+        persisted.AttemptHistory.Single().Error.ShouldNotBeNull().ShouldContain("controlled failure");
+    }
+
+    [Theory]
+    [InlineData("http", "network")]
+    [InlineData("schema", "invalid-response")]
+    [InlineData("unknown", "unknown")]
+    public async Task Non_provider_failures_are_classified_and_persisted(string errorKind, string classification)
+    {
+        await using var factory = await CreateFactoryAsync();
+        Exception error = errorKind switch
+        {
+            "http" => new HttpRequestException("offline"),
+            "schema" => new AnalysisResponseValidationException("invalid payload"),
+            _ => new InvalidOperationException("unexpected")
+        };
+        var handler = new Handler((_, _) => throw error);
+        await using var processor = new DurableAnalysisJobProcessor(factory, handler, new(1, 1));
+        await processor.EnqueueAsync(NewJob($"failure-{errorKind}", maximumAttempts: 1));
+
+        (await processor.RunAutomaticAsync()).ShouldBe(1);
+
+        await using var db = await factory.CreateDbContextAsync();
+        (await db.AnalysisJobs.SingleAsync()).Error.ShouldStartWith(classification + ":");
+    }
+
+    [Fact]
+    public async Task Retryable_failure_returns_to_the_durable_queue_with_backoff()
+    {
+        await using var factory = await CreateFactoryAsync();
+        var handler = new Handler((_, _) => throw new HttpRequestException("offline"));
+        await using var processor = new DurableAnalysisJobProcessor(
+            factory, handler, new(1, 1, RetryBaseDelay: TimeSpan.FromMinutes(1)));
+        await processor.EnqueueAsync(NewJob("retryable", maximumAttempts: 2));
+
+        (await processor.RunAutomaticAsync()).ShouldBe(1);
+
+        await using var db = await factory.CreateDbContextAsync();
+        var persisted = await db.AnalysisJobs.Include(x => x.AttemptHistory).Include(x => x.Screenshot).SingleAsync();
+        persisted.JobStatus.ShouldBe(AnalysisJobStatus.Pending);
+        persisted.NextAttemptAt.ShouldNotBeNull();
+        persisted.NextAttemptAt.Value.ShouldBeGreaterThan(DateTimeOffset.UtcNow);
+        persisted.CompletedAt.ShouldBeNull();
+        persisted.Screenshot!.ProcessingStatus.ShouldBe(ScreenshotStatus.Queued);
+        persisted.AttemptHistory.Single().RetryAt.ShouldBe(persisted.NextAttemptAt);
+    }
+
+    [Fact]
+    public async Task Every_trigger_drains_only_its_own_durable_jobs()
+    {
+        await using var factory = await CreateFactoryAsync();
+        var handler = new Handler((job, _) => Task.FromResult(Result(job.Trigger.ToString())));
+        await using var processor = new DurableAnalysisJobProcessor(factory, handler, new(1, 1));
+        foreach (var trigger in Enum.GetValues<AnalysisJobTrigger>())
+            await processor.EnqueueAsync(NewJob($"trigger-{trigger}", trigger: trigger));
+
+        (await processor.RunManualAsync()).ShouldBe(1);
+        (await processor.RunBatchAsync()).ShouldBe(1);
+        (await processor.RunSessionEndAsync()).ShouldBe(1);
+        (await processor.RunAutomaticAsync()).ShouldBe(1);
+
+        await using var db = await factory.CreateDbContextAsync();
+        (await db.AnalysisJobs.CountAsync(x => x.JobStatus == AnalysisJobStatus.Completed)).ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task Enqueue_requires_a_job_and_a_stable_idempotency_key()
+    {
+        await using var factory = await CreateFactoryAsync();
+        await using var processor = new DurableAnalysisJobProcessor(
+            factory, new Handler((_, _) => Task.FromResult(Result())));
+
+        await Should.ThrowAsync<ArgumentNullException>(() => processor.EnqueueAsync(null!));
+        await Should.ThrowAsync<ArgumentException>(() => processor.EnqueueAsync(NewJob(" ")));
+    }
+
+    private AnalysisJob NewJob(
+        string key,
+        int provider = 0,
+        int maximumAttempts = 3,
+        AnalysisJobTrigger trigger = AnalysisJobTrigger.Automatic) => new()
+        {
+            IdempotencyKey = key,
+            ScreenshotId = _screenshotId,
+            ProviderProfileId = _providerIds[provider],
+            MaximumAttempts = maximumAttempts,
+            Trigger = trigger
+        };
     private static CaptureAnalysis Result(string text = "ok") => new() { ExtractedText = text };
 
     private async Task<Factory> CreateFactoryAsync()

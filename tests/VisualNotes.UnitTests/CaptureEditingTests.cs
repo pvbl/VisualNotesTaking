@@ -14,12 +14,18 @@ public sealed class CaptureEditingTests
     public async Task Debounce_CoalescesRapidEdits()
     {
         var saved = new List<string>();
-        await using var saver = new DebouncedCaptureSaver((capture, _) => { saved.Add(capture.UserContext); return Task.CompletedTask; }, TimeSpan.FromMilliseconds(30));
+        var completed = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using var saver = new DebouncedCaptureSaver((capture, _) =>
+        {
+            saved.Add(capture.UserContext);
+            completed.TrySetResult(capture.UserContext);
+            return Task.CompletedTask;
+        }, TimeSpan.FromMilliseconds(30));
         var capture = new Screenshot { UserContext = "primero" };
         saver.Schedule(capture);
         capture.UserContext = "último";
         saver.Schedule(capture);
-        await Task.Delay(80);
+        (await completed.Task.WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe("último");
         saved.ShouldBe(["último"]);
     }
 
