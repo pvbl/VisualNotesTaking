@@ -3,7 +3,36 @@
  <UserControl.Resources><BooleanToVisibilityConverter x:Key="BoolToVisibility"/></UserControl.Resources>
  <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel>
   <TextBlock Text="Configuración" FontSize="32" FontWeight="SemiBold" Foreground="#172033"/>
-  <TextBlock Text="Personaliza VisualNotes y sus opciones de exportación." FontSize="16" Foreground="#64748B" Margin="0,8,0,30"/>
+  <TextBlock Text="Configura primero tu API key y después personaliza VisualNotes." FontSize="16" Foreground="#64748B" Margin="0,8,0,30"/>
+  <Border Background="White" CornerRadius="10" Padding="28" Margin="0,0,0,18"
+          AutomationProperties.AutomationId="ApiCredentialsSection">
+   <StackPanel>
+    <TextBlock Text="API key de OpenAI" FontSize="20" FontWeight="SemiBold" Foreground="#334155"/>
+    <ProgressBar Height="3" IsIndeterminate="True" Visibility="{Binding SaveCredentialCommand.IsRunning, Converter={StaticResource BoolToVisibility}}"/>
+    <TextBlock Text="Pega la clave en el campo «Nueva API key» y pulsa Guardar. Si utilizas una única clave, puedes guardarla tanto para extracción como para composición."
+               Foreground="#64748B" TextWrapping="Wrap" Margin="0,4,0,14"/>
+    <TextBlock Text="La clave queda protegida por Windows para tu usuario y el valor guardado nunca vuelve a mostrarse."
+               Foreground="#64748B" TextWrapping="Wrap" Margin="0,0,0,10"/>
+    <ItemsControl ItemsSource="{Binding CredentialProfiles}"><ItemsControl.ItemTemplate><DataTemplate>
+     <Border BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,5">
+      <StackPanel>
+       <DockPanel>
+        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="15"/>
+        <TextBlock DockPanel.Dock="Right" Text="{Binding MaskedValue, TargetNullValue=No configurada}" Foreground="#64748B"/>
+       </DockPanel>
+       <PasswordBox PasswordChanged="CredentialPasswordChanged" Margin="0,8,0,8"
+                    AutomationProperties.Name="Nueva API key"/>
+       <WrapPanel>
+        <Button Content="Guardar" Command="{Binding DataContext.SaveCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="0,0,6,0" Padding="12,5"/>
+        <Button Content="Verificar" Command="{Binding DataContext.VerifyCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="0,0,6,0" Padding="12,5"/>
+        <Button Content="Eliminar" Command="{Binding DataContext.DeleteCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="0,0,12,0" Padding="12,5"/>
+        <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Foreground="#334155"/>
+       </WrapPanel>
+      </StackPanel>
+     </Border>
+    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+   </StackPanel>
+  </Border>
   <Border Background="White" CornerRadius="10" Padding="28" Margin="0,0,0,18">
    <StackPanel>
     <TextBlock Text="Configuración por niveles" FontSize="20" FontWeight="SemiBold" Foreground="#334155"/>
@@ -28,24 +57,6 @@
       </Grid>
      </DataTemplate></ItemsControl.ItemTemplate>
     </ItemsControl>
-   </StackPanel>
-  </Border>
-  <Border Background="White" CornerRadius="10" Padding="28" Margin="0,0,0,18">
-   <StackPanel>
-    <TextBlock Text="Credenciales de API" FontSize="20" FontWeight="SemiBold" Foreground="#334155"/>
-    <ProgressBar Height="3" IsIndeterminate="True" Visibility="{Binding SaveCredentialCommand.IsRunning, Converter={StaticResource BoolToVisibility}}"/>
-    <TextBlock Text="Protegidas por Windows para el usuario actual. Nunca se muestra el valor guardado." Foreground="#64748B" Margin="0,4,0,14"/>
-    <ItemsControl ItemsSource="{Binding CredentialProfiles}"><ItemsControl.ItemTemplate><DataTemplate>
-     <Grid Margin="0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="130"/><ColumnDefinition Width="190"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="90"/><ColumnDefinition Width="140"/></Grid.ColumnDefinitions>
-      <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
-      <TextBlock Grid.Column="1" Text="{Binding MaskedValue, TargetNullValue=No configurada}" VerticalAlignment="Center"/>
-      <PasswordBox Grid.Column="2" PasswordChanged="CredentialPasswordChanged" Margin="4,0" AutomationProperties.Name="Nueva credencial"/>
-      <Button Grid.Column="3" Content="Guardar" Command="{Binding DataContext.SaveCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="3,0"/>
-      <Button Grid.Column="4" Content="Verificar" Command="{Binding DataContext.VerifyCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="3,0"/>
-      <Button Grid.Column="5" Content="Eliminar" Command="{Binding DataContext.DeleteCredentialCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" Margin="3,0"/>
-      <TextBlock Grid.Column="6" Text="{Binding Status}" VerticalAlignment="Center" Margin="8,0"/>
-     </Grid>
-    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
    </StackPanel>
   </Border>
   <Border Background="White" CornerRadius="10" Padding="28">

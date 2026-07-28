@@ -32,7 +32,7 @@
         <Button AutomationProperties.AutomationId="NavCaptures" Content="Capturas" Command="{Binding NavigateCommand}" CommandParameter="Captures" Style="{StaticResource NavButton}"/>
         <Button AutomationProperties.AutomationId="NavInstructions" Content="Instrucciones" Command="{Binding NavigateCommand}" CommandParameter="Instructions" Style="{StaticResource NavButton}"/>
         <Button AutomationProperties.AutomationId="NavDocument" Content="Documento" Command="{Binding NavigateCommand}" CommandParameter="Document" Style="{StaticResource NavButton}"/>
-        <Button AutomationProperties.AutomationId="NavSettings" Content="Configuración" Command="{Binding NavigateCommand}" CommandParameter="Settings" Style="{StaticResource NavButton}"/>
+        <Button AutomationProperties.AutomationId="NavSettings" Content="Configuración y API" Command="{Binding NavigateCommand}" CommandParameter="Settings" Style="{StaticResource NavButton}"/>
       </StackPanel></DockPanel>
     </Border>
     <ContentControl AutomationProperties.AutomationId="PageContent" AutomationProperties.Name="Contenido de la página actual" Grid.Column="1" Content="{Binding CurrentViewModel}" Margin="36"/>

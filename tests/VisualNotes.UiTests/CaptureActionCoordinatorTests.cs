@@ -31,6 +31,26 @@ public sealed class CaptureActionCoordinatorTests
     }
 
     [Fact]
+    public async Task Capture_can_resume_the_active_session_and_notifies_the_panel()
+    {
+        var actions = new StubActions();
+        var sessions = Substitute.For<ISessionRepository>();
+        var coordinator = new SessionCoordinator(sessions, Substitute.For<IScreenshotRepository>(),
+            Substitute.For<ISettingsRepository>(), Substitute.For<IUnitOfWork>());
+        var main = new VisualNotes.App.ViewModels.MainViewModel(coordinator, sessions, captureActions: actions);
+        var session = new NoteSession { IsPaused = true };
+        main.Sessions.SelectedSession = session;
+        var activations = 0;
+        main.SessionActivated += () => activations++;
+
+        await main.ResumeActiveSessionAsync();
+
+        session.IsPaused.ShouldBeFalse();
+        activations.ShouldBe(1);
+        actions.StateChangeCount.ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
     public void Actions_are_disabled_without_capture_and_while_session_is_paused()
     {
         var session = new NoteSession();
@@ -115,6 +135,7 @@ public sealed class CaptureActionCoordinatorTests
     private sealed class StubActions : VisualNotes.App.ViewModels.ICaptureActionContract
     {
         public bool Enabled { get; set; }
+        public int StateChangeCount { get; private set; }
         public bool CanUndo => Enabled;
         public bool CanMarkImportant => Enabled;
         public bool CanAddContext => Enabled;
@@ -123,7 +144,7 @@ public sealed class CaptureActionCoordinatorTests
         public Task MarkImportantAsync() => Task.CompletedTask;
         public Task AddContextAsync() => Task.CompletedTask;
         public void CaptureCompleted(Screenshot capture) { }
-        public void SessionStateChanged() { }
+        public void SessionStateChanged() => StateChangeCount++;
         public void RaiseChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
 }

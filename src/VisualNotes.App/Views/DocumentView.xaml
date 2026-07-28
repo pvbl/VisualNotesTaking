@@ -22,7 +22,13 @@
    <ListView.View><GridView>
     <GridViewColumn Header="Incluir" DisplayMemberBinding="{Binding IsIncluded}" Width="65"/>
     <GridViewColumn Header="Tipo" DisplayMemberBinding="{Binding Node.Type}" Width="100"/>
-    <GridViewColumn Header="Contenido" DisplayMemberBinding="{Binding Node.Content}" Width="390"/>
+    <GridViewColumn Header="Contenido" Width="390">
+     <GridViewColumn.CellTemplate><DataTemplate>
+      <TextBox AutomationProperties.Name="Contenido editable del documento"
+               Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+               AcceptsReturn="True" TextWrapping="Wrap" MinWidth="350" Padding="5"/>
+     </DataTemplate></GridViewColumn.CellTemplate>
+    </GridViewColumn>
     <GridViewColumn Header="Estado" DisplayMemberBinding="{Binding State}" Width="110"/>
    </GridView></ListView.View>
   </ListView>

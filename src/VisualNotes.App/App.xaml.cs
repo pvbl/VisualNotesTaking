@@ -162,6 +162,13 @@ public partial class App : System.Windows.Application
         _capturePanelViewModel = new CapturePanelViewModel(_viewModel);
         _capturePanelViewModel.CaptureRequested += CaptureFromPanel;
         _capturePanel = new Views.CapturePanelWindow { DataContext = _capturePanelViewModel };
+        _capturePanel.Closing += (_, args) =>
+        {
+            if (_isExiting) return;
+            args.Cancel = true;
+            _capturePanel.Hide();
+        };
+        _viewModel.SessionActivated += ShowCapturePanel;
         _window.Closing += (_, args) =>
         {
             if (_isExiting) return;
@@ -203,7 +210,8 @@ public partial class App : System.Windows.Application
     private async void CaptureFromPanel(CapturePanelMode mode) => await CaptureFromPanelAsync(mode);
     private async Task CaptureFromPanelAsync(CapturePanelMode mode)
     {
-        if (_capture is null) return;
+        if (_capture is null || _viewModel is null) return;
+        await _viewModel.ResumeActiveSessionAsync();
         if (mode == CapturePanelMode.Region && _activeRegion is not null) { await CapturePersistentRegionAsync(); return; }
         var captureMode = mode switch { CapturePanelMode.Monitor => ScreenCaptureMode.CurrentMonitor, CapturePanelMode.Desktop => ScreenCaptureMode.FullVirtualDesktop, CapturePanelMode.Window => ScreenCaptureMode.ActiveWindow, _ => ScreenCaptureMode.OneTimeRegion };
         var frame = await _capture.CaptureAsync(new(captureMode));
@@ -240,6 +248,14 @@ public partial class App : System.Windows.Application
         _window!.Show();
         if (_window.WindowState == WindowState.Minimized) _window.WindowState = WindowState.Normal;
         _window.Activate();
+    }
+
+    private void ShowCapturePanel()
+    {
+        if (_capturePanel is null || _isExiting) return;
+        if (!_capturePanel.IsVisible) _capturePanel.Show();
+        if (_capturePanel.WindowState == WindowState.Minimized) _capturePanel.WindowState = WindowState.Normal;
+        _capturePanel.Activate();
     }
 
     private async void ExitApplication() => await ExitApplicationAsync();

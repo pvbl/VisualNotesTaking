@@ -87,6 +87,31 @@ public sealed class CapturePanelUiTests
     }
 
     [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Closing_the_panel_hides_it_and_reactivating_a_session_shows_it_again()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        source.ShouldContain("_capturePanel.Closing +=");
+        source.ShouldContain("args.Cancel = true;");
+        source.ShouldContain("_capturePanel.Hide();");
+        source.ShouldContain("_viewModel.SessionActivated += ShowCapturePanel;");
+        source.ShouldContain("if (!_capturePanel.IsVisible) _capturePanel.Show();");
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
+    public void Capturing_from_the_panel_resumes_a_paused_session_first()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        var resume = source.IndexOf("await _viewModel.ResumeActiveSessionAsync();", StringComparison.Ordinal);
+        var capture = source.IndexOf("var frame = await _capture.CaptureAsync(new(captureMode));", StringComparison.Ordinal);
+        resume.ShouldBeGreaterThanOrEqualTo(0);
+        capture.ShouldBeGreaterThan(resume);
+    }
+
+    [Fact, Trait("Category", "UI"), Trait("Category", "Windows")]
     public void Global_capture_action_hotkeys_execute_the_same_explicit_commands_as_the_panel()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "VisualNotes.App", "App.xaml.cs");

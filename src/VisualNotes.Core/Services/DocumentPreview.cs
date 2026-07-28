@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -9,20 +11,38 @@ public enum ExportScope { Document, Section, Selection }
 public enum PreviewContentState { Ready, NeedsReview, MissingFile }
 
 /// <summary>A semantic node prepared for review, ordering and export.</summary>
-public sealed class PreviewItem
+public sealed class PreviewItem : INotifyPropertyChanged
 {
+    private SemanticNode _node;
+
     internal PreviewItem(SemanticNode node, string? sectionKey, int order, PreviewContentState state)
     {
-        Node = node; SectionKey = sectionKey; Order = order; State = state;
+        _node = node; SectionKey = sectionKey; Order = order; State = state;
     }
 
-    public SemanticNode Node { get; }
+    public SemanticNode Node => _node;
+    public string Content
+    {
+        get => _node.Content;
+        set
+        {
+            if (value == _node.Content) return;
+            _node = _node with { Content = value };
+            IsContentEdited = true;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Node));
+        }
+    }
+    public bool IsContentEdited { get; private set; }
     public string StableKey => Node.StableKey;
     public string? SectionKey { get; }
     public int Order { get; internal set; }
     public bool IsIncluded { get; internal set; } = true;
     public bool IsSelected { get; set; }
     public PreviewContentState State { get; }
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void OnPropertyChanged([CallerMemberName] string? name = null) =>
+        PropertyChanged?.Invoke(this, new(name));
 }
 
 /// <summary>Editable preview projected directly from the semantic model.</summary>

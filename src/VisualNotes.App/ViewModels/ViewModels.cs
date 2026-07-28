@@ -162,9 +162,11 @@ public sealed class MainViewModel : ViewModelBase
         TogglePauseCommand = new AsyncRelayCommand(async (_, cancellationToken) =>
         {
             if (ActiveSession is null) return;
-            await _coordinator.SetPausedAsync(ActiveSession, !ActiveSession.IsPaused);
+            var pause = !ActiveSession.IsPaused;
+            await _coordinator.SetPausedAsync(ActiveSession, pause, cancellationToken);
             RefreshHeader();
             _captureActions?.SessionStateChanged();
+            if (!pause) SessionActivated?.Invoke();
         });
         CaptureRegionCommand = new AsyncRelayCommand(async (_, _) => await (CaptureRegionRequested?.Invoke() ?? Task.CompletedTask));
         RedefineRegionCommand = new AsyncRelayCommand(async (_, _) => await (RedefineRegionRequested?.Invoke() ?? Task.CompletedTask));
@@ -193,13 +195,15 @@ public sealed class MainViewModel : ViewModelBase
     public AsyncRelayCommand AddContextCommand { get; }
     public event Func<Task>? CaptureRegionRequested;
     public event Func<Task>? RedefineRegionRequested;
+    public event Action? SessionActivated;
 
     public async Task InitializeAsync()
     {
         if (_settings is not null) { await _settings.LoadCredentialsAsync(); await _settings.LoadSettingsAsync(); }
         await Sessions.LoadAsync();
         var restored = await _coordinator.RestoreLastOpenAsync();
-        if (restored is not null) Activate(restored);
+        if (restored is not null)
+            Sessions.SelectedSession = Sessions.RecentSessions.FirstOrDefault(session => session.Id == restored.Id) ?? restored;
     }
 
     public async Task CaptureAddedAsync(Screenshot capture)
@@ -211,10 +215,20 @@ public sealed class MainViewModel : ViewModelBase
         if (_captureWorkspace is not null) await Captures.LoadAsync();
     }
 
+    public async Task ResumeActiveSessionAsync(CancellationToken cancellationToken = default)
+    {
+        if (ActiveSession is not { IsPaused: true } session) return;
+        await _coordinator.ContinueAsync(session, cancellationToken);
+        RefreshHeader();
+        _captureActions?.SessionStateChanged();
+        SessionActivated?.Invoke();
+    }
+
     private async void Activate(NoteSession session)
     {
         ActiveSession = session;
         _captureActions?.SessionStateChanged();
+        SessionActivated?.Invoke();
         await Captures.LoadAsync();
     }
     private async Task ExportDocument(SemanticDocument document, ExportScope _)
@@ -249,7 +263,8 @@ public sealed class SessionViewModel : ViewModelBase
         DuplicateCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; var copy = await _coordinator.CreateAsync(NewDraft(), SelectedSession.Id); RecentSessions.Insert(0, copy); SelectedSession = copy; });
         ContinueCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; await _coordinator.ContinueAsync(SelectedSession); _activate(SelectedSession); });
         SaveCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is not null) await _coordinator.SetPausedAsync(SelectedSession, SelectedSession.IsPaused); });
-        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; SelectedSection = await _coordinator.AddSectionAsync(SelectedSession, "Nueva sección", parentId: SelectedSection?.Id); _activate(SelectedSession); });
+        AddSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null) return; SelectedSection = await _coordinator.AddSectionAsync(SelectedSession, "Nueva sección", ct: cancellationToken); _activate(SelectedSession); });
+        AddSubsectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null || SelectedSection is null) return; SelectedSection = await _coordinator.AddSectionAsync(SelectedSession, "Nueva subsección", parentId: SelectedSection.Id, ct: cancellationToken); _activate(SelectedSession); });
         ActivateSectionCommand = new AsyncRelayCommand(async (value, cancellationToken) => { if (SelectedSession is null || value is not NoteSection section) return; await _coordinator.ActivateSectionAsync(SelectedSession, section.Id); SelectedSection = section; _activate(SelectedSession); });
         RenameSectionCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSection is not null) await _coordinator.RenameSectionAsync(SelectedSection, SelectedSection.Title); });
         MoveUpCommand = new AsyncRelayCommand(async (_, cancellationToken) => { if (SelectedSession is null || SelectedSection is null) return; await _coordinator.ReorderSectionAsync(SelectedSession, SelectedSection.Id, SelectedSection.Order - 1); OnPropertyChanged(nameof(OrderedSections)); });
@@ -266,6 +281,7 @@ public sealed class SessionViewModel : ViewModelBase
     public ICommand ContinueCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand AddSectionCommand { get; }
+    public ICommand AddSubsectionCommand { get; }
     public ICommand ActivateSectionCommand { get; }
     public ICommand RenameSectionCommand { get; }
     public ICommand MoveUpCommand { get; }
@@ -443,10 +459,14 @@ public sealed class DocumentViewModel : ViewModelBase
     public void ReplaceDocument(SemanticDocument document)
     {
         var excluded = Items.Where(x => !x.IsIncluded).Select(x => x.StableKey).ToHashSet();
+        var editedContent = Items.Where(x => x.IsContentEdited)
+            .ToDictionary(x => x.StableKey, x => x.Content);
         var states = Items.ToDictionary(x => x.StableKey, x => x.State);
         var selectedKey = SelectedItem?.StableKey;
         _preview = new(document, states);
         _preview.SetIncluded(excluded, false);
+        foreach (var item in _preview.Items)
+            if (editedContent.TryGetValue(item.StableKey, out var content)) item.Content = content;
         Refresh();
         SelectedItem = Items.FirstOrDefault(x => x.StableKey == selectedKey);
     }
