@@ -14,6 +14,7 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Extensions.Logging;
+using Serilog.Formatting.Display;
 using Serilog.Parsing;
 
 namespace VisualNotes.Infrastructure.Diagnostics;
@@ -172,15 +173,50 @@ public sealed partial class RedactingSink(ILogEventSink inner) : ILogEventSink, 
 
 public static class LoggingFactory
 {
-    public static (ILoggerFactory Factory, Serilog.ILogger Logger) Create(string logPath, Action<LoggerConfiguration>? configure = null)
+    private const string OutputTemplate = "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}";
+
+    private sealed class TerminalSink : ILogEventSink
+    {
+        private readonly MessageTemplateTextFormatter formatter = new(OutputTemplate);
+        private readonly object sync = new();
+
+        public void Emit(LogEvent logEvent)
+        {
+            lock (sync)
+            {
+                formatter.Format(logEvent, Console.Out);
+            }
+        }
+    }
+
+    public static (ILoggerFactory Factory, Serilog.ILogger Logger) Create(
+        string logPath,
+        LogEventLevel minimumLevel,
+        Action<LoggerConfiguration>? configure = null)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(logPath))!);
-        var configuration = new LoggerConfiguration().MinimumLevel.Information().Enrich.FromLogContext();
+        var configuration = new LoggerConfiguration()
+            .MinimumLevel.Is(minimumLevel)
+            .Enrich.FromLogContext();
         configure?.Invoke(configuration);
+
         var fileLogger = new LoggerConfiguration()
-            .WriteTo.File(new Serilog.Formatting.Json.JsonFormatter(), logPath)
+            .WriteTo.File(
+                new Serilog.Formatting.Json.JsonFormatter(),
+                logPath,
+                rollingInterval: RollingInterval.Day,
+                retainedFileCountLimit: 14,
+                shared: true)
             .CreateLogger();
-        var logger = configuration.WriteTo.Sink(new RedactingSink(fileLogger)).CreateLogger();
+        var logger = configuration
+            .WriteTo.Sink(new RedactingSink(new TerminalSink()))
+            .WriteTo.Sink(new RedactingSink(fileLogger))
+            .CreateLogger();
         return (new SerilogLoggerFactory(logger, dispose: false), logger);
     }
+
+    public static LogEventLevel ParseMinimumLevel(string? value) =>
+        Enum.TryParse(value, ignoreCase: true, out LogEventLevel level)
+            ? level
+            : LogEventLevel.Information;
 }

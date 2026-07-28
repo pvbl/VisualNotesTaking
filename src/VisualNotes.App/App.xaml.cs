@@ -5,6 +5,8 @@ using System.Windows;
 
 using Microsoft.Extensions.Logging;
 
+using Serilog.Events;
+
 using VisualNotes.App.Services;
 using VisualNotes.App.ViewModels;
 using VisualNotes.Core.Models;
@@ -109,7 +111,21 @@ public partial class App : System.Windows.Application
             FirstRunWindow.Save(bootstrapPath, bootstrap);
         }
         var dataDirectory = environmentDirectory ?? bootstrap?.DataDirectory ?? localDirectory;
-        (_loggerFactory, _serilog) = LoggingFactory.Create(Path.Combine(dataDirectory, "diagnostics", "visualnotes-.json"));
+        var configuredLogLevel = Environment.GetEnvironmentVariable("VISUALNOTES_LOG_LEVEL");
+        var minimumLogLevel = LoggingFactory.ParseMinimumLevel(configuredLogLevel);
+        (_loggerFactory, _serilog) = LoggingFactory.Create(
+            Path.Combine(dataDirectory, "diagnostics", "visualnotes-.json"),
+            minimumLogLevel);
+        var startupLogger = _loggerFactory.CreateLogger<App>();
+        if (!string.IsNullOrWhiteSpace(configuredLogLevel) &&
+            !Enum.TryParse(configuredLogLevel, ignoreCase: true, out LogEventLevel _))
+        {
+            startupLogger.LogWarning(
+                "Unknown VISUALNOTES_LOG_LEVEL value; using {LogLevel}",
+                minimumLogLevel);
+        }
+        startupLogger.LogInformation("VisualNotes starting with log level {LogLevel}", minimumLogLevel);
+        startupLogger.LogDebug("Application data directory resolved");
         _telemetry = new VisualNotesTelemetry(enableLocalConsoleExporter: false);
         _exceptions = new GlobalExceptionHandler(_loggerFactory!.CreateLogger<GlobalExceptionHandler>(), ShowError, code => Shutdown(code));
         DispatcherUnhandledException += (_, args) => { _exceptions.HandleDispatcher(args.Exception); args.Handled = true; };
@@ -119,6 +135,7 @@ public partial class App : System.Windows.Application
         try
         {
             _runtime = await VisualNotesRuntime.CreateAsync(dataDirectory, CancellationToken.None);
+            startupLogger.LogInformation("Local services initialized");
         }
         catch (Exception exception)
         {
@@ -143,15 +160,18 @@ public partial class App : System.Windows.Application
             _runtime.CaptureWorkspace, _runtime.DocumentExporter, new WindowsExportInteraction(),
             _runtime.Settings, _runtime.UnitOfWork, _runtime.AnalysisJobs, captureActions);
         _viewModel.ReviewRequested += ShowWindow;
-        _ = _runtime.RecoverIncompleteJobsAsync();
+        _ = RecoverIncompleteJobsAsync(startupLogger);
         _hotkeys.HotkeyInvoked += OnHotkeyInvoked;
         var bindings = bootstrap?.EnableHotkeys == false
             ? SettingsViewModel.DefaultBindings().Select(binding => binding with { IsEnabled = false }).ToArray()
             : SettingsViewModel.DefaultBindings();
         var hotkeyResult = _hotkeys.Apply(bindings);
         if (!hotkeyResult.Succeeded)
+        {
+            startupLogger.LogWarning("Some global hotkeys could not be registered; conflict count: {ConflictCount}", hotkeyResult.Conflicts.Count);
             MessageBox.Show(string.Join(Environment.NewLine, hotkeyResult.Conflicts.Select(x => x.Message)),
                 "Conflicto de atajos", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
         await _viewModel.InitializeAsync();
         _regions = new PersistentRegionService(_regionSettings);
         _capture = new WindowsScreenCaptureService(new RegionSelectionOverlay());
@@ -208,6 +228,20 @@ public partial class App : System.Windows.Application
         _capturePanel.Show();
         UpdateContextPanelVisibility();
         if (_activeRegion is not null) _regionBorder.Show(_activeRegion);
+        startupLogger.LogInformation("VisualNotes is ready");
+    }
+
+    private async Task RecoverIncompleteJobsAsync(ILogger logger)
+    {
+        try
+        {
+            var recovered = await _runtime!.RecoverIncompleteJobsAsync();
+            logger.LogInformation("Background job recovery completed; processed {JobCount} jobs", recovered);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Background job recovery failed; startup will continue");
+        }
     }
 
     private async void RedefinePersistentRegion() => await RedefinePersistentRegionAsync();
@@ -357,6 +391,7 @@ public partial class App : System.Windows.Application
     private async Task ExitApplicationAsync()
     {
         _isExiting = true;
+        _loggerFactory?.CreateLogger<App>().LogInformation("VisualNotes shutting down");
         _trayIcon?.Dispose();
         _applicationIcon?.Dispose();
         _regionBorder?.Dispose();

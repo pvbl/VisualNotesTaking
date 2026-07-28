@@ -96,6 +96,26 @@ dotnet run --project src/VisualNotes.App/VisualNotes.App.csproj
 La variable solo cambia la carpeta de datos para ese proceso o terminal. No pongas
 claves API en esta variable ni en archivos del repositorio.
 
+### Logs y depuración
+
+Al ejecutar VisualNotes desde PowerShell o una terminal, la aplicación muestra logs
+breves de estado, advertencias y errores. También conserva logs estructurados JSON en
+`<carpeta de datos>\diagnostics`, con rotación diaria y un máximo de 14 archivos. Los
+dos destinos aplican el mismo filtrado de secretos y contenido sensible.
+
+El nivel predeterminado es `Information`. Para investigar un problema de desarrollo,
+activa temporalmente `Debug` antes de arrancar la aplicación:
+
+```powershell
+$env:VISUALNOTES_LOG_LEVEL = "Debug"
+dotnet run --project src/VisualNotes.App/VisualNotes.App.csproj
+```
+
+Los valores admitidos son `Verbose`, `Debug`, `Information`, `Warning`, `Error` y
+`Fatal` (sin distinguir mayúsculas). Un valor desconocido genera una advertencia y
+usa `Information`. No registres prompts, claves, imágenes ni contenido de apuntes;
+los logs deben contener únicamente estado operativo e identificadores técnicos.
+
 ## Configurar una API
 
 ### Obtener una clave
