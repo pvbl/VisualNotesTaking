@@ -14,8 +14,9 @@ En PowerShell, desde la raíz:
 
 ```powershell
 dotnet tool restore
-dotnet restore VisualNotes.sln
-dotnet format VisualNotes.sln --verify-no-changes --no-restore --severity error
+dotnet restore VisualNotes.sln --locked-mode
+dotnet format VisualNotes.sln --verify-no-changes --no-restore
+dotnet build VisualNotes.sln --configuration Debug --no-restore /warnaserror
 dotnet build VisualNotes.sln --configuration Release --no-restore /warnaserror
 dotnet test VisualNotes.sln --configuration Release --no-build `
   --filter "Category=Unit|Category=Architecture|Category=Integration"

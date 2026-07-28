@@ -19,6 +19,7 @@ de CI son la fuente de verdad; no se deben copiar porcentajes a mano al README.
 | Mutaciones | Stryker.NET sobre comportamiento crítico de Core | Objetivo mínimo 70 %; bloquea por debajo de 60 %. |
 | Rendimiento | BenchmarkDotNet | Se registra como tendencia; aún no hay presupuesto automático. |
 | Secretos | Gitleaks | Ningún secreto detectado. |
+| Dependencias | Dependency Review + auditoría NuGet transitiva | Sin vulnerabilidades nuevas de severidad moderada o superior. |
 
 Los umbrales globales son el suelo inicial, no el destino. Core se mantiene en el
 objetivo progresivo 90/85 y el código nuevo no puede esconderse detrás de cobertura
@@ -130,3 +131,18 @@ HTML) como artefacto para poder revisar supervivientes incluso cuando falla el u
 Esto evita que cargas lentas oculten el resultado principal. Los trabajos tienen timeout
 y la cobertura se publica como artefacto. Toda modificación de estas puertas debe
 actualizar este documento y `tests/README.md` en el mismo pull request.
+
+Los restores de CI usan exclusivamente los `packages.lock.json` versionados mediante
+`--locked-mode`. La caché de NuGet se deriva del contenido de esos locks y no usa claves
+de fallback, de modo que una rama no puede reutilizar una caché con un grafo distinto.
+Cuando cambie una referencia, regenere los locks deliberadamente con `dotnet restore
+VisualNotes.sln --force-evaluate` y revise el diff antes de integrarlo.
+
+El check agregado **Quality / Required quality gate** debe configurarse como requerido
+en el ruleset de `main`, junto con al menos una aprobación y la invalidación de
+aprobaciones cuando aparezcan commits nuevos. Active también la exigencia de que la
+rama esté actualizada y bloquee el merge si quedan conversaciones sin resolver. Esta
+protección se configura en *Settings → Rules → Rulesets* porque los workflows no pueden
+otorgarse a sí mismos permisos administrativos. Los administradores no deben omitir el
+ruleset. Los jobs lentos de mutaciones y benchmarks se ejecutan semanalmente y bajo
+demanda, por lo que conservan señal histórica sin aumentar el tiempo de cada cambio.
