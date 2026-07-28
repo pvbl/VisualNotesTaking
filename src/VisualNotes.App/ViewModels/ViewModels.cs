@@ -38,7 +38,7 @@ public sealed class MainViewModel : ViewModelBase
         _currentViewModel = Sessions;
         NavigateCommand = new RelayCommand(page => CurrentViewModel = page switch
         {
-            "Captures" => new CapturesViewModel(), "Instructions" => new InstructionsViewModel(),
+            "Captures" => new CapturesViewModel(ActiveSession?.Screenshots), "Instructions" => new InstructionsViewModel(),
             "Document" => new DocumentViewModel(), "Settings" => _settings ?? new SettingsViewModel(), _ => Sessions
         });
         TogglePauseCommand = new RelayCommand(async _ =>
@@ -73,6 +73,13 @@ public sealed class MainViewModel : ViewModelBase
         await Sessions.LoadAsync();
         var restored = await _coordinator.RestoreLastOpenAsync();
         if (restored is not null) Activate(restored);
+    }
+
+    public void CaptureAdded(Screenshot capture)
+    {
+        if (ActiveSession is not null && ActiveSession.Screenshots.All(item => item.Id != capture.Id))
+            ActiveSession.Screenshots.Add(capture);
+        if (CurrentViewModel is CapturesViewModel captures) captures.AddCapture(capture);
     }
 
     private void Activate(NoteSession session) => ActiveSession = session;
@@ -179,6 +186,12 @@ public sealed class CapturesViewModel : ViewModelBase
         SelectedCaptures.Clear();
         foreach (var capture in selection) SelectedCaptures.Add(capture);
         SelectedCapture = SelectedCaptures.LastOrDefault();
+    }
+
+    public void AddCapture(Screenshot capture)
+    {
+        _library.Add(capture);
+        Refresh();
     }
 
     private IReadOnlyCollection<Guid> SelectedIds() => Selected().Select(capture => capture.Id).ToArray();

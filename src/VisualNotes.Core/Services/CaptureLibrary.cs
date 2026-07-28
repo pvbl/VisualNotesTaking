@@ -26,6 +26,13 @@ public sealed class CaptureLibrary
     public IReadOnlyList<Screenshot> Captures => _captures;
     public bool CanUndo => _undo.Count > 0;
 
+    public void Add(Screenshot capture)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        _captures.Add(capture);
+        _captures.Sort((left, right) => left.CapturedAt.CompareTo(right.CapturedAt));
+    }
+
     public IReadOnlyList<Screenshot> Query(CaptureFilter filter) => _captures
         .Where(capture => filter.SectionId is null || capture.SectionId == filter.SectionId)
         .Where(capture => filter.Status is null || capture.ProcessingStatus == filter.Status)
